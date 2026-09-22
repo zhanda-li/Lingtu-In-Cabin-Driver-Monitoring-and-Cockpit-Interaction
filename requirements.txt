@@ -1,0 +1,14 @@
+# 已装好的环境：conda env `dms`（Python 3.10，在 D:\Anaconda3\envs\dms）
+# 重建方式：
+#   conda create -n dms -y python=3.10
+#   D:\Anaconda3\envs\dms\python.exe -m pip install -r requirements.txt \
+#       -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+torch            # CPU 版即可（本机无 NVIDIA 显卡）
+numpy
+opencv-python
+mediapipe        # 骨骼提取
+scikit-learn     # 混淆矩阵、分类报告
+matplotlib
+pandas
+pyserial         # 串口控制 Arduino 灯带
