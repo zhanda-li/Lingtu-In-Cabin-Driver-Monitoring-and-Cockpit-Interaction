@@ -1,0 +1,54 @@
+片段 30 个   输出 D:\sdk_env_v1.12.1\dms_project\runs\fuse_replay
+
+normal/normal_00     帧  167  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+normal/normal_01     帧  147  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+normal/normal_02     帧   75  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+normal/normal_03     帧   81  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+normal/normal_04     帧   78  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+glance/glance_00     帧   83  闸门开   0.0%  L1max 1  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  
+glance/glance_01     帧   84  闸门开   0.0%  L1max 1  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  
+glance/glance_02     帧   86  闸门开   0.0%  L1max 1  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  
+glance/glance_03     帧   84  闸门开   0.0%  L1max 1  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  
+glance/glance_04     帧  119  闸门开   0.0%  L1max 1  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  
+phone/phone_00      帧   67  闸门开   0.0%  L1max 2  L2max 0  Lfused 2  支路二投票   0 帧  P出数   0 帧  
+phone/phone_01      帧  108  闸门开   0.0%  L1max 2  L2max 0  Lfused 2  支路二投票   0 帧  P出数   0 帧  
+phone/phone_02      帧   57  闸门开   0.0%  L1max 2  L2max 0  Lfused 2  支路二投票   0 帧  P出数   0 帧  
+phone/phone_03      帧   52  闸门开   0.0%  L1max 2  L2max 0  Lfused 2  支路二投票   0 帧  P出数   0 帧  
+phone/phone_04      帧  111  闸门开   0.0%  L1max 2  L2max 0  Lfused 2  支路二投票   0 帧  P出数   0 帧  
+fatigue/fatigue_00    帧  127  闸门开   0.0%  L1max 3  L2max 0  Lfused 3  支路二投票   0 帧  P出数   0 帧  
+fatigue/fatigue_01    帧   99  闸门开   0.0%  L1max 3  L2max 0  Lfused 3  支路二投票   0 帧  P出数   0 帧  
+fatigue/fatigue_02    帧  113  闸门开   0.0%  L1max 3  L2max 0  Lfused 3  支路二投票   0 帧  P出数   0 帧  
+fatigue/fatigue_03    帧  119  闸门开   0.0%  L1max 3  L2max 0  Lfused 3  支路二投票   0 帧  P出数   0 帧  
+fatigue/fatigue_04    帧  109  闸门开   0.0%  L1max 3  L2max 0  Lfused 3  支路二投票   0 帧  P出数   0 帧  
+yawn_open/yawn_open_00  帧   91  闸门开 100.0%  L1max 0  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  哈欠抬级 55 帧 (3.0s)
+yawn_open/yawn_open_01  帧   71  闸门开 100.0%  L1max 0  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  哈欠抬级 17 帧 (2.3s)
+yawn_open/yawn_open_02  帧   96  闸门开 100.0%  L1max 0  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  哈欠抬级 76 帧 (4.3s)
+yawn_open/yawn_open_03  帧   99  闸门开 100.0%  L1max 0  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  哈欠抬级 42 帧 (5.5s)
+yawn_open/yawn_open_04  帧   80  闸门开 100.0%  L1max 0  L2max 0  Lfused 1  支路二投票   0 帧  P出数   0 帧  哈欠抬级 57 帧 (3.3s)
+talking/talking_00    帧   77  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+talking/talking_01    帧   89  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+talking/talking_02    帧   81  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+talking/talking_03    帧  113  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+talking/talking_04    帧   95  闸门开 100.0%  L1max 0  L2max 0  Lfused 0  支路二投票   0 帧  P出数   0 帧  
+
+==========================================================================
+【对账】
+  0. 闸门开过吗：15/30 个片段开过，累计 1440/2858 帧（50.4%）
+     ✅ 闸门能开，支路二确实接到了帧。
+     （支路二出过数的帧：0 帧 / 0 个片段）
+     ⚠️ **支路二在这些片段上一次都没出数** —— 片段比 HIST_SEC=27 s 短，
+        缓冲永远不满。所以下面的检查 2/3 是**结构性通过**，不是验证；
+        支路二只能靠真人不间断跑 27 s 以上来验（L4）。
+        唯一在短片段上真的跑起来的是哈欠**规则**（只要 2.5 s 缓冲）。
+  1. fatigue 片段到 L3 的：5/5   ✅
+     支路二在这些片段上单独投过票的帧数：0（哈欠规则另抬 0 帧）（应远小于总数；疲劳片段的头也在动，闸门多半是关的）
+  2. glance 闸门全程关闭（0.0%）→ l2 恒 0 是**结构性的**，这条不构成支路二的验证
+  2. phone  闸门全程关闭（0.0%）→ l2 恒 0 是**结构性的**，这条不构成支路二的验证
+  3. normal 平均闸门开 100.0%   支路二投票 0 帧   l2max>0 的片段 0/5   ⚠️ 支路二未出数 —— **结构性通过，不算验证**
+  4. yawn_open 触发哈欠：5/5   ✅
+     talking   误触发：0/5   ✅
+==========================================================================
+🟡 无未过项，但**支路二本批一次没跑**（片段短于 HIST_SEC）。
+   真被验到的：支路一的级别轨迹、闸门开合、哈欠规则端到端、
+   以及「支路二没有被喂到帧」这件事本身。
+   支路二本身仍然只能靠 L4 真人会话（不间断 27 s 以上）。

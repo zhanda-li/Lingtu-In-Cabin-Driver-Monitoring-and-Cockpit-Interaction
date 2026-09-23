@@ -105,6 +105,28 @@ def draw_hud(bgr, lines):
         y += 28
 
 
+# ---------------------------------------------------------------- 可录目标
+# 除了四个模型类别，还要补录几类**不是模型类别**的素材（用途见
+# docs/技术方案.md 的采集协议）。它们只落在 data/raw/<名字>/ 下，
+# **不进 C.CLASSES** —— build_dataset.py 和 extract_pose.py 都是按
+# C.CLASSES 枚举的，所以读不到它们，不会污染训练集和数据集划分。
+#
+#   yawn             打哈欠，**按真实习惯捂着嘴打**。真实开车时人就是捂嘴的，
+#                    录不捂嘴的哈欠 = 又是"演的点头"重演，到车上必然失效。
+#   yawn_open        不捂嘴的哈欠，**纯对照**。用途只有一个：万一 yawn 那组
+#                    量出来 jawOpen 塌了，好区分是"手挡掉了信号"还是
+#                    "MediaPipe 根本估不出哈欠"。没有它，失败结论是读不出来的。
+#   talking          说话的硬负例。录哈欠就**必须**录说话，否则哈欠检测器
+#                    会在驾驶员每次说话时报警。
+#   long_closure     长闭眼事件。反例用已有的 normal 片段（正常眨眼）。
+#
+# 顺序只往后追加：前 7 个键的编号别动，用户可能已经按老编号录过了。
+REC_EXTRA = ["yawn", "talking", "long_closure", "yawn_open"]
+REC_TARGETS = list(C.CLASSES) + REC_EXTRA
+# 数字键 1..N 直接映射到 REC_TARGETS 的下标
+KEY2IDX = {ord(str(i + 1)): i for i in range(len(REC_TARGETS))}
+
+
 def next_path(cls):
     """给这一类的下一段起名，挑最小的没被占用的编号。"""
     d = C.DATA_RAW / cls
@@ -260,9 +282,12 @@ def clip_problems(rep, cls, min_seconds):
         out.append(f"头面部置信度只有 {rep['vis_head']:.2f}——四类动作全靠头部姿态，"
                    f"建议重录")
 
-    if cls == "phone" and rep["vis_hand"] < 0.5:
-        out.append(f"手部置信度只有 {rep['vis_hand']:.2f}——phone 类靠举手机的动作，"
-                   f"手必须进画面")
+    # 这里**故意不检查手部**。原先有一条 `cls == "phone" and vis_hand < 0.5`
+    # 的告警，理由是"phone 类靠举手机的动作"。实测（106 段全部用 pose CSV 量过）：
+    # 手部可见度中位 0.097、最大 0.365，**26 段 phone 里 0 段达到 0.5** ——
+    # 也就是说每一段 phone 都会弹这条告警，而 phone 类靠的是低头俯仰（手本来
+    # 就在取景之外），模型照样全部识别对。一条必然误报的告警只会让人学会
+    # 忽略告警，所以删掉。真要捡起手部线索，前提是改取景重录全部素材。
 
     if rep["native_fps"] < C.TARGET_FPS * 0.6:
         out.append(f"摄像头实际只有 {rep['native_fps']:.1f} fps（低于目标 "
@@ -401,7 +426,9 @@ def selftest():
                                       det_rate=0.0), "normal", ["几乎全黑"]),
         ("双肩丢了（归一化基准）",   mk(vis_shoulder=0.30), "normal", ["双肩置信度"]),
         ("头面部不稳",              mk(vis_head=0.20), "normal", ["头面部置信度"]),
-        ("phone 手没进画面",        mk(vis_hand=0.10), "phone", ["手部置信度"]),
+        # 手永远在取景之外（实测 0/26 段 phone 手部可见度 >= 0.5），
+        # 所以 phone 不能因为"看不见手"就告警 —— 见 clip_problems 里的说明
+        ("phone 手没进画面也别告警", mk(vis_hand=0.10), "phone", []),
         ("时长不足",                mk(wall_seconds=4.0), "normal", ["切不出足够窗口"]),
         ("摄像头被拖慢",            mk(native_fps=5.0), "normal", ["摄像头实际只有"]),
     ]
@@ -492,8 +519,11 @@ def main():
         display = False
         print(f"[自检] 录 {args.test_frames} 帧到 {p}")
 
-    print("\n按键： 1/2/3/4 切类别   空格 开始/结束录制   s 开关骨骼   q 退出")
-    print("当前类别：" + "  ".join(f"{i+1}={c}" for i, c in enumerate(C.CLASSES)) + "\n")
+    print(f"\n按键： 1-{len(REC_TARGETS)} 切类别   空格 开始/结束录制   "
+          f"s 开关骨骼   q 退出")
+    print("当前类别：" + "  ".join(f"{i+1}={c}"
+                                 for i, c in enumerate(REC_TARGETS)))
+    print(f"  （其中 {'/'.join(REC_EXTRA)} 是补录素材，不进训练集）\n")
 
     while True:
         ok, frame = cap.read()
@@ -517,7 +547,7 @@ def main():
         lm = pose.detect(frame, ts_ms)
 
         if state == "countdown" and now >= countdown_end:
-            cls = C.CLASSES[cls_idx]
+            cls = REC_TARGETS[cls_idx]
             path = next_path(cls)
             rec = ClipRecorder(path, (real_w, real_h), C.TARGET_FPS)
             state = "recording"
@@ -546,7 +576,7 @@ def main():
             hd = rec.vis_head if rec else 1.0
             lum = rec.lum_mean if rec else float(frame.mean())
             lines += [
-                (f"class: {C.CLASSES[cls_idx]}  (press 1-4)", WHITE),
+                (f"class: {REC_TARGETS[cls_idx]}  (press 1-{len(REC_TARGETS)})", WHITE),
                 (f"cam {native_fps:4.1f} fps -> out {C.TARGET_FPS} fps"
                  f"   bright {lum:3.0f}",
                  GREEN if native_fps >= C.TARGET_FPS * 0.6 and lum >= LUM_DARK else YELLOW),
@@ -575,14 +605,14 @@ def main():
 
         if key in (ord("q"), 27):
             break
-        elif key in (ord("1"), ord("2"), ord("3"), ord("4")):
-            cls_idx = key - ord("1")
-            print(f"当前类别 -> {C.CLASSES[cls_idx]}")
+        elif key in KEY2IDX:
+            cls_idx = KEY2IDX[key]
+            print(f"当前类别 -> {REC_TARGETS[cls_idx]}")
         elif key == ord("s"):
             show_skel = not show_skel
         elif key == ord(" "):
             if state == "recording":
-                cls = C.CLASSES[cls_idx]
+                cls = REC_TARGETS[cls_idx]
                 rep = rec.finish()
                 print_camera_report(rep, cls, args.min_seconds)
                 rec = None
@@ -593,7 +623,7 @@ def main():
             elif state == "idle":
                 countdown_end = time.perf_counter() + 3.0
                 state = "countdown"
-                print(f"准备录 {C.CLASSES[cls_idx]}，3 秒后开始...")
+                print(f"准备录 {REC_TARGETS[cls_idx]}，3 秒后开始...")
 
     tick("喂帧主循环")
 
@@ -607,7 +637,7 @@ def main():
                   f"亮度 {rep['lum_mean']:.0f}/255，检测率 {rep['det_rate']:.1f}%")
         else:
             print("[warn] 退出时还在录制，已保存")
-            print_camera_report(rep, C.CLASSES[cls_idx], args.min_seconds)
+            print_camera_report(rep, REC_TARGETS[cls_idx], args.min_seconds)
     cap.release()
     if display:
         cv2.destroyAllWindows()
@@ -629,10 +659,13 @@ def main():
         tick("读回校验")
     else:
         print("\n各目录已录段数：")
-        for cls in C.CLASSES:
+        for cls in REC_TARGETS:
             n = len(list((C.DATA_RAW / cls).glob("*.mp4")))
-            mark = "OK" if n >= 8 else f"还差 {8 - n} 段"
-            print(f"  {cls:<8} {n:>2} 段   {mark}")
+            if cls in REC_EXTRA:
+                mark = "补录素材（不进训练集）"
+            else:
+                mark = "OK" if n >= 8 else f"还差 {8 - n} 段"
+            print(f"  {cls:<14} {n:>2} 段   {mark}")
         print("\n录够了就跑： python tools/extract_pose.py")
 
     # 必须是 main() 的最后一行，不能放到 if __name__ 里。

@@ -112,16 +112,70 @@ def add_table(doc, rows):
 
 
 def split_row(line):
-    """| a | b | -> ['a', 'b']"""
-    return [c.strip() for c in line.strip().strip("|").split("|")]
+    """| a | b | -> ['a', 'b']
+
+    ⚠️ 单元格里的 `\\|` 是**转义**，不是分隔符（本项目用它写 `P(phone\\|fatigue)`）。
+    按所有 `|` 切的话表头会多出两列、文字被切碎 —— 实测过，Word 里是一张
+    10 列的空表。
+    """
+    inner = line.strip().strip("|")
+    parts = re.split(r"(?<!\\)\|", inner)
+    return [c.replace("\\|", "|").strip() for c in parts]
 
 
 def is_sep_row(line):
     return bool(re.fullmatch(r"\|[\s:\-|]+\|", line.strip()))
 
 
+def join_open_bold(lines):
+    """把跨行的 `**粗体**` 先接成一行，再交给逐行解析。
+
+    本项目的 .md 按 ~40 列手工折行，所以「**……\\n……**」很常见。
+    逐行调 INLINE 的话，两个半截 `**` 会**原样打进 Word**（实测 10 段中招）。
+    Markdown 里连续的正文行本来就属于同一段，接起来是对的。
+
+    遇到结构性行（空行、表格、标题、代码围栏、顶格写的列表项）就放弃合并 ——
+    那种地方出现未闭合的 `**` 是源文件本身写坏了，硬接会把后面几行吞掉。
+    ⚠️ **缩进**的续行不算结构性行：Markdown 里它本来就是上一行的一部分
+    （列表项的 lazy continuation），所以「**……\\n    ……**」要接起来。
+    """
+    out, buf = [], ""
+    for ln in lines:
+        s = ln.strip()
+        indented = ln[:1].isspace()
+        structural = (not s or s.startswith(("|", "#", ">", "```"))
+                      or (not indented and re.match(r"^([-*]|\d+\.)\s", s)))
+        if structural:
+            if buf:
+                out.append(buf)      # 未闭合，原样吐出
+                buf = ""
+            # 结构性行**自己**就可能开着粗体（列表项折行最常见）——
+            # 这时它同样要进缓冲区，否则续行没地方接。表格/标题/引用/围栏不接：
+            # 那些行一旦被并长，后面的解析会认不出它的结构。
+            if ln.count("**") % 2 and not s.startswith(("|", "#", ">", "```")):
+                buf = ln
+            else:
+                out.append(ln)
+            continue
+        if buf:
+            # 续行的缩进是给编辑器看的对齐，并进段落后要去掉；
+            # 中英之间补一个空格，免得把英文单词粘成一个。
+            cont = ln.lstrip()
+            glued = (buf[-1:].isascii() and buf[-1:].isalnum()
+                     and cont[:1].isascii() and cont[:1].isalnum())
+            buf = buf + (" " if glued else "") + cont
+        else:
+            buf = ln
+        if buf.count("**") % 2 == 0:
+            out.append(buf)
+            buf = ""
+    if buf:
+        out.append(buf)
+    return out
+
+
 def convert(md_text, doc):
-    lines = md_text.splitlines()
+    lines = join_open_bold(md_text.splitlines())
     i = 0
     while i < len(lines):
         line = lines[i]

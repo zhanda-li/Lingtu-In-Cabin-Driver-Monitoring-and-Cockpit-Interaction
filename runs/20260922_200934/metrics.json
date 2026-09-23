@@ -1,0 +1,63 @@
+{
+  "data": "D:\\sdk_env_v1.12.1\\dms_project\\data\\dataset\\dataset.npz",
+  "out_dir": "D:\\sdk_env_v1.12.1\\dms_project\\runs\\20260922_200934",
+  "n_params": 161988,
+  "epochs_run": 60,
+  "best_epoch": 51,
+  "best_val_loss": 0.20549926597080873,
+  "best_val_acc": 1.0,
+  "test_loss": 0.760843732140281,
+  "test_acc": 0.8011363636363636,
+  "val_is_test_fallback": false,
+  "confusion_matrix": [
+    [
+      37,
+      0,
+      0,
+      3
+    ],
+    [
+      15,
+      28,
+      0,
+      0
+    ],
+    [
+      0,
+      12,
+      38,
+      0
+    ],
+    [
+      0,
+      0,
+      5,
+      38
+    ]
+  ],
+  "classes": [
+    "normal",
+    "glance",
+    "phone",
+    "fatigue"
+  ],
+  "classification_report": "              precision    recall  f1-score   support\n\n      normal     0.7115    0.9250    0.8043        40\n      glance     0.7000    0.6512    0.6747        43\n       phone     0.8837    0.7600    0.8172        50\n     fatigue     0.9268    0.8837    0.9048        43\n\n    accuracy                         0.8011       176\n   macro avg     0.8055    0.8050    0.8003       176\nweighted avg     0.8102    0.8011    0.8009       176\n",
+  "train_time_s": 200.49,
+  "args": {
+    "data": "D:\\sdk_env_v1.12.1\\dms_project\\data\\dataset\\dataset.npz",
+    "out": null,
+    "epochs": 60,
+    "batch_size": 64,
+    "lr": 0.0003,
+    "weight_decay": 0.0001,
+    "d_model": 64,
+    "n_head": 4,
+    "n_layer": 3,
+    "dropout": 0.1,
+    "label_smooth": 0.05,
+    "patience": 15,
+    "device": "cpu",
+    "seed": 42,
+    "quiet": false
+  }
+}

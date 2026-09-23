@@ -1,0 +1,18 @@
+D:\sdk_env_v1.12.1\dms_project\src\model.py:38: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.norm_first was True
+  self.encoder = nn.TransformerEncoder(
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+WARNING: Logging before InitGoogle() is written to STDERR
+W0000 00:00:1790135974.277232   40436 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1790135974.292819   39280 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1790135974.298734   40832 face_landmarker_graph.cc:180] Sets FaceBlendshapesGraph acceleration to xnnpack by default.
+W0000 00:00:1790135974.305083   10628 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1790135974.314458   28404 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1790135974.374385   32312 landmark_projection_calculator.cc:81] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+支路一 best.pt  参数 161,988  窗口 45 帧 = 3.0 s
+
+性能自检  fatigue_02.mp4  200 帧
+  pose     中位   18.9 ms   p95   37.8 ms   n=200
+  face     中位   12.2 ms   p95   18.6 ms   n=200
+  infer    中位    2.2 ms   p95    2.9 ms   n=156
+  合计       中位   31.0 ms  ->   32.2 FPS（推理另算 2.2 ms，不在同一帧里阻塞）
+  ✅ 通过（判据 <= 60 ms = 16.7 FPS）
