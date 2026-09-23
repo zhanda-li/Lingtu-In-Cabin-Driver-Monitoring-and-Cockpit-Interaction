@@ -14,6 +14,27 @@ live*.csv
 logs/
 *.log
 
+# ---------------- 支路二的回归 / 回放中间产物 ----------------
+# 逐段明细：fuse_regress/ 是 121 段 × 双臂的逐帧对比 CSV，fuse_replay/ 是 30 段的
+# 逐帧概率。都是"重跑一遍就有"的东西，结论已经收在 runs/*.txt 里，明细不进仓库。
+runs/fuse_regress/
+runs/fuse_replay/
+runs/*.prefuse-bak.txt
+runs/_*.txt
+runs/_*.csv
+
+# 临时决策日志。live_fuse.bat 正常写的是 runs\sessionN.csv，这两个名字是早期的散落文件
+fuse.csv
+_live_*.csv
+_*.py
+
+# ---------------- 草稿目录 ----------------
+# _scratch/ 是开发与取证的草稿场。**脚本要进仓库**——src/face.py 的注释和
+# live_face.bat 都按路径引用它们；其余全是本人的视频/面部中间产物，跟 data/ 同理。
+_scratch/*
+!_scratch/*.py
+!_scratch/_face_live_20260922_235417.csv
+
 # ---------------- Python ----------------
 __pycache__/
 *.py[cod]
