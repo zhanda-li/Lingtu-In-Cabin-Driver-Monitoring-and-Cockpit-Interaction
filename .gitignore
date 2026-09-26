@@ -36,11 +36,26 @@ _scratch/*
 !_scratch/*.py
 !_scratch/_face_live_20260922_235417.csv
 # 这两份是**被正文按行号点名的证据记录**，不是本人的面部中间产物：
-#   README.md:300 引 `_scratch/_replay3.txt` 当"合并三类后 79/79"的原始记录；
+#   README.md §6.6 引 `_scratch/_replay3.txt` 当"合并三类后 79/79"的原始记录
+#   （原来这儿写的是行号 `README.md:300`，2026-09-26 正文重写后行号全变了，
+#     改成节号 —— 节号只在改结构时才动，行号每改一个字都会烂）；
 #   tools/calib_yawn.py 引 `_scratch/_ear.txt:178` 当"MAR 分不开哈欠"那条的反证。
 # 指针进仓库而证据不进 = 死链，所以放行（都是十几 KB 的纯文本）。
 !_scratch/_ear.txt
 !_scratch/_replay3.txt
+# 2026-09-26 补：正文 §8.9 按路径点名了一张**对照图**，它同样是"证据"而不是草稿，
+# 但它躺在**子目录**里，所以上面那两条能用的写法在这儿**不生效**：
+# `_scratch/*` 把 `_sprite_probe/` 这个**目录本身**排除了，git 不下探，
+# 单写一行 `!_scratch/_sprite_probe/qa16_checker.png` 是**不会命中**的
+# （negation 管不了"父目录已被排除"的文件）。必须三步：
+#   1) 放行目录本身（让 git 肯下探）  2) 把它下面重新排掉  3) 单独放行这一张。
+# 为什么非得进仓库：它证明的是「11.png 动态动作那 6 格抠不出来」（白底白身 →
+# 下半身是个洞），而别人 clone 下来**没法自己重生成** —— 生成脚本 `_qa16_chk.py`
+# 依赖源图 `ui/图片效果/`，那个目录是排除的。证据不能只有指针没有实体。
+# 374 KB 一张，其余 65 MB 仍在排除（只放行被点名的那一张，别按目录整块放行）。
+!_scratch/_sprite_probe/
+_scratch/_sprite_probe/*
+!_scratch/_sprite_probe/qa16_checker.png
 
 # ---------------- 界面 ----------------
 # ui/config.json 里放 DeepSeek 的 API key，**绝对不能进仓库**。
