@@ -68,9 +68,9 @@ FACE_TASK = C.MODELS_DIR / "face_landmarker.task"
 # `points` 就是原来本地的 `_pts`（同名同义，换了个名字）。
 sys.path.insert(0, str(ROOT / "src"))
 from face import (BLINK_THR, FEATURE_NAMES, NEED, ROLL_WIN,  # noqa: E402
-                  YAWN_MIN, YAWN_THR, FaceBranch, clip_features, ear_of,
+                  YAWN_MIN, YAWN_THR, YAWN_WIN, FaceBranch, clip_features, ear_of,
                   euler_of, feature_vector, mar_of, norm_by_time, points,
-                  runs_sec)
+                  runs_sec, yawn_plateau, yawn_seconds)
 # 注：NOD_DROP / NOD_MIN 不再需要 import —— 摇头次数现在由 face._features
 # 在里面算，探针只从窗口统计量里读。探针里已经不剩任何"特征口径"的常量了，
 # 这正是这次重构要达到的状态。
@@ -396,8 +396,15 @@ def analyze(path_csv, path_png, win_thr="time"):
     ax[1].plot(t, pitch, lw=0.8, color="green")
     ax[1].set_ylabel("pitch (deg)")
     ax[1].set_title("HEAD POSE - the control variable", fontsize=9)
-    ax[2].plot(t, a["mar"][ok], lw=0.8, color="purple")
-    ax[2].axhline(YAWN_THR, color="red", ls="--", lw=1, label=f"yawn {YAWN_THR}")
+    #    判据挂在**滚动均值**上（2026-09-26 起），所以这条阈值线必须配着那条曲线看：
+    #    画在单帧 MAR 上的话，真人一眼看到自己的 MAR 一直在 0.55 以下，会以为
+    #    哈欠判据坏了 —— 这正是本项目最忌讳的那种"图在撒谎"。
+    _yp = yawn_plateau(t, a["mar"])
+    ax[2].plot(t, a["mar"][ok], lw=0.8, color="purple", alpha=0.45,
+               label="MAR (单帧)")
+    ax[2].plot(t, _yp, lw=1.2, color="purple", label=f"滚动均值 {YAWN_WIN}s")
+    ax[2].axhline(YAWN_THR, color="red", ls="--", lw=1,
+                  label=f"yawn 判据 {YAWN_THR}（比这条线）")
     ax[2].set_ylabel("MAR")
     ax[2].legend(loc="upper right", fontsize=8)
     ax[2].set_xlabel("time (s)")
@@ -571,10 +578,14 @@ def main():
         d100 = st["d_pitch"] if st else 0.0
 
         # 哈欠：MAR 持续张开（按真实秒数，不按帧数）
+        # ⚠️ 2026-09-26：这里原来是**抄了一遍**单帧判据（`runs_sec(... v > YAWN_THR)`）。
+        #   判据换成「1.5 s 滚动均值」之后，抄本就成了第二个口径 —— 屏上画的曲线
+        #   （下面 ax[2] 的 axhline 还是单帧口径）跟这一行报的数会是两回事。
+        #   所以这里改成直接调 `face.yawn_seconds`，口径只留一份在 src/face.py。
         yawn_s = 0.0
         if fb.span >= YAWN_MIN_SPAN:
             bt, _, bm, _ = fb.arrays()
-            yawn_s = max(runs_sec(bt, bm, lambda v: v > YAWN_THR) or [0.0])
+            yawn_s = yawn_seconds(bt, bm)
 
         # LR 概率：只在 full() 时喂 —— 窗口整个落在缓冲里，基线才没被截断。
         # 早喂的代价不是报错，是概率整体偏低，然后你会以为模型不行。

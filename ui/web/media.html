@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>多媒体 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* =========================================================================
+   多媒体 —— 本页唯一的页面级样式（★ 2026-09-25 第八次改版：换成用户自己的歌）
+   -------------------------------------------------------------------------
+   用户的话：「D:\CloudMusic 这里边有我的音乐 放到多媒体里边 把那些常用应用栏目
+   去掉 推荐歌单栏目上移 布局一下 你那个位置都不对」；
+   2026-09-25 又补了两句：「可以下载30首到本地 然后其他读取我那个链接」（= 那 30 首
+   拷进 `ui/media/`，其余仍读 `D:\CloudMusic`）、
+   「音效设置那一栏去掉 其他栏目等比例放大填充好那个页面」。
+
+   **这一页什么真、什么未接入**：
+
+     真 · 正在播放 / 波形 / 进度 / 音量 / 播放列表
+                    —— 曲库两个来源的真 mp3（内置 30 首 + `D:\CloudMusic` 的 125 首，
+                       见 `ui/server.py` 的「曲库（内置 + 本机）」那节）。波形是真解码
+                       出来的峰值，时长是文件真给的。
+     真 · 小瑞那句话 —— 按当前这一首现算的
+     未接入 · 推荐歌单后三张 —— 在线歌单分类。**本项目没有接任何在线曲库**，
+                       那三张挂着「未接入」，点了会说清楚。
+     未接入 · 外部媒体入口 —— 蓝牙 / USB / 收音机那三路。**这一版整个删了**
+                       （用户点名「把那些常用应用栏目去掉」）。删掉是如实的：
+                       这个项目里没有蓝牙协议栈、没有 USB 挂载、没有 FM 调谐器，
+                       摆六个点不动的格子只会让人以为是自己没点对。
+     ❌ 已删 · 音效设置 —— **2026-09-25 整块删了**（用户点名「音效设置那一栏去掉」）。
+                       删掉的是三段真的 WebAudio BiquadFilter（低架/峰/高架 + 四组
+                       预设），不是摆样子的 —— 所以这里要记一笔，免得后来人以为
+                       它从来就没有过、或者在别处又找回来。
+                       ⚠️ 连带删掉的还有"音频非得走那张 WebAudio 图"这条路：
+                          `createMediaElementSource` 一旦调用，`<audio>` 就只从那张
+                          图出声，图要是 suspended 就是"进度条在走但没声音"。现在
+                          声音直接从元素出来，那一整类故障没有了。
+                       ⚠️ **列表每行右端那三根会跳的小柱子不叫音效设置**（它是
+                          `.tracks li .eq`，表示"这一首正在放"），别跟着一起删。
+
+   ⚠️ 版式是**方案 B**（用户选的），音效删掉之后是三行：
+      正在播放整行 → 推荐歌单整行（紧跟其后）→ 我的音乐（左宽）+ 小瑞（右窄）。
+   ⚠️ 裸类名（`.foo{}` 这种全站共享的）**不要重名** —— `.rec` / `.app` /
+      `.nt` / `.ring` 都已经有别处在用了，所以这一页的外层
+      一律带 `mp-` 前缀。见 `_scratch/_audit_class.py`。
+      （`.player` 原本也在这张名单里，2026-09-25 跟着 chat.html 那条示意播放条
+        一起删了，名单里划掉。）
+   ========================================================================= */
+
+/* ------------------------------------------------------------- 主栅格 */
+/* 两列：上面「正在播放」整行跨两列，下面「我的音乐」占左宽栏、小瑞占右窄栏。
+   ⚠️ **纵向只有 654px 可用，而且这是量出来的**（`_scratch/_probe_geom.py`，
+      2026-09-25）：`--window-size=1672,940` 起出来的 Edge，`innerHeight` 只有
+      **843**（不是 940 —— 窗口那 97px 是浏览器自己的），减掉顶栏 87、底栏 70、
+      内外边距 = `.sub-body` **654**。
+      旧版那句"~723px 可用"就是这么来的：**按 940 算的账**，而实际拿不到 ——
+      于是那一版整页需要 **1368px**，要滚两屏才看得见。
+   ⚠️ 所以下面每个尺寸都是**倒排**出来的。**2026-09-24 删掉「推荐歌单」整行之后
+      重排过一次**，这份账是那一次量出来的（`_scratch/_probe_geom.py` 的输出）：
+        标题行 31 + 缝 13.6 → 网格可用 **610**（145 ~ 755）
+        正在播放 **249** + 缝 8.7 + 我的音乐那行 **352** = 610
+        （小瑞跟我的音乐同一行，取高的那个；`.mp-xq` 靠 `align-self:stretch`
+          把卡片盒撑到 352，不然右边会空出一截）
+        最后一张卡的底边贴到可视底边 755 —— `scrollHeight` 就等于
+        `clientHeight`，即"不用滚"。
+      删歌单之前那三行是 148 / 189 / 209。拿掉 189 那一行 + 一个缝 8.7，
+      再加上原本底下就空着的 46（上一次删说明文字留下的），一共 **243.7px**
+      按**等比例**（×1.684）分给剩下两行 ——
+      用户原话「我的音乐部分 和小瑞音乐推荐模块等比例放大 使画面别那么空」。
+      同一套做法在 2026-09-25 删音效那一行时也用过（×1.345），是用户认过的。
+   ⚠️ **加东西之前先量**（`_scratch/_probe_geom.py` 一跑就出新版的数），
+      别再按 940 去算 —— 那就是旧版塌掉的原因。
+      1rem 在这台机器上是 **14.53px**（`style.css` 的
+      `html{font-size:clamp(11px, min(100vh/58, 100vw/112), 22px)}`，实测视口
+      1638×843），倒排尺寸时要换算。
+      高度是怎么定的（2026-09-24 起）：**只有「正在播放」是死数** —— 看
+      `.now-row .art`（14rem）。**「我的音乐」那一行不再是死数**，它吃满
+      `.sub-body` 的剩余高度、里面的列表再 `flex:1` 跟着长（见 `.mp-fill` 和
+      `.mp-lib ul.tracks` 两段）。所以窗口比设计比例高的时候，多出来的高度
+      落在列表上，**不会在卡片底下留一块空白** —— 那一块以前正好顶在
+      「小瑞 正在播放《…》」那条栏上方，用户看到的就是它。
+      上面那份 610 / 249 / 352 的账仍然成立，它说的是**设计尺寸下**的分配；
+      窗口更高时第 2 行在这个基础上继续长。 */
+.mp-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);
+  /* ⚠️ 第 1 行「正在播放」按自己的封面高（auto），**第 2 行吃掉剩下的全部高度**。
+     改之前两行都是 auto、`align-items:start`，高度全由 rem 定死 ——
+     窗口比设计比例高的时候多出来的高度就堆在卡片底下，于是「我的音乐 / 小瑞」
+     那一行被顶到页面最下面、上面留一长条空白。用户的话是
+     「**正好占满这个页面，不是小瑞和所有歌都去下边了**」。
+     ⚠️ 这里能写出 `1fr` 的前提是**它的高度是确定的** —— 靠的是上面
+        `.mp-fill` 那层（`.sub-body` 变成 grid、这一格被拉伸）。直接给一个
+        普通块写 `1fr` 行是**不解析**的，会退化成按内容撑（试过，见 `.mp-fill`）。 */
+  grid-template-rows:auto 1fr;
+  gap:.6rem; align-items:stretch;
+}
+
+/* ------------------------------------- 让卡片正好占满这一页（只在 media.html 上） */
+/* ⚠️ 为什么要这一层：`.sub-body` 的高度**跟着视口走**（视口高 − 顶栏 − 底栏 −
+   内外边距），而卡片的高度是**一堆 rem**，且
+   `1rem = clamp(11px, min(100vh/58, 100vw/112), 22px)` —— **取宽高里小的那个**。
+   窗口只要比设计比例（1672×940）**更高**，`100vh/58` 先到顶、`1rem` 反被宽度
+   （或 22px 那道上限）卡住不再长，卡片就此定死、`.sub-body` 还在长 ——
+   多出来的高度全落在卡片底下。实测（`_scratch/_probe_heights.py`）：
+     1672×1040 空 176px、1672×1180 空 316px、1440×900 空 156px；
+     1920×980 只空 4px —— 那一档 1rem 正好跟着宽度长上去了。
+   ⚠️ **做法只能是"把 `.sub-body` 变成 grid + 那一行 `1fr`"，不能是"给 `.mp-grid`
+      加 flex:1"** —— 两条都试过：
+        · `.mp-fill{display:flex}` + `.mp-grid{flex:1 1 auto}`：`.mp-grid` 的高度
+          是内容撑出来的，**不是确定高度**，里面那行 `1fr` 解析不出来 →
+          列表一口气长到 4693px、整页又能滚（实测 sub-body 内容 5167px）。
+        · 换成 `flex:1 1 0` 也一样。
+      改成一格被**拉伸**的 grid item，高度才是确定的，`1fr` 才真生效。
+   ⚠️ 只在本页生效：`mp-fill` 是 media.html 自己在 `<div class="sub-body">` 上加的
+      类。**不要把这个 display 写进全局的 `.sub-body`** —— 别的页也在用它。
+   ⚠️ 窗口**不够高**时这一套自动让位：这一格的 `1fr` 下限仍是内容高度，
+      挤不下就退回 `.sub-body` 自己滚（= 改之前的行为），不会盖住底栏。 */
+.mp-fill{ display:grid; grid-template-rows:auto 1fr; }
+.mp-fill > .mp-grid{ min-height:0; }
+/* ⚠️ 下面这两条是**高度预算**的一部分，不是审美：`.card-pad` 全站是 1.05rem，
+   这一页四行都要它，各收 0.33rem 就是每张卡省 10px。改回去之前先看上面那段账。 */
+.mp-grid .card-pad{ padding:.68rem .9rem; }
+.mp-grid .card-h{ margin-bottom:.38rem; }
+.mp-hero{ grid-column:1 / span 2; }
+
+/* ========================= 2026-09-25 第十二次改版 · 两张分区底图 =========
+   用户给了两张图、原话「换到对应地方」，文件名就是去处：
+     `多媒体部分正在播放部分背景图.png` -> 「正在播放」这张卡（`.mp-hero`）
+     `多媒体页我的音乐部分背景图.png`   -> 「我的音乐」这张卡（`.mp-lib`）
+   都由 `_scratch/_mk_bg.py` 的 `SRC_3` 出，**源图右下角那行「豆包AI生成」已经
+   在生成那一步裁掉**（裁的是画面最底下 6%，`center/cover` 下看不出来）。
+
+   ★ 做法是**底图 + 一层白纱**（分层背景），不是把照片直接铺上去，也不是
+     `::before` 浮层。理由是量出来的：
+       · 两张源图本身已经很浅（p05 亮度 167 / 192），但正文 `.meta b` 是
+         1.5rem 的深墨字，**零白纱**压在最暗处只有 3.44:1 —— 白纱 .30 把它
+         抬到 ~4.0:1，同时光带/音符还认得出是张照片。
+       · 用 `::before` 绝对定位就要给卡片里的子元素逐个补 `position`/`z-index`，
+         而这个文件顶上那段 `.art/.meta/.tags` 的教训正是"壳一换、规则全失配、
+         而且不报错"。分层背景**一个 DOM 节点都不碰**。
+   ⚠️ 这一条是**整条替换** `.card` 的 `background:var(--glass)` ——
+      卡片从此不再透出页面底图，这张照片就是它的底，这是想要的。
+   🔴 **选择器必须带 `html[data-theme="light"]`，光写 `.mp-hero` 是不生效的。**
+      第一版就是只写了 `.mp-hero{background:…}`，结果**整条被丢掉**：
+      真正管着卡片底色的是 `style.css` 里那条
+      `html[data-theme="light"] .card{ background:rgba(255,255,255,.80); … }`，
+      它的特指度是 (0,1,1)，压过 `.mp-hero` 的 (0,1,0) —— **和"谁写在后面"
+      一点关系都没有**，所以两处都写在 `<style>` 里也赢不了。
+      症状极难看出来：页面不报错、CSS 里明明有 `media_playing` 这个串、
+      `getComputedStyle(...).backgroundImage` 却老老实实回 `none`
+      （`_scratch/_shot_bgs3.py` 最后那一段"生效的底图"就是为这个写的）。
+      带上同一个前缀之后是 (0,2,1) > (0,1,1)，也不用 `!important`。
+   ⚠️ 两张**共用白纱 .30**，不各写一个值：不同值会让两张并排的卡看起来
+      "一张洗过一张没洗"，而它们本来就是同一次改版给的一对。
+   ⚠️ 换图/调白纱之后**必须重跑** `_scratch/_mk_bg.py` 的亮度那几行，别凭眼睛调。 */
+html[data-theme="light"] .mp-hero{
+  background:
+    linear-gradient(rgba(255,255,255,.30), rgba(255,255,255,.30)),
+    url("assets/media_playing.jpg") center/cover no-repeat;
+}
+html[data-theme="light"] .mp-lib{
+  background:
+    linear-gradient(rgba(255,255,255,.30), rgba(255,255,255,.30)),
+    url("assets/media_music.jpg") center/cover no-repeat;
+}
+/* ★ 2026-09-25 深夜追加第三张：用户给了 `多媒体页小瑞·音乐推荐部分背景.png`，
+   原话「把多媒体页小瑞·音乐推荐部部分背景.png换到对应地方」—— 就是这一页
+   右边那张「小瑞 · 音乐推荐」卡（`.mp-xq`，实测 488x352）。
+   文件名里那个「部部分」是用户打字重复了，磁盘上是
+   `多媒体页小瑞·音乐推荐部分背景.png`（**带一个 `·`**，不是下划线）。
+   ⚠️ 同 `.mp-hero` / `.mp-lib`：**必须带 `html[data-theme="light"]` 前缀**，
+      不然被 `html[data-theme="light"] .card` 那条 (0,1,1) 整条盖掉，
+      而症状是"CSS 里明明写了、computed 却是 none"（那一段教训写在上面）。
+   ⚠️ 白纱同样是 `.30`：这一页三张卡是**同一次改版给的一对半**，
+      有一张洗得浅一点，并排看就知道不对。
+      这张源图 p05=172 / 均值 220，白纱 .30 之后正文 ~4.0:1，
+      和另外两张是同一个数 —— 量法是 `_mk_bg.py` 生成后那几行亮度统计。 */
+html[data-theme="light"] .mp-xq{
+  background:
+    linear-gradient(rgba(255,255,255,.30), rgba(255,255,255,.30)),
+    url("assets/media_xq.jpg") center/cover no-repeat;
+}
+/* ⚠️ 2026-09-24：加了竖向 flex。网格第 2 行把这一格拉高之后，要让**里面的列表**
+   把多出来的高度接住 —— 不然卡片是变高了，列表还是原来那么长，卡片内部留一块
+   空白，看起来跟没改一样。 */
+.mp-lib { grid-column:1; display:flex; flex-direction:column; min-height:0; }
+/* ⚠️ `align-self:stretch` 跟栅格上的 `align-items:start` 是**反着**的，这里是
+   故意：小瑞那张卡的内容比左边「我的音乐」矮（253 vs ~200），不撑开的话
+   右边会空出一块、看起来像"卡片没加载完"。撑开之后内容靠 `justify-content`
+   分布（见 `.mp-xq` 那段），不是硬塞一个高出来的空盒子。 */
+.mp-xq  { grid-column:2; align-self:stretch; }
+
+/* ------------------------------------------- 页标题那一行（2026-09-25 改版） */
+/* 用户的话：「副标题文字偏淡，可以稍微提高字重；页面顶部导航文字有点挤，拉开间距」。
+   ⚠️ 「页面顶部导航」我读成**这一行**（返回箭头 + 页名 + 副题）—— 它就是这一页
+      顶部的导航行，而且用户是把它写在「标题区域」这一条里的。所以下面两条
+      都只动这一行，**没有动顶栏和左导航**（那两处是全站共用的，见 chrome.js）：
+        · 全站的 `.ptitle` 是 `gap:1rem`，这里加一条 `body .ptitle` 盖掉它 ——
+          多带一个 body 是**故意的**：`.ptitle` 在 pages.css 里是 (0,1,0)，
+          `body .ptitle` 是 (0,1,1)，不用 `!important` 也能赢，而且只影响本页
+          （`body` 是 media.html 自己的祖先）。**别把它挪进 pages.css** ——
+          那会顺手改掉另外 8 张子页的标题行，用户没要。
+        · 副题从 11.9px/400/--ink-3 抬到 12.5px/500/--ink-2（实测值）。
+          ⚠️ 只抬到 --ink-2 **不抬到 --ink**：--ink 是 h1「多媒体」那个色，
+            副题跟它同级就没主次了。字重也只到 500（不到 600）：它是"顺带一句"，
+            不是第二个标题。
+   ⚠️ 用 `::after` 画那个音符而不是塞一个 <svg>：它纯装饰，`aria-hidden`
+      的语义靠伪元素天然拿到，也不会被选中复制。 */
+body .ptitle{ gap:1.3rem; }
+.mp-lead{
+  font-size:.84rem; font-weight:500; color:var(--ink-2); letter-spacing:.02em;
+  padding-left:1.05rem; margin-left:.15rem;
+  border-left:1px solid var(--line);
+}
+.mp-lead::after{ content:' ♪'; color:var(--accent); }
+
+/* ⚠️ 下面这一组（`.art` / `.meta` / `.tags`）挂在 `.now-row` 上 —— 原来那层
+   `<div class="now">` 这一版没有了。2026-09-25 踩过一次：**壳一换，七条规则
+   全部失配**，而 CSS 失配不报错，表现是封面塌成 0×0、标题不省略号直接折行、
+   两枚标签没有药丸背景 —— 只有截图看一眼才发现。改结构时先把这一组的选择器
+   一起改掉。
+   ⚠️ **横排**是这一版的省钱办法：旧版是封面一行、波形一行、按钮一行（三层），
+   整张卡 248px；横过来之后三列并排，高度由最高的那一列（封面那格）决定。
+   ⚠️ 2026-09-24 删掉「推荐歌单」整行之后**这一格从 7rem 放到 14rem**（102 → 203px）：
+   空出来的高度按比例分给剩下两行，这张卡从 148 长到 ~249（1.68 倍）。
+   封面的尺寸就是这张卡的高度（其余两列都比它矮、垂直居中），所以想调这张卡的
+   高度**先动这里** —— 但动完要跟 `.mp-lib ul.tracks` 一起重新配平（那边是余量的
+   去处），只动一个不是溢出就是底下空一截。 */
+/* ⚠️ 第一列那个 `38rem` 是**跟着封面走的**，不是随手写的：这一列里装的是
+   `.now-head` = 封面（`flex:0 0 auto`，固定 14rem）+ `.meta`（`min-width:0`，
+   能被压到 0）。封面从 7rem 放到 14rem 那一次**第一列还留在 17rem**，于是
+   247 − 203 − 11.6 只剩 **32px** 给歌名 —— 而歌名那行是
+   `white-space:nowrap` + `text-overflow:ellipsis`，32px 压出来就是一小截省略号，
+   用户看到的就是「看不见歌名」。
+   **改封面的尺寸就要一起改这一列**，差值至少要留得下一首歌名。
+   2026-09-24 实测（`_scratch/_probe_geom.py`）：38rem 时 `.head` 552，
+   扣掉封面 203 和缝 11.6，`.meta` **可用 337px**，1.5rem 的歌名能放十七八个汉字。
+   ⚠️ 判据钉的是**可用宽度**（`.head` − 封面 − 缝），不是 `.meta` 自己的宽度 ——
+      后者等于文字的宽度，标题短的时候它也跟着短，拿它当判据会在标题短的时候
+      假装"窄"、在标题长的时候假装"宽"，量的根本不是同一件事（第一版就写错了）。 */
+.now-row{
+  display:grid;
+  grid-template-columns:minmax(0,38rem) minmax(0,1fr) auto;
+  gap:1.1rem; align-items:center;
+}
+.now-row .art{
+  width:14rem; height:14rem; flex:0 0 auto; display:grid; place-items:center;
+  border-radius:var(--r-md); color:var(--accent);
+  background:radial-gradient(circle at 50% 40%, rgba(var(--rgb),.28), rgba(255,255,255,.04) 70%);
+  border:1px solid rgba(var(--rgb),.35);
+}
+/* ★ 2026-09-25 深夜：封面从 `XQ.icon('music')` 的字形换成用户给的那张图
+   （见 `renderNow()` 上面 `ART_HTML` 那一段）。这一条替换掉原来的
+   `.now-row .art svg{ width:5rem; height:5rem }` —— 那个 svg 已经不在封面里了
+   （列表行里的 `XQ.icon('music')` 不受影响，它由 `.tracks li > svg` 那条管）。
+   ⚠️ `object-fit:cover` + `border-radius:inherit`：源图裁完水印是 2048x1928
+      （**不是正方形**），`cover` 只切掉一点点上下、圆盘还是居中的；
+      不写 `border-radius:inherit` 的话图片的方角会从圆角封面里戳出来。
+   ⚠️ 上面那条 `radial-gradient` **留着**，它就是这张图的占位底：
+      图还没解码出来的时候是一块品牌色的蓝，而不是白/灰闪一下
+      （和驾驶监测页 `#stageHost` 那条 `background-color` 是同一个道理）。 */
+.now-row .art img{
+  width:100%; height:100%; object-fit:cover; border-radius:inherit; display:block;
+}
+.now-row .meta{ min-width:0; }
+/* 歌名 1.3 → 1.5rem、副行 .82 → .88rem：这张卡从 148 长到 249、封面 102 → 203，
+   字不跟着大一号就会显得卡片空、字小。**高度不靠这两行撑**（撑高度的是 `.art`），
+   所以改字号不会把卡片撑破。 */
+.now-row .meta b{ display:block; font-size:1.5rem; font-weight:600; margin-bottom:.25rem;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.now-row .meta span{ font-size:.88rem; color:var(--muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+.now-row .meta .tags{ display:flex; gap:.35rem; margin-top:.4rem; flex-wrap:wrap; }
+.now-row .meta .tags i{
+  font-style:normal; font-size:.7rem; padding:.14rem .55rem; border-radius:2rem;
+  color:var(--ink-3); background:var(--fill-2); border:1px solid var(--line);
+  white-space:nowrap;
+}
+.now-head{ display:flex; gap:.8rem; align-items:center; min-width:0; }
+
+/* 波形 / 进度。柱子按真实峰值给高度；`<i>` 一个个改色就是"播放进度"，
+   比在上面盖一层半透明遮罩准 —— 遮罩在窄屏下会和柱子的亚像素对不齐。 */
+/* 高度 4rem：跟封面一起放大（原来 2.6rem）。柱子是 `flex:1 1 0` 拉满宽度的，
+   高度一变整条波形就跟着长 —— 卡片高了而波形还是原来那么细一条会显得空。 */
+.mp-wave{ display:flex; align-items:center; gap:2px; height:4rem; margin:.1rem 0 .28rem; cursor:pointer; }
+/* ⚠️ 未播放的柱子**不能用 `--fill-4`**：浅色主题下它是 `rgba(255,255,255,.80)`，
+   而这张卡本身就是白的 —— 白压白，整条波形在屏上是隐形的（第一版就是这样，
+   看上去"波形没画出来"）。改用品牌色的一档透明，深浅两个主题都成立。
+   ★ 2026-09-25：用户说「波形颜色和页面主题蓝色统一，不要颜色脱节」。
+      两条柱子本来就是**同一个变量**的两个浓淡（`--rgb` 与 `--accent` 在浅色
+      normal 档下都是 #1E7FD8），所以"脱节"不是配色写错了，是**未播放那档
+      太淡**：`.24` 压在白卡上算出来是 rgb(198,224,246)，在屏上已经读不出蓝，
+      像一条灰的 —— 用户看到的"另一个颜色"就是它。
+      `.24 → .40`（rgb(165,204,240)）是**照着"还认得出是同一支蓝"定的**，
+      不是随手调亮的：再往上（试算 .55 是 rgb(131,185,233)）就开始和
+      `--accent` 的实心柱子抢"哪个才是进度"了。
+   ⚠️ **两个颜色都必须是变量，不许写字面色值** —— 这一页跟着 `data-sev` 换
+      `--accent`/`--rgb`（疲劳时会整页转黄/橙/红），写死就真的脱节了。
+      钉住这件事的是 `_check_media_lib.py` 的 M 段（把算完的颜色和 `--rgb`
+      逐字比），**不是**这里看一眼觉得像。 */
+.mp-wave i{ flex:1 1 0; min-width:1px; border-radius:1px; background:rgba(var(--rgb),.40); transition:background .12s; }
+.mp-wave i.done{ background:var(--accent); }
+
+.mp-time{ display:flex; justify-content:space-between; font-size:.76rem; color:var(--muted);
+  font-variant-numeric:tabular-nums; }
+
+.mp-ctl{ display:flex; align-items:center; gap:1.1rem; }
+.mp-ctl button{
+  background:none; border:none; color:var(--ink-2); cursor:pointer; padding:.2rem;
+  display:grid; place-items:center; transition:.2s;
+}
+.mp-ctl button:hover{ color:var(--accent); }
+.mp-ctl button svg{ width:1.8rem; height:1.8rem; }
+.mp-ctl button.pp{
+  width:3.2rem; height:3.2rem; border-radius:50%; color:#fff;
+  background:var(--accent); box-shadow:0 0 1.4rem rgba(var(--rgb),.4);
+}
+.mp-ctl button.pp svg{ width:1.7rem; height:1.7rem; }
+.mp-ctl button.pp:hover{ filter:brightness(1.08); color:#fff; }
+
+.mp-vol{ display:flex; align-items:center; gap:.45rem; color:var(--muted); margin-top:.7rem; }
+.mp-vol svg{ width:1.25rem; height:1.25rem; }
+
+/* range 的外观。**功能是真的**：拖动 = 真的 seek / 真的改 volume。 */
+.mp-vol input[type=range]{ width:7.5rem; accent-color:var(--accent); cursor:pointer; }
+
+/* ----------------------------------------------------- 推荐歌单 —— 已删 */
+/* 2026-09-24 用户要求：「把多媒体页面推荐歌单部分去掉」。整行连 CSS 一起删了
+   （`.rec-grid` / `.rec-card` / `.rec-card .cv` 等十条规则、`RECS` 表、
+   `renderRecs()`），腾出的高度按等比例分给正在播放和我的音乐那行。
+   那段 HTML 的原文备份见 web/_bak_20260924_prose/media.html。 */
+
+/* --------------------------------------------------------------- 小瑞 */
+/* 那一栏比首页那张卡窄，`style.css` 的 `.mascot` 放进来会把气泡挤没，
+   所以这里单独缩一号。见 `pages.css` 里 `.main.dash .mascot` 同一类处理。
+   2026-09-25：删音效之后这一栏跟着放大（头像 3.2 → 5.5rem）并**撑满行高**。
+   ⚠️ 撑开靠的是 `.mp-xq{align-self:stretch}`（卡片盒），内容再用 flex 分布：
+      头像+气泡在上、三枚 chip 贴底 —— 不然撑开之后底下是一大块空白。
+   ⚠️ 内容高度必须**小于**左边「我的音乐」那行（253px），否则撑高度的就变成
+      这一栏，左边那个列表的 `max-height` 反而说了不算了（那会让整页高度失控）。 */
+/* ★ 2026-09-25：`min-height:0` 是**补上的一环**，别删。
+   加它的原因是一次量出来的事故（`_scratch/_diag_bubble.py`，灌 30 条消息那一步）：
+   这一栏是**网格项**，网格项默认 `min-height:auto` = "不许比自己的内容矮"。
+   所以话题一多，链条是这样断的 ——
+     `.xq-head` 和 `#xqBubble` 都写了 `min-height:0`，气泡自己也确实在滚；
+     但这张卡片**不肯比内容矮**，于是它长到 1925px、**从自己那一行里捅出去**
+     （卡片底 2339 / 行底 850），把 `.sub-body` 撑出 2234px 的滚动高度 ——
+     现象是"聊多了以后整页能滚，卡片压到底栏上"。
+   实测（1672×940，`.sub-body` 745px）：
+     0 条：卡片 437 / 气泡 348   （原来的样子，没变）
+     8 条：卡片 582 / 气泡 493   ← 已经开始捅
+    30 条：卡片 1925 / 气泡 1837  ← 整页 2234，滚起来了
+   补上这一条之后卡片被钉在行高上，气泡那一层才真的开始滚（`overflow-y:auto` 生效）。
+   ⚠️ 只有"气泡撑不满"的小内容时看不出区别 —— 所以那一段判据必须灌满才有效，
+      只灌两句是验不出来的（`_check_media_lib.py` 的 I2 段灌 40 条就是这个道理）。 */
+.mp-xq{ display:flex; flex-direction:column; min-height:0; }
+/* ⚠️ `flex:1 1 auto`：撑高之后多出来的那 100px 由这一行吸收，而不是全堆在
+   对话框和三枚 chip 中间。`flex-basis:auto` 表示它只在**有富余**时变大，
+   内容多到放不下时它自己先撑破卡片 —— 所以卡片高度还是由左边那行说了算。
+   ★ 2026-09-25：`align-items:center` 改成 `flex-start` —— 那一栏从"一个气泡"
+      变成了**多行对话框**（见下面 `.xq-bubble` 那段），头像跟着竖直居中会让
+      第一句话从半空中开始。现在头像贴顶，对话框从它右边往下长。
+   ⚠️ `min-height:0` 是这次新加的、**不能省**：flex 子项的默认下限是内容高度
+      （`min-height:auto`），不覆盖它，聊到第五轮时这个盒子会自己长高、
+      把卡片顶穿（`.mp-xq` 是 `align-self:stretch` 撑到跟左边「我的音乐」一样高，
+      它再往上长就顶穿 `.sub-body`）。 */
+.mp-xq .xq-head{ display:flex; gap:.9rem; align-items:flex-start; flex:1 1 auto; min-height:0; }
+.mp-xq .mascot{ width:7rem; height:7rem; flex:0 0 auto; }
+/* ------------------------------------------------- 对话框（2026-09-25 改版） */
+/* 用户的话：「右侧对话框，目前只有一行文字，可以预留多行对话区域，后续接入
+   DeepSeek API，多轮聊天时界面不会崩」。
+   ★ 所以这里从"一个气泡"改成**消息流的容器**：容器自己**不画气泡**（把
+     style.css 那份 `.xq-bubble` 的外观在这个作用域里全部按掉），气泡改画在
+     每条 `<p class="m">` 上 —— 一条消息一个泡，来多少条都不挤在一起。
+   ⚠️ 那四条外观（background / border / backdrop-filter / border-radius）是
+      **逐条按掉**的，不是"反正看不见就不管"：`backdrop-filter` 留着会在容器上
+      再开一层合成层，滚动时会闪（项目里踩过同一族的问题）。
+   ⚠️ `min-height:0` + `overflow-y:auto` 这一对是"多轮不会崩"的**全部道理**：
+      高度由卡片给（不是由内容撑），超出就**在框里滚**。少了 `min-height:0`，
+      容器的最小高度等于内容高度，滚不动，卡片被顶穿。
+   ⚠️ 这是**共用类的局部覆盖**：`.xq-bubble` 在 style.css 里是全站的（首页 /
+      驾驶监测页小瑞卡里那个大气泡也是它），`html[data-theme]` 那套主题规则
+      管不着它。所以样式一律写在 `.mp-xq` 下面（(0,2,0) > (0,1,0)），
+      **不要去改 style.css 那一条**。
+   ⚠️ `data-who="me"` 那一路（主人在右边）现在**没有调用方** —— 它是给
+      DeepSeek 接进来那天准备的口子（用户那句"多轮聊天"），所以先把外观定下来。
+      谁都不许因为"现在用不上"把它删掉。 */
+.mp-xq .xq-bubble{
+  flex:1 1 auto; min-width:0; min-height:0; overflow-y:auto;
+  /* ⚠️ 这一条是"预留多行对话区域"真正生效的那一步，别删：`.xq-head` 是
+     `align-items:flex-start`（为了不让小瑞立绘被拉变形），所以气泡的 `flex:1`
+     只管**宽**；不给它 `align-self:stretch`，高度就跟着内容走 —— 实测改之前
+     一屏话只有 44px 高，而它所在的格子有 348px，剩下 300px 是**看着空、
+     写进去也不会被看到的空白**。stretch 之后它才是一个定高的滚动区。
+     量到的数：`.xq-head` 348 / 气泡 351×348（1672×940 下）。 */
+  align-self:stretch;
+  display:flex; flex-direction:column; gap:.42rem;
+  font-size:.82rem; padding:.15rem .3rem .15rem 0;
+  background:none; border:none; backdrop-filter:none; border-radius:0;
+  scrollbar-width:thin; scrollbar-color:rgba(var(--rgb),.3) transparent;
+}
+.mp-xq .xq-bubble::-webkit-scrollbar{ width:6px; }
+.mp-xq .xq-bubble::-webkit-scrollbar-thumb{ background:rgba(var(--rgb),.3); border-radius:3px; }
+.mp-xq .xq-bubble::-webkit-scrollbar-track{ background:transparent; }
+.mp-xq .xq-bubble p.m{
+  /* ⚠️ `flex:0 0 auto` 是"多轮聊天不会崩"的命门，别删：`p` 是 flex 子项，
+     默认 `flex-shrink:1` —— 聊到第 20 轮、内容高过这一格时，**气泡会被压扁**
+     而不是让框滚起来（现象是每条都被挤成一行、越聊越扁，最后什么都没了）。
+     写成 0 0 auto 才是"该多高就多高，装不下由 `overflow-y:auto` 去滚"。 */
+  flex:0 0 auto; margin:0; max-width:93%; padding:.5rem .7rem;
+  border-radius:.85rem .85rem .3rem .85rem;
+  font-size:.82rem; line-height:1.55; color:var(--ink-2);
+  background:rgba(var(--rgb),.16); border:1px solid rgba(var(--rgb),.34);
+  overflow-wrap:anywhere;
+}
+.mp-xq .xq-bubble p.m[data-who="me"]{
+  align-self:flex-end; border-radius:.85rem .85rem .85rem .3rem;
+  background:var(--fill-2); border-color:var(--line); color:var(--ink);
+}
+/* 「小瑞正在想…」那一行。它是个**占位**、不是小瑞说过的话，所以只把普通气泡
+   调淡，不另给一套外观 —— 回音一到这一行就消失（见 paintLog / onSay）。 */
+.mp-xq .xq-bubble p.m.waiting{ opacity:.55; font-style:italic; }
+/* 最下面那行**状态**（正在放什么 / 曲库从哪来）。它不是"小瑞说过的话"，
+   所以长得也不像气泡：一条虚线 + 满宽。见 JS 的 paintLog()。
+   ⚠️ 满宽（`align-self:stretch` + `max-width:100%`）是为了跟上面的气泡分开 ——
+      状态是"这一格的页脚"，不是又一句发言。 */
+.mp-xq .xq-bubble p.m.st{
+  align-self:stretch; max-width:100%; padding:.55rem .1rem 0;
+  border:none; border-top:1px dashed rgba(var(--rgb),.34); border-radius:0;
+  background:none; font-size:.78rem; color:var(--ink-2);
+}
+/* 撑开上面那段空白，把状态行**顶到底部**。
+   ⚠️ 不用 `margin-top:auto`（那是更常见的写法）：在**会滚的 flex 容器**里给子项
+      自动外边距，一溢出就会把顶部内容顶到滚不到的地方去 —— 正是"聊多了就崩"。
+      换成一根 `flex:1 1 auto` 的空条：有富余时它吃掉富余，装不下时它缩成 0，
+      两种情况都不会多出一像素的溢出。 */
+.mp-xq .xq-bubble .sp{ flex:1 1 auto; min-height:0; }
+/* ★ 2026-09-25：三枚 chip 从"宽度随字数"改成**等宽**（用户：「按钮尺寸统一，
+   不要大小不一」）。实测改之前是 89 / 65 / 77px 三个数 —— 同一排里三个宽度。
+   ⚠️ `flex:1 1 0` + `min-width:max-content`：前者让三枚**均分**这一行，
+      后者是**兜底** —— 均分完比字还窄时按字宽撑（否则「随便挑一首」会被压成
+      两行或溢出）。四枚的时候（疲劳时会多一枚「听这首舒缓的」）也是同样的算法，
+      所以这里不用为它再加一条规则。 */
+.xq-chips{ display:flex; flex-wrap:wrap; gap:.45rem; margin-top:auto; padding-top:.8rem; }
+.xq-chips button{
+  flex:1 1 0; min-width:max-content; text-align:center; white-space:nowrap;
+  font:inherit; font-size:.78rem; cursor:pointer; padding:.42rem .95rem;
+  border-radius:2rem; color:var(--accent);
+  background:rgba(var(--rgb),.12); border:1px solid rgba(var(--rgb),.34); transition:.25s;
+}
+/* ★ 2026-09-25（第十四次改版）：这一格静止时描边已经是档位色 `.34`，所以原来
+   hover **只把底染深**（.12 → .22），描边一动不动 —— 看着是"变亮了"，不是
+   "被选中"。补上描边那半：`.34 → .52`（这一格没有选中态，所以可以足一点）。
+   语汇和铁律见 `style.css` 里 `.ri` 上面那段。 */
+.xq-chips button:hover{ background:rgba(var(--rgb),.22); border-color:rgba(var(--rgb),.52); }
+
+/* ------------------------------------------------- 打字聊天（2026-09-25 晚） */
+/* 用户：「小瑞那可以打字聊天」。放在三枚 chip **下面**当收尾那一行（和
+   `detail.html` / `chat.html` 的对话栏同一个位置习惯）。
+   ⚠️ `flex:0 0 auto` **不能改**：这一行是**固定高度**的，让位是气泡那一格的事 ——
+      气泡是 `flex:1 1 auto; min-height:0`，卡片放不下时它自己缩、自己滚。反过来
+      让输入行参与伸缩，视口一矮它就被压成一条缝，打字的口子就没了。
+   ⚠️ 这里**没有三枚 chip 那个 `flex:1 1 0` 均分** —— 输入框和「发送」不是
+      平级的两枚按钮：输入框吃掉剩下的全部宽度（`flex:1 1 auto; min-width:0`，
+      `min-width:0` 不加的话长 placeholder 会把它顶宽、把「发送」挤出卡片），
+      「发送」按字宽（`flex:0 0 auto`）。
+   ⚠️ 样式一律带 `.mp-xq` 前缀（(0,2,0)）—— `.xq-say` 是这一页独有的类，
+      但维护习惯和上面几条一致：这一页不去改 style.css 里任何全站规则。 */
+.mp-xq .xq-say{ display:flex; gap:.4rem; flex:0 0 auto; margin-top:.55rem; }
+.mp-xq .xq-say input{
+  flex:1 1 auto; min-width:0; font:inherit; font-size:.78rem; color:var(--ink);
+  padding:.42rem .75rem; border-radius:2rem;
+  background:var(--fill-2); border:1px solid var(--line);
+}
+.mp-xq .xq-say input::placeholder{ color:var(--ink-3); }
+/* 聚焦时描边跟着档位色走（和 chips 一样吃 `--rgb`）—— 疲劳时整页变黄/变红，
+   输入框也是那一套颜色里的一件，不是钉死的蓝。 */
+.mp-xq .xq-say input:focus{ outline:none; border-color:rgba(var(--rgb),.55); }
+.mp-xq .xq-say button{
+  flex:0 0 auto; font:inherit; font-size:.78rem; cursor:pointer;
+  padding:.42rem .95rem; border-radius:2rem; white-space:nowrap;
+  color:var(--accent); background:rgba(var(--rgb),.16);
+  border:1px solid rgba(var(--rgb),.34); transition:.25s;
+}
+/* ★ 同 `.xq-chips button:hover`：静止描边已是 `.34`，补上 hover 的描边那半。 */
+.mp-xq .xq-say button:hover{ background:rgba(var(--rgb),.26); border-color:rgba(var(--rgb),.52); }
+
+/* ----------------------------------------------------- 我的音乐（播放列表） */
+/* 155 首。**列表自己滚**，不撑页面：行做成单行、`.tx` 里歌名 + 灰的歌手 +
+   内置那几首多一枚「内置」标，标题过长省略号。
+   ⚠️ 2026-09-24 这一格从 `max-height:21rem` 改成了 `flex:1 1 auto` ——
+      **这是故意的，跟下面这段旧警告正好相反，先看完再决定要不要改回去：**
+      旧版之所以不许 `flex:1`，是因为那会儿外面没有"有界"的容器，卡片一拉伸就把
+      整页顶穿、被底栏盖住。现在卡片的高度是**网格第 2 行给的确定高度**
+      （见 `.mp-fill` / `.mp-grid`），列表 `flex:1` 只是在这个盒子**内部**分配，
+      撑不出 `.sub-body`。
+      ⚠️ `min-height` 是这套做法的命门：flex 子项默认的下限是**内容高度**
+         （`min-height:auto`），不覆盖它，列表一撑破就顶穿 `.sub-body` ——
+         表现是"整页又能滚了"。这里给 `6rem`：既能被压缩，又留了个地板，
+         窗口太矮时退回 `.sub-body` 自己滚（改之前的行为），不会压成一条缝。
+   ⚠️ 这一格仍然是**整页高度的调节阀**：窗口高出来的部分全落在这里
+      （列表越长，一屏能看见的歌越多）。想给整页挪高度，先动这里。
+      量法：`_scratch/_probe_geom.py`（`libul` 是列表）。
+   ★ 2026-09-25：**一屏几首由 `.tracks li` 那条 `flex-basis` 的**分母**说了算**
+      （现在是 6，用户要「一页只放六首 然后可以下滑」）。改一屏几首就改那个 6，
+      别在这一格上写 `max-height` 去凑 —— 那会让列表下面空出来一块，
+      正好是用户上一次嫌过的那种空白。 */
+.mp-lib ul.tracks{
+  flex:1 1 auto; min-height:6rem; overflow-y:auto; padding-right:.2rem;
+}
+.mp-lib ul.tracks::-webkit-scrollbar{ width:6px; }
+.mp-lib ul.tracks::-webkit-scrollbar-thumb{ background:rgba(var(--rgb),.3); border-radius:3px; }
+.mp-lib ul.tracks::-webkit-scrollbar-track{ background:transparent; }
+
+.tracks{ list-style:none; display:flex; flex-direction:column; gap:.25rem; }
+.tracks li{
+  display:flex; align-items:center; gap:.75rem; cursor:pointer;
+  padding:.4rem .85rem; border-radius:var(--r-md);
+  background:var(--fill-1); border:1px solid var(--line); transition:.2s;
+  /* ★ 2026-09-25 用户：「多媒体页 我的音乐部分一下展示的音乐太多了 显得字小
+     可以一页只放六首 然后可以下滑 现在有13首 这样字可以大一点 感觉更好」。
+     做法是**把行高从死数改成列表高度的 1/6**（减掉 5 个缝），于是"一屏正好六首"
+     在窗口高矮变化时自己成立，不用去追 `.sub-body` 那个会飘的高度
+     （量过：`--window-size=1672,940` 起出来的 Edge，`.sub-body` 在 652~657
+     之间飘 —— 差 5px 就够让第 7 行露一条边/第 6 行被切掉一条边，而这一页
+     的窗口高度本来就允许飘）。
+     ⚠️ `max-height` 是**防呆**，不是设计值：`flex-basis` 里的百分比是活的，
+        窗口比设计比例高的时候列表会跟着长，没有这个上限每行会一起长成
+        一大块空白。卡在 3.4rem 之后，多出来的高度变成「多看见几首」——
+        正好接上这一页「余量落在列表上」那套做法（见 `.mp-grid` 那段）。
+     ⚠️ 百分比 `flex-basis` **要有确定高度的容器才解析**，这里靠
+        `.mp-lib ul.tracks{flex:1 1 auto}` + 外面那层网格给。窄屏兜底那一段
+        把列表改回 `flex:0 0 auto`（高度变回内容撑），所以那边必须另给死数，
+        见 `@media (max-width: 74rem)` 里那条 —— 别只改这一处。 */
+  flex:0 0 calc((100% - 5 * .25rem) / 6);
+  max-height:3.4rem;
+}
+/* ★ 2026-09-25：用户说「当前播放行高亮，现在蓝色高亮条视觉可以柔和一点，
+   贴合整体浅蓝风格」。实测改之前是 `rgba(--rgb,.18)` + 边框 `.55` ——
+   在满屏近白卡上那一圈边比列表本身还抢眼。
+   现在：底色 `.18 → .13`、边框 `.55 → .34`，另加一道 2px 的**左侧内阴影**
+   当"当前"的记号。**换成内阴影是为了不靠"更重的底"来讲这件事** ——
+   底再淡下去就跟 hover 分不清了，而左边那道细线是"选中"的通用语汇。
+   ⚠️ 顺手把 hover 从 `.13` 降到 `.09`：不然 hover 比 `.on` 还重，
+      鼠标扫过时高亮会"跳一下"（这是**顺序**问题，不是配色问题）。
+   ⚠️ `.playing`（真在放的那一行）现在跟 `.on` **同一档外观**，两者只靠
+      左端的 ▶ / 歌名变强调色 / 右端那三根跳动的柱子区分 —— 见下面 `.eq` 那段。 */
+.tracks li:hover{ background:rgba(var(--rgb),.09); border-color:rgba(var(--rgb),.38); }
+.tracks li.on, .tracks li.playing{
+  background:rgba(var(--rgb),.13); border-color:rgba(var(--rgb),.34);
+  box-shadow:inset 2px 0 0 rgba(var(--rgb),.5);
+}
+.tracks li .no{ width:1.7rem; flex:0 0 auto; text-align:center; font-size:.95rem;
+  color:var(--muted); font-variant-numeric:tabular-nums; }
+.tracks li.on .no{ color:var(--accent); }
+/* ⚠️ 这一条不能省：`XQ.icon()` 给的 <svg> **没有自带尺寸**（全局没有 svg 兜底
+   规则），不写的话每一行都会插一个 300×150 的默认尺寸图标，整页被撑爆。 */
+.tracks li > svg{ width:1.45rem; height:1.45rem; color:var(--accent); flex:0 0 auto; }
+/* ★ 2026-09-25：这一格原来是**三种文字**混在一起 —— 歌名(600/ink) + 歌手
+   (400/.68rem/灰) + 「内置」蓝底小标。用户的话：「歌曲信息列有点杂，
+   建议统一字段：歌曲名 | 歌手，去掉多余文字」。改成两段：
+     · 歌名包进 <b>、歌手是 <i>，中间那个「·」由 `i::before` 给 ——
+       分隔符写在 CSS 里而不是塞进 DOM 文本，`textContent` 才是干净的两段
+       （检查脚本 I 段拿 `.tx` 的 textContent 对歌名，别把它搅进文本里）。
+     · 两段字号从 .78/.68 收到 .78/.72：差三级也是"杂"的来源之一。
+     · 当前这一行的歌名跟着变强调色（替代原来那圈重边框的活儿）。 */
+.tracks li .tx{ flex:1 1 auto; min-width:0; font-size:1.05rem;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tracks li .tx b{ font-weight:600; color:var(--ink); }
+.tracks li.on .tx b{ color:var(--accent); }
+.tracks li .tx i{ font-style:normal; font-weight:400; font-size:.96rem; color:var(--muted); }
+.tracks li .tx i::before{ content:'·'; margin:0 .42rem; opacity:.7; }
+/* ------------------------------------------------- 「内置」那枚小标 —— 已删 */
+/* 2026-09-25 用户要求「去掉多余文字」，那枚蓝底「内置」小标**从行里删掉了**。
+   ⚠️ 它是 2026-09-25 早些时候**故意加**的（曲库有两个来源：跟着项目走的内置
+      30 首 + 用户自己那个目录，要一眼看出"哪几首换台机器也放得出来"），
+      所以这里记一笔"它是被用户点名删的"，不是从来没做过。
+   ⚠️ 信息**没丢**，换了两处承载：
+        · 同一组数字在卡头 `#listNote`（「共 155 首 · 内置 30 · …」）；
+        · 正在播放那张卡的 `#tFmt`（「MP3 · 内置文件 / 本机文件」）。
+      而且它最要紧的那个场景本来就轮不到它说话：**答辩机上没有用户的音乐
+      目录时，155 首**全是**内置，155 行全挂一个标等于没标**。
+   ⚠️ 但**出处这件事本身留在了 DOM 上**：每一行有 `data-src="内置"`（见
+      renderList）。颜色/字号那些是给人看的，`data-src` 是给脚本和将来用的
+      （自动推荐舒缓音乐也只在 `data-src="内置"` 那批里挑，理由见 JS 那段），
+      所以**别**顺手把不带外观的它一起删掉 —— `_check_media_lib.py` A2 段
+      就是靠它验证"内置那批仍排在列表最前面"的。 */
+.tracks li .dur{ font-size:.96rem; color:var(--muted);
+  font-variant-numeric:tabular-nums;
+  /* ★ 2026-09-25 用户：「时长统一右对齐，更整洁」。给一个定宽 + 右对齐 ——
+     `tabular-nums` 只保证数字等宽，保证不了「读不到」这种三字文本和
+     「2:11」右边缘对齐。定宽还有一个用处：它是这一行里**唯一**会变宽变窄的
+     格子，掐住它，右边的 `.eq` 才不会跟着左右挪。 */
+  flex:0 0 auto; min-width:3.2rem; text-align:right; }
+.tracks li.empty{ cursor:default; color:var(--muted); font-size:1rem; }
+.tracks li.empty:hover{ background:var(--fill-1); border-color:var(--line); }
+/* 正在放的那一行：三条小柱子在跳。**是装饰，不是频谱** —— 它不读音频数据。
+   ★ 2026-09-25：不在放的时候**整块隐形**（原来那三根静止的 30% 小柱挂在每一行
+   右端，看着就是一个「⋯」的"更多"按钮，点它却什么都不会弹 —— 这是列表看着
+   杂的一大来源）。位置照留：它是 `.dur` 右对齐右边那个定宽格，删掉时长就不齐了。
+   现在只有真在放的那一行才看得见它，而且三根同时在跳，"这一首正在放"这件事
+   就由它一个人说了 —— `.on` 和 `.playing` 的外观是同一条（见上面）。 */
+.tracks li .eq{ display:flex; align-items:flex-end; gap:3px; height:1.15rem; width:1.15rem; flex:0 0 auto;
+  opacity:0; transition:opacity .2s; }
+.tracks li.playing .eq{ opacity:1; }
+.tracks li .eq i{ width:3px; background:var(--accent); border-radius:1px; height:30%; }
+.tracks li.playing .eq i{ animation:eqb .9s ease-in-out infinite; }
+.tracks li.playing .eq i:nth-child(2){ animation-delay:.15s; }
+.tracks li.playing .eq i:nth-child(3){ animation-delay:.3s; }
+@keyframes eqb{ 0%,100%{ height:25% } 50%{ height:100% } }
+
+/* （2026-09-25 这里原来是「音效设置」那一段：.eq-body / .eq-bands / .eq-band /
+   .eq-presets，配 WebAudio 的三段 BiquadFilter。用户点名整块去掉，CSS 和 JS
+   一起删了。**别把 `.tracks li .eq` 跟着删** —— 那是列表里"正在放"的三根小柱子，
+   跟音效设置只是名字像。） */
+
+/* ------------------------------------------------------------- 底部那一条 */
+/* 参考图这一页底下不是对话输入框，是「正在播放 + 语音助手」。
+   所以 `.talk` 只借外壳，里面的 `.talk-now` / `.talk-va` 是本页自己的。 */
+.talk-now{ flex:1 1 auto; min-width:0; font-size:var(--fs-sm); color:var(--ink-2);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.talk-now b{ color:var(--ink); font-weight:600; }
+.talk-say{ font-size:.68rem; color:var(--muted); }
+.talk-va{
+  display:flex; align-items:center; gap:.45rem; flex:0 0 auto;
+  font:inherit; font-size:.8rem; cursor:pointer; padding:.55rem 1.1rem;
+  border-radius:2rem; color:#fff; background:var(--accent); border:none;
+  box-shadow:0 0 1.2rem rgba(var(--rgb),.36); transition:.25s;
+}
+.talk-va:hover{ filter:brightness(1.08); }
+.talk-va svg{ width:1.05rem; height:1.05rem; }
+
+/* ------------------------------------------------------------- 小屏兜底 */
+/* 1672×940 是设计基准。窗口再窄就折成一列 —— 不折的话两列各自挤到读不出字，
+   而且「正在播放」那条横排会先塌（封面 + 波形 + 按钮挤在一行里）。 */
+@media (max-width: 74rem){
+  /* ⚠️ 折成一列之后**必须把"占满这一页"这套关掉**：三张卡上下叠起来本来就可能
+     比视口高，再让它们分摊余量，只会各自摊到一块没用的空白。`.mp-fill` 退回
+     普通块、三行都写 auto，回到"内容多高就多高、放不下就 `.sub-body` 自己滚"。 */
+  .mp-fill{ display:block; }
+  .mp-grid{ grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto auto; }
+  .mp-hero, .mp-lib, .mp-xq{ grid-column:1; }
+  .now-row{ grid-template-columns:minmax(0,1fr); }
+  /* 折成一列之后封面不再决定高度（横排被拆了），给它一个不比视口高的上限。 */
+  .now-row .art{ width:min(14rem, 46vw); height:min(14rem, 46vw); }
+  /* ⚠️ 折成一列之后列表的高度变回**内容撑**，上面那条
+     `flex:0 0 calc((100% - …) / 6)` 里的百分比就没有分母了（解析成内容高度）。
+     所以这里必须把行高改回死数 —— 否则行高会变成"内容说了算"，
+     大字号一上去行距就散。6 行 × 2.6rem + 5 个缝 ≈ 17rem。 */
+  .mp-lib ul.tracks{ flex:0 0 auto; max-height:17rem; }
+  .tracks li{ flex:0 0 auto; height:2.6rem; }
+}
+</style>
+</head>
+<body class="pg-media" data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <!-- ⚠️ `mp-fill` 是这一页**自己加的**（别的页没有）：让卡片正好占满这一页，
+         不然余量会堆在卡片底下、「我的音乐 / 小瑞」那一行被顶到最下面。
+         原因和两次试错都在 `<style>` 里 `.mp-fill` 那一段。 -->
+    <div class="sub-body mp-fill">
+
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1>多媒体</h1>
+        <span class="mp-lead">让每一次出行，都有喜欢的声音</span>
+        <!-- 2026-09-24：这里原来还有一枚 `#libPill`（「曲库 · 155 首 · 内置 30」），
+             用户点名去掉。同一组数字本来就在「我的音乐」卡头那句 `#listNote` 里
+             （「共 155 首 · 内置 30 · 点一行就放」）—— 数字摆在它描述的那张卡上，
+             比挂在页标题右边更说得通，所以这是挪走、不是丢掉。
+             ⚠️ 删它必须连 `mountLib()` 里那句 `$('libPill').textContent` 一起删：
+                `$()` 拿到 null，`.textContent` 当场抛异常，`mountLib()` 会在
+                `renderAll()` **之前**断掉 —— 现象是列表一直停在「读曲库…」，
+                而控制台只有一条 TypeError，不看那一行根本猜不到是这里。 -->
+        <span class="spacer"></span>
+      </div>
+
+      <div class="mp-grid">
+
+        <!-- ================= 1 · 正在播放（整行，横排） ================= -->
+        <section class="card card-pad mp-hero">
+          <div class="card-h"><h3>正在播放</h3><span class="note" id="stateNote">未开始</span></div>
+
+          <div class="now-row">
+            <div class="now-head">
+              <div class="art" id="art"></div>
+              <div class="meta">
+                <b id="tName">—</b>
+                <span id="tSub">—</span>
+                <div class="tags">
+                  <!-- ★ 2026-09-25 晚：这里原来还有一枚 `<i id="tRate">`（容量），
+                       用户拍板「只删重复的容量」——**容量在这张卡上写了两遍**：
+                       上一行 `#tSub` 是「歌手 · 5.1 MB」，这一枚又写一遍「5.1 MB」。
+                       留下的 `#tFmt`（「MP3 · 内置文件 / 本机文件」）**不许删**：
+                       它和上一行那个容量**不是同一件事**，而且全站只有它一处还
+                       说明"这首是跟着项目走的、还是读你机器上的"（列表行里那枚
+                       「内置」小标被用户点名删掉之后就是它了，见文件头那段）。 -->
+                  <i id="tFmt">—</i>
+                </div>
+              </div>
+            </div>
+
+            <div class="now-wave">
+              <div class="mp-wave" id="wave" title="点一下跳到那个位置"></div>
+              <div class="mp-time"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+            </div>
+
+            <div>
+              <div class="mp-ctl">
+                <button id="prevBtn" title="上一首"></button>
+                <button id="ppBtn" class="pp" title="播放 / 暂停"></button>
+                <button id="nextBtn" title="下一首"></button>
+              </div>
+              <div class="mp-vol">
+                <span id="volIco"></span>
+                <input type="range" id="vol" min="0" max="100" value="80" title="音量">
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2026-09-24：原来这里是第 2 行「推荐歌单」（六张卡：前三张指曲库、
+             后三张在线歌单未接入）。用户要求整块去掉，HTML / CSS / JS 三处
+             一起删。原文备份见 web/_bak_20260924_prose/media.html。 -->
+
+        <!-- ================= 3 · 我的音乐（左宽，自己滚） ================= -->
+        <section class="card card-pad mp-lib">
+          <div class="card-h"><h3>我的音乐</h3><span class="note" id="listNote">读曲库…</span></div>
+          <ul class="tracks" id="tracks"></ul>
+          <!-- 2026-09-24：原来这里有一整段「如实说明」（155 首 / 内置 30 首 /
+               D:\CloudMusic / 不接在线曲库 / 与座舱主界面没有控制通道），
+               按用户要求删除。原文备份见 web/_bak_20260924_prose/media.html。 -->
+        </section>
+
+        <!-- ================= 4 · 小瑞（右窄） ================= -->
+        <section class="card card-pad mp-xq">
+          <div class="card-h"><h3>小瑞 · 音乐推荐</h3></div>
+          <div class="xq-head">
+            <div class="mascot" id="mascot">
+              <div class="ring"></div>
+              <div class="ring r2"></div>
+              <img class="mascot-img" id="mascotImg" alt="小瑞" hidden>
+              <div id="mascotSvgHost"></div>
+            </div>
+            <!-- ★ 2026-09-25：`#xqBubble` 从"一个气泡"变成**消息流的容器**
+                 （用户：「预留多行对话区域，后续接入DeepSeek API，多轮聊天时
+                 界面不会崩」）。每一条消息是里面一个 `<p class="m">`，一条一个
+                 泡，多了就在框里滚（高度由卡片给，不由内容撑）。
+                 ⚠️ **id 和 class 都没改**：`#xqBubble` 是检查脚本（I / L 两段）
+                    和"底栏那句话"都按名字找的落点，改名的代价是一串空引用。
+                 ⚠️ `aria-live="polite"`：它是**会自己长出新话**的区域，读屏
+                    得知道；不写这一条，小瑞后来说的话只在屏幕上出现。 -->
+            <div class="xq-bubble" id="xqBubble" hidden aria-live="polite"></div>
+          </div>
+          <!-- chip **真能放**：点一下真的换一首/重头放，不是装饰按钮。
+               2026-09-25：疲劳时这里会多出第四枚「听这首舒缓的」（小瑞刚从
+               「内置那批」里挑出来的那一首），回到清醒档自己收起来 ——
+               见 JS 的 renderXq()。 -->
+          <div class="xq-chips" id="xqChips"></div>
+          <!-- ★ 2026-09-25 晚：**打字聊天**（用户：「小瑞那可以打字聊天」）。
+               走的是一条早就在跑的链路：打字 → `{type:'say',text}` 上行 →
+               服务端 `handle()` 里那一支交给小瑞的大脑 → 广播 `{type:'say'}` 回来。
+               `payload.user` 里带着**我打出去的原文**，所以左右两边气泡都画得出来
+               （`data-who="me"` 那一路的外观早就留好了，见上面 `.xq-bubble` 那段）。
+               ⚠️ id 用 `xqSay`/`xqSend`，**故意不叫** `sayInput`/`send`：那两名字
+                  是 `app.js` 的 `bind()` 按名找的（它会给 `#sayInput` 挂一条
+                  Enter 监听）。这一页**没有引 app.js**（只有 chrome.js + live.js），
+                  所以眼下不会撞；但哪天有人为了别的功能把 app.js 引进来，
+                  同一次回车就会发两条上行、收两条回复。名字分开是**防将来**。 -->
+          <div class="xq-say">
+            <input id="xqSay" type="text" autocomplete="off" maxlength="200"
+                   placeholder="对小瑞说点什么…" aria-label="对小瑞说话">
+            <button id="xqSend" type="button">发送</button>
+          </div>
+        </section>
+
+        <!-- （2026-09-25 这里原先是第 5 块「音效设置」整行卡片。用户点名
+             「音效设置那一栏去掉」，所以整块删了 —— 连同它真的那套 WebAudio
+             三段滤波一起（见文件头那段记录和 JS 里"均衡器"那节的墓碑注释）。
+             删完之后省下的高度按比例分给了上面三行，改的是这四处的尺寸：
+             `.now-row .art` / `.rec-card .cv` / `.mp-lib ul.tracks` / `.mp-xq`。
+             2026-09-24 又把「推荐歌单」整行删了，那次的四处在上面 `.mp-grid` 的
+             注释里（现在只剩两处：`.now-row .art` 和 `.mp-lib ul.tracks`）。 -->
+
+      </div>
+    </div>
+
+    <!-- 底部那一条：参考图这一页底下是「正在播放 + 语音助手」。
+         ⚠️ 和驾驶监测页一样挂在 `.main.sub` 上、`.sub-body` 的**外面** ——
+            `.sub-body` 是 `overflow-y:auto` 的滚动容器，放进去就跟着滚走了。 -->
+    <div class="talk" id="talk">
+      <div class="talk-ava">
+        <img id="talkAvaImg" alt="" hidden>
+        <div id="talkAvaSvgHost"></div>
+      </div>
+      <div class="talk-now" id="talkNow">小瑞 <b>待机中</b></div>
+      <div class="talk-say">有什么想听的，随时叫我哦～</div>
+      <button class="talk-va" id="talkVa" title="语音助手">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0v-6a3 3 0 0 1 3-3z" fill="currentColor"/><path d="M19 12a7 7 0 0 1-6 6.9V22h-2v-3.1A7 7 0 0 1 5 12h2a5 5 0 0 0 10 0z" fill="currentColor"/></svg>
+        语音助手
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script>
+/* =========================================================================
+   多媒体（车机左导航「多媒体」那一项的目标页）
+   -------------------------------------------------------------------------
+   ★ 2026-09-25：**这一页开始连 WebSocket 了**（原来不连）。
+   用户的话：「增加状态联动：当DMS监测疲劳时，小瑞自动在这里推荐舒缓音乐，
+   把多媒体和疲劳监测模块打通，这个是答辩大亮点！不是孤立的音乐播放器，
+   是感知驾驶员状态的情感化座舱」。
+   ⚠️ 所以「不连 WebSocket」这条老规矩**在这一页作废了**。现在收两样：
+      `state`（`severity` → `body[data-sev]` 整页换色 + 触发小瑞推荐）和
+      `say` 里**我打出去那句的回音**（2026-09-25 晚加的**打字聊天**，见下面
+      「7 · 接上座舱状态」那一段）。
+   ⚠️ `say` 接得**很挑**：只认 `d.user === SAY_WAIT` 的那一条。小瑞的主动预警
+      和语音那一路走的是同一个广播，**这一页照旧不吭声** —— 「放歌的时候不该
+      突然念一句话」这条判断没变，只是从"整个 say 都不接"收窄成"只接我点过的"。
+      `info` **仍然不接**：这一页不画角标，服务端的临时话在这页没有落点。
+   ⚠️ 这里原来写着「**左栏仍然不放喇叭按钮**，所以 `mountChrome` 是 `{active:'media'}`，
+      别看着现在有 WS 了就顺手加上」。★ 2026-09-25 左栏那张卡片整块删了，
+      `voice` 这个参数也从 `railHTML` 的签名里去掉了 —— **加不上，也不用再纠结**。
+      底下那条理由（"这一页根本没有麦克风那一路"：ASR 会话在驾驶监测/对话页那边，
+      开麦要 `ear_start`，不是有个 WS 就能说话）**仍然成立**，只是它现在管的是
+      "这一页不做语音输入"，跟左栏没关系了。
+   ⚠️ 连上 WS 还有一个**副作用**（是好事，但要知情）：`ui/server.py` 的
+      `watch_pages()` 是按"还有没有页面在看着"决定松不松摄像头的，而它的注释里
+      早就把多媒体算成"所有页面的 WS"之一（那时这句话是假的）。现在它成真了：
+      从驾驶监测页翻到多媒体，摄像头**不会**在 3 秒后松手 —— 因为这一页正靠
+      DMS 的实时档位干活。关掉浏览器/这一页走空，照旧松手。
+
+   曲库从两个接口来（都在 `ui/server.py` 的「曲库（内置 + 本机）」那一节）：
+     GET /music.json     目录 + 曲目表（file / title / artist / mb / src）
+     GET /music/<文件名> 一首歌本身，带 Range，所以进度条能拖
+   歌有**两个来源**，服务端合成一张表（按文件名去重、内置优先）：
+     · 内置 `ui/media/`  —— 30 首 91 MB，跟着项目走。演示机上没有用户的音乐
+       目录时，就靠这一份出声（拷它们的脚本：`_scratch/_add_bundled_music.py`）。
+     · 本机 `ui/config.json` 的 `media.dir`（默认 D:\CloudMusic）—— 剩下的 125 首。
+   ⚠️ 所以**不要再写"歌全在你机器上"**这种话了：有 30 首不是。
+      页面里凡是提到来源的地方都读 /music.json 的 `bundled` / `dirOk` 现算。
+
+   真在算的：真解码拿峰值画波形、真 duration、真 seek、真音量、真三段均衡、
+   放完自动下一首。**没有接任何在线曲库**，页面里凡是不通的地方都这么写着。
+   ⚠️ 直接从 `file://` 打开时这两条接口都拿不到（没有服务器），页面会如实说
+      "没读到曲库目录"，而不是显示一个空列表 —— 空列表看起来像"你的歌丢了"。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+const BUCKETS = 150;          // 波形柱子数。再密在 1080p 上也看不出差别
+const PEAK_BYTES = 2 * 1024 * 1024;   // 波形只看开头这一段，见 loadPeaks()
+const au = new Audio();       // 唯一真正出声的元素
+au.preload = 'metadata';
+
+let LIB = null;               // /music.json 的原样返回
+let TRACKS = [];              // 就是 LIB.tracks（列表、播放、进度都读它）
+let idx = 0;                  // 当前选中的那一首（没开始放也选中）
+let peaks = null;             // 当前这一首的真实峰值（拿不到就是 null，退回等宽柱子）
+let peakTok = 0;              // 解码令牌，切歌后过期的结果不许回写（见 playTrack）
+
+/* --- 状态联动（2026-09-25 新加，来龙去脉见文件头） -------------------------
+   `sevNow` 存的是**归一化之后的档位字符串**（'normal'/'mild'/'moderate'/
+   'severe'），不是数字 —— `XQ.LV` 那张表键和值同名（看着像恒等映射，但那张表
+   是三个页面合用的，理由写在 live.js 里），别在这里自己写一份 0/1/2/3。
+   `null` = 还没收到过任何 state（跟 'normal' 是两件事：一个是"不知道"，一个是
+   "知道他不累"，混在一起会让"第一次收到 mild"判不出上升沿）。 */
+let sevNow = null;      // 归一化之后的档位，null = 还没收到 state
+let lastAct = 0;        // 用户最近一次**亲手**动播放器的时间戳（见 userAct）
+let calmIdx = -1;       // 小瑞挑出来的那首（TRACKS 下标；-1 = 还没挑出来）
+let calmTable = null;   // 量出来的舒缓度原始量（见 calmScan），null = 还没量
+let calmBusy = false;   // 正在量（量一轮要几十秒，别叠着跑）
+
+/* ======================================================= 1 · 曲库读进来 */
+/* ⚠️ 拿到之前**不许先渲染一个空列表**：那看起来像"曲库是空的"。所以开局
+   列表里那一行是「读曲库…」，读完之后才知道该显示什么。 */
+function fileUrl(t) { return '/music/' + encodeURIComponent(t.file); }
+
+function extOf(name) {
+  const i = name.lastIndexOf('.');
+  return i > 0 ? name.slice(i + 1).toUpperCase() : '音频';
+}
+
+async function mountLib() {
+  try {
+    const r = await fetch('/music.json', { cache: 'no-store' });
+    LIB = await r.json();
+  } catch (e) {
+    /* 没有服务器（file:// 直接打开）或者服务端挂了。**不打印**，写屏。 */
+    LIB = { ok: false, dir: '', dirOk: false, bundled: 0, tracks: [],
+            error: '拿不到 /music.json' };
+  }
+  TRACKS = Array.isArray(LIB.tracks) ? LIB.tracks : [];
+  idx = 0;
+  peaks = null;
+
+  /* 2026-09-24：这里原来写两处 —— 页标题右边那枚 `#libPill`，和正页那段「如实
+     说明」里的三个数字 + 一句警告（libDir / libTotal / libBundled / libWarn）。
+     用户先后把这两块都点名删了，所以这几句写入一并不做 —— 留着就是空引用。
+     数字没丢：「我的音乐」卡头的 `#listNote` 现算「共 N 首 · 内置 nb」，
+     整个曲库读不出来时它也写「曲库没接上」，`noLibWhy()` 的 toast 再补一句原因。 */
+  renderAll();
+  renderXq();
+  drawWave(null);                       // 先给"还没测量"的等高柱
+  if (TRACKS.length) {
+    const tok = ++peakTok;
+    /* 首屏那一版波形**不等它**：解码是后台跑的，回来对得上号才画。 */
+    loadPeaks(fileUrl(TRACKS[0])).then((a) => {
+      if (a && tok === peakTok && !au.src) drawWave(a);
+    });
+    probeDurations();
+    resumeFrom();     // ★ 跨页回来时接着放（没有存档就什么都不做）
+  }
+}
+
+/* ======================================================= 2 · 推荐歌单 —— 已删 */
+/* 2026-09-24 用户要求：「把多媒体页面推荐歌单部分去掉」。
+   这里原来是一张 `RECS` 表（前三张真能点：全部歌曲 / 随便听听 / 接着听；
+   后三张在线歌单分类挂「未接入」）+ 一个 `renderRecs()`。
+   连同 HTML 的 `.mp-rec` 整行和 CSS 的十几条规则一起删了。
+   ⚠️ 删掉之后**「随便听听」那个随机播放入口没有了** —— 要放歌得从
+      「我的音乐」列表里点。用户要的就是这样，别再往回加。
+   原文备份见 web/_bak_20260924_prose/media.html。 */
+
+/* ======================================================= 3 · 均衡器 —— 已删 */
+/* 2026-09-25 这里原来是一套**真的**三段 WebAudio 均衡：`createMediaElementSource(au)`
+   接 200 Hz lowshelf → 1 kHz peaking → 4 kHz highshelf → destination，四组预设
+   （标准/流行/古典/自定义），建图时机卡在第一次用户手势上（早建会被 Chrome 打
+   "AudioContext was not allowed to start"，而 `createMediaElementSource` 一旦调用，
+   `<audio>` 的声音**只走那张图**：图要是 suspended，现象是"进度条在走但没声音"）。
+   用户点名「音效设置那一栏去掉」，连同那片卡、CSS、这套图一起删了。
+   ⚠️ 删掉之后**声音直接从 `<audio>` 出来**，上面那一整类"没声音"的故障没有了；
+      音量仍然是真的（`au.volume`，从没走过那张图）。
+   ⚠️ 要加回来，先把建图/`resume()`/`play()` 的**顺序**和上面那条 suspended 的坑
+      一起想清楚 —— 不是把这段 git 回来就能跑的（这也是留这段注释的原因）。 */
+
+/* ======================================================= 4 · 小瑞的话 */
+/* ★ 2026-09-25（同日第二次要求去文案）：对话框里**不再解释曲库是怎么拼出来的**。
+   用户原话：「曲库里有 155 首：30 首跟着项目走，125 首读你自己机器上的目录。想听哪个
+   点一下，或者我随便挑一首。都去掉 不要这些解释文字」。
+   ⚠️ 于是 `libLine()` **整个函数删了**（它只被 xqSay 用过这一处）。那两句连同
+      「内置 30 / 本机 125」这组数一起退场 —— 上一条改动已经把这组数从卡头
+      `#listNote` 拿掉了，这里是最后一处，现在全站没有再提曲库构成的文字。
+   ⚠️ **「目录没找到」这一句留着**，它和上面那些不是一类东西：那些是在解释曲库
+      *怎么构成*，这一句是在报**故障**。不说 = 装作目录还在，现象是用户以为
+      "我机器上那 125 首怎么没了"。`libWarn()` 只在这一种情况下有输出。
+      ⚠️ L 段（`_check_media_lib.py` 用 `--media-dir Z:/__这个目录不存在__` 起
+      第二份服务）盯的就是这句，判据是「没找到」+ 目录名 + 「内置」三个子串 ——
+      改这段文案之前先去看那一段，别把它改成静默。
+   ⚠️ 「内置那 30 首换台机器也放得出来」这条信息**页面上没有别处在说了**（行里的小标、
+      卡头的读数都删了）。这是用户点名的结果，不是漏，别再往回加。 */
+function libWarn() {
+  if (!LIB || LIB.dirOk) return '';
+  /* ★ 2026-09-25 晚加「主人」（用户：「固定话术也要说主人」）。这句出现在状态行/
+     对话框里，是**小瑞在说话**，所以叫。
+     ⚠️ 但隔壁 `noLibWhy()` **故意不叫**：它有两副面孔 —— 一半是列表占位符和
+        "读曲库失败：…（去 ui/config.json 指一下目录）"这种**诊断文案**，那种句子
+        前面缀一个「主人」是错位的。这两句长得像，别顺手一起改。 */
+  return `主人，没找到这个目录：${LIB.dir || '（没配）'} —— 现在只放得了内置那份。`;
+}
+
+/* **按当前这一首现算**，不是写死一句 —— 写死的话切歌之后它还挂在那儿，
+   等于在说假话。也不许编歌手说过的话：这里只陈述"现在在放什么 / 停在哪"。
+   ★ 2026-09-25：这个函数的输出**就是对话框最下面那行状态**（`xqState(xqSay())`），
+   不再往气泡里写。
+   ⚠️ 它**可以返回空串**：一首都没放过的时候没有状态可报（入口是下面那三枚 chip），
+      这时 `paintLog()` 那条 `XQ_ST ? … : ''` 就不渲染状态行。别改成无条件渲染
+      空的 `<p class="st">` —— 那会是一根没有字的虚线。 */
+function xqSay() {
+  const t = TRACKS[idx];
+  if (!LIB || !LIB.ok) return noLibWhy();
+  if (!t) return '曲库是空的：两个来源里都没找到能放的文件（认 mp3 / m4a / wav / ogg / opus / flac）。';
+  const name = t.artist ? `《${t.title}》· ${t.artist}` : `《${t.title}》`;
+  if (!au.src) return libWarn();
+  if (au.paused) return `${name} 停在这儿了 —— 接着放，还是换一首？`;
+  return `正在放 ${name}。`;
+}
+
+/* ★ 2026-09-25：这一节从"一个气泡装一句现算的话"改成**一块消息流**。
+   用户：「右侧对话框，目前只有一行文字，可以预留多行对话区域，后续接入 DeepSeek
+   API，多轮聊天时界面不会崩」。
+   现在 `#xqBubble` 里只有两种孩子（顺序就是显示顺序）：
+     · 上面是**聊过的那些** —— `XQ_LOG`，一条一个 `<p class="m">`，最多 30 条；
+     · 中间一根 `.sp` 空条（撑开空白用，见 CSS 那段）；
+     · 最下面是**一行状态** —— `XQ_ST`，永远只有一条、永远在最下面、原地改内容。
+   ⚠️ **状态为什么不进 XQ_LOG**：它每 play/pause 一次就变一次，进日志等于往对话里
+   不停插"正在放…"；而且 30 条的上限是**从头丢**的，它能把真聊天记录全挤出去。
+   分开之后两边都对：状态永远看得见（钉在底部）、聊天记录只涨不刷。
+   ⚠️ 状态行**不参与裁剪**，所以检查脚本 L 段要的那句曲库来源（「没找到 … 内置」）
+   进来了就不会被挤走 —— 那正是它的判据，别把它挪进 XQ_LOG。
+   ⚠️ 文本一律走 `XQ.esc()` 再进 innerHTML：将来接 DeepSeek，模型的话就是外部输入，
+   现在这条不加，接进来的第一天就是个 XSS 口子。 */
+const XQ_LOG = [];            // 聊过的（不含最下面那行状态）
+const LOG_MAX = 30;           // 上限。多轮聊天不能把 DOM 撑成无限长
+let XQ_ST = '';               // 最下面那行状态的内容
+
+/* ★ 2026-09-25 晚：**打字聊天**那一路的两个变量。
+   `SAY_WAIT` = 我打出去、**还在等回音**的那句话（原文）。服务端那条带 `user` 的
+   回音一到就清空；它不为空时对话框底下多一行「小瑞正在想…」。
+   ⚠️ 它同时是**过滤器**，这不只是显示用：小瑞的**主动播报**（疲劳预警那段
+      40~60 字）和**语音**那一路（`voice:true`）走的是**同一个 `say` 广播**。
+      不按这句话比对，这一页会突然冒出"别人问的"问答气泡。判据见 onSay。
+   ⚠️ 它**不进 XQ_LOG**：正在想的那一行是"临时状态"、不是聊过的一句
+      （和 `XQ_ST` 同一个理由，见上面那段）。 */
+let SAY_WAIT = '';
+let SAY_TIMER = null;         // 等回音的兜底计时器（服务端可能压根不回）
+let DOWN_N = 0;               // 和座舱断过几次（只给检查脚本读：掉线是偶尔还是常态）
+/* ★ 上一次 `xqSend` **为什么没发出去**（没连上 / 上一句还在等）。只为一件事存在：
+   红的时候能一眼看出是哪条 early-return 拦的 —— 别的都只是猜测（见 stats().why，
+   O 段那条"点发送没发出去"就是靠它定位的）。
+   ⚠️ 它**只在 `xqSend` 返回 false 时**被写；发成功时清空。 */
+let SAY_WHY = '';
+
+/* 追加一条小瑞（或主人）说的话。**连着说两遍同一句没有意义**，第二遍丢掉。 */
+function xqPush(text, who) {
+  if (!text) return;
+  const last = XQ_LOG[XQ_LOG.length - 1];
+  if (last && last.text === text && last.who === (who || 'xq')) return;
+  XQ_LOG.push({ text: text, who: who || 'xq' });
+  while (XQ_LOG.length > LOG_MAX) XQ_LOG.shift();
+  paintLog();
+}
+
+/* 改最下面那行状态。内容没变就什么都不做（别白刷一遍 DOM、白滚一次）。 */
+function xqState(text) {
+  const t = text || '';
+  if (t === XQ_ST) return;
+  XQ_ST = t;
+  paintLog();
+}
+
+function paintLog() {
+  const b = $('xqBubble');
+  b.hidden = false;
+  b.innerHTML = XQ_LOG.map((m) =>
+      `<p class="m" data-who="${m.who === 'me' ? 'me' : 'xq'}">${XQ.esc(m.text)}</p>`).join('')
+    + '<div class="sp"></div>'
+    /* 「小瑞正在想…」夹在 `.sp` 和状态行**中间**：它属于对话那一摞（最新的在
+       最下面），而状态行是这一格的页脚、永远压在最底下 —— 顺序不能换。
+       ⚠️ 检查脚本 I2 段断言的是"最后一条是状态行"，所以这一行必须排在它前面。 */
+    + (SAY_WAIT ? '<p class="m waiting" data-who="xq">小瑞正在想…</p>' : '')
+    + (XQ_ST ? `<p class="m st" data-who="xq">${XQ.esc(XQ_ST)}</p>` : '');
+  /* 新话在最下面：写完自己滚到底。`scrollHeight` 必须在这之后读（innerHTML 一写
+     完布局就是新的），写在前面拿到的是上一版的高度。 */
+  b.scrollTop = b.scrollHeight;
+}
+
+/* ================================== 打字聊天（2026-09-25 晚，用户点名要的） */
+/* ★★ 2026-09-25 晚，用户实测报了一个**真问题**：他打「放歌」，小瑞回了
+   「好的主人，舒缓的歌已经放上了，音量也帮您调小了些」—— 而**播放器一动没动**。
+   根因有两层，两层都补了：
+     ① `ui/xiaorui.py` 的系统提示把那几条"可用动作"写得太像"你能做"，模型就用了
+        完成时。那里加了第 7 条：**没有执行能力、不许用完成时**（全站生效）。
+     ② 这一页**没有任何东西去执行它说的动作** —— 于是那句话只能是谎话。
+   所以这里把**命令**和**闲聊**分开：
+     · 认得出是命令（放歌 / 下一首 / 停一下 / 小声点…）→ **本地真做**，回话是
+       **按执行完的真实结果**拼出来的（所以它才敢用完成时）；
+     · 认不出 → 还是走 DeepSeek 那条路（`{type:'say'}` 上行）。
+   ⚠️ 命令**故意不发给服务端**：模型没有执行能力，发过去只会换一句漂亮的谎话回来。
+      这不是"省一次请求"，是"能做的去做、能说的去说"。
+   ⚠️ 命令那一路**不要求连上服务端**（本地就能做），所以拦在 `!LINK.online` 那道
+      守卫**前面** —— 用 `file://` 打开这一页时命令照样能用。
+   ⚠️ 回话**由执行结果生成**，一句都不是写死的：「放上了」只在 `playTrack()` 真返回
+      true 时才会出现；被浏览器挡住就说"你点一下播放键"（`tryPlay()` 的返回值就是
+      为这个存在的，疲劳联动那次踩过同一个坑）。 */
+const MUSIC_CMD = [
+  ['pause',   /(暂停|停一下|停下来|先停|别放了)/],
+  ['resume',  /(继续放|接着放|接着听|继续听|接着响)/],
+  ['next',    /(下一首|下一曲|换一首|换歌|切歌|不好听)/],
+  ['prev',    /(上一首|上一曲|前一首)/],
+  ['restart', /(从头|重放|重新放|再放一遍|重头)/],
+  ['volDown', /(小声|轻一点|声音小|音量小|调小|降低音量|太吵)/],
+  ['volUp',   /(大声|响一点|声音大|音量大|调大|提高音量|听不清)/],
+  ['play',    /(放歌|放音乐|放首|放一首|放点|放个|来一首|来点|来段|播一首|播放|随便放|听点|听歌|想听)/],
+];
+/* ⚠️ **这张表的顺序就是优先级**：「下一首」里含「一首」，而 `play` 那条也含
+   「一首」—— `next` 必须排在 `play` 前面，不然"下一首"会被当成"随便放一首"。
+   取的是**第一个命中**的（`find`），所以别随手重排。 */
+/* 「舒缓一点」这类**修饰**（不是命令）：命中就从**内置那批**里挑小瑞量出来的
+   那一首 —— 和疲劳联动同一张表、同一条"只在放得出来的里面挑"的规矩。 */
+const CALM_ASK = /(舒缓|轻音乐|安静|放松|催眠|助眠|慢一点|温柔|柔一点|有点困|累了|疲劳)/;
+
+function trackName(t) {
+  if (!t) return '（没选）';
+  return t.artist ? `《${t.title}》· ${t.artist}` : `《${t.title}》`;
+}
+
+/* 认得出是命令就返回动作名，认不出返回 null（那就走 DeepSeek 那条路）。 */
+function cmdOf(text) {
+  const hit = MUSIC_CMD.find(([, re]) => re.test(text));
+  return hit ? hit[0] : null;
+}
+
+/* 真做 + 如实说。每条回话都从**真实结果**现算。 */
+async function runCmd(act, text) {
+  if (!TRACKS.length) { xqPush(noLibWhy()); return; }
+  /* ★ 2026-09-25 晚：这几句回话**都加了「主人」**。用户原话「并且固定话术也要说
+     主人」—— 上一版只给 `ui/xiaorui.py` 那三张对话表加，媒体页自己这一套（命令
+     回话 + 疲劳推荐 + 曲库读不到的说明）没加，于是同一个座舱里小瑞一半叫、一半
+     不叫，一眼就能看出"哪句是话术"。
+     ⚠️ 只加呼语，**一个判据都不动**：检查脚本是按子串认的（"停了"/"放上了 "/
+        "接着放 "），所以「主人，」只能缀在**句子最前面**，别把那些词挪位置。 */
+  if (act === 'pause') {
+    if (!au.src) { xqPush('主人，现在没在放东西，没什么可停的。'); return; }
+    if (au.paused) { xqPush('主人，已经是停着的了 —— 要接着听就说一声。'); return; }
+    au.pause();
+    xqPush('主人，停了。');
+    return;
+  }
+  if (act === 'resume') {
+    if (!au.src) { xqPush('主人，还没挑过曲子呢 —— 要我随便挑一首吗？'); return; }
+    if (!au.paused) { xqPush('主人，正放着呢。'); return; }
+    xqPush(await tryPlay()
+      ? `主人，接着放 ${trackName(TRACKS[idx])}。`
+      : '主人，要接着放得你点一下播放键，浏览器不让它自己响。');
+    return;
+  }
+  if (act === 'volUp' || act === 'volDown') {
+    const v = $('vol');
+    const nv = Math.min(100, Math.max(0, (+v.value) + (act === 'volUp' ? 10 : -10)));
+    if (nv === +v.value) {
+      xqPush(act === 'volUp' ? '主人，已经是最大声了。' : '主人，已经是最小声了。');
+      return;
+    }
+    v.value = nv;
+    au.volume = nv / 100;
+    xqPush(`主人，音量调到 ${nv}% 了。`);   // 这个数是从滑杆上读回来的，不是编的
+    return;
+  }
+  if (act === 'restart') {
+    au.currentTime = 0;
+    await playTrack(idx);
+    xqPush(`主人，${trackName(TRACKS[idx])} 从头来。`);
+    return;
+  }
+  /* ★ 说「放歌」而**当前正是疲劳档**时走舒缓那一档 —— 这本来就是"感知驾驶员状态"
+     该有的样子；主人明确说了"舒缓"也算。⚠️ 但**现摇一首**（`pickCalm()`），不是
+     复用它上次说的那首 `calmIdx` —— 否则"每次放歌都是同一首"，和上面那条被用户
+     点名的毛病是同一个。 */
+  const wantCalm = CALM_ASK.test(text) || lastOrd >= 1;
+  let i;
+  if (act === 'next') i = (idx + 1) % TRACKS.length;
+  else if (act === 'prev') i = (idx - 1 + TRACKS.length) % TRACKS.length;
+  else if (wantCalm) {
+    const c = pickCalm();
+    i = c >= 0 ? c : Math.floor(Math.random() * TRACKS.length);
+    calmNote(c);                    // 记一笔给"别的页面那颗按钮"共用（见 calmNote）
+  } else i = Math.floor(Math.random() * TRACKS.length);   // 「随便放」：整张曲库摇
+  const ok = await playTrack(i);
+  xqPush(ok ? `主人，放上了 ${trackName(TRACKS[i])}。`
+            : `主人，挑了 ${trackName(TRACKS[i])}，但浏览器不让它自己响 —— 你点一下播放键。`);
+}
+
+/* 我打出去一句话。
+   ★ **先画自己的气泡、不等服务端** —— 打字的人要立刻看见自己那句进去了，
+     等一秒空白再接上，会让人以为没发出去、于是再按一次。
+   返回 true 表示"真的发出去了"，调用方**只在这种情况下清空输入框** ——
+   不然连不上服务端时那句话就从输入框里消失了、等于白打。
+   ⚠️ 一次只等一句（`SAY_WAIT` 不为空就拦住）：回音是按 `user` 原文比对的，
+      两句同时在飞的时候，先回的那句会填到后打的那句头上。
+   ⚠️ `userAct()`：打字也算"用户亲手动过"，和点 chip / 点播放键记同一笔
+      （疲劳推荐那条"6 秒内不抢歌"的护栏读的就是它）。 */
+function xqSend(text) {
+  text = (text || '').trim();
+  if (!text) { SAY_WHY = '文本是空的'; return false; }
+  /* ★ 命令先拦一道（见上面那一大段）：**本地就能做，不要求连上服务端**。 */
+  const act = cmdOf(text);
+  if (act) {
+    SAY_WHY = '';               // 命令**真的发出去了**（本地执行），没有失败原因
+    userAct();
+    xqPush(text, 'me');
+    /* async 但**不等**：回话由它自己按真实结果 push。挂了要冒出来（不吞异常）——
+       `console.error` 会被检查脚本的"零报错"那条逮住。 */
+    runCmd(act, text).catch((e) => {
+      console.error('runCmd 失败', e);
+      xqPush('主人，这个动作没做成 —— 页面里报了个错。');
+    });
+    return true;
+  }
+  if (!LINK || !LINK.online) {
+    SAY_WHY = '没连上服务端';
+    XQ.flash('还没连上座舱服务，这句话没发出去（用 run_ui.bat 启动服务端）');
+    return false;
+  }
+  if (SAY_WAIT) { SAY_WHY = '上一句还在等回音'; XQ.flash('上一句还在等小瑞回话，稍等一下'); return false; }
+  userAct();
+  xqPush(text, 'me');
+  SAY_WAIT = text;
+  SAY_WHY = '';
+  paintLog();
+  LINK.send({ type: 'say', text });
+  /* 兜底。服务端那一支在**还没拿到座舱状态**（`st is None`）时是静默 return 的，
+     网络也可能就在这一刻断了。不等的话「小瑞正在想…」会永远挂在那儿 ——
+     那比不回话更像坏了。等到就作废，迟到的回音由 onSay 的比对挡掉。 */
+  clearTimeout(SAY_TIMER);
+  SAY_TIMER = setTimeout(() => {
+    if (!SAY_WAIT) return;
+    SAY_WAIT = '';
+    xqPush('主人，小瑞没接上话（服务端没回），再试一次。');
+  }, 20000);
+  return true;
+}
+
+/* 服务端回来的一句话（`{type:'say'}`）。
+   ★ 这一页**只认"我打出去那句的回音"** —— 判据是 `d.user === SAY_WAIT`，
+     服务端在 `payload["user"]` 里原样带回了我的话。
+   ⚠️ 为什么不用"有等待就收"这种松判据：小瑞的**主动播报**（疲劳预警那段 40~60 字）
+      和**语音**那一路（`voice:true`）走的是**同一个 `say` 广播**（`server.py` 的
+      `handle()` / `voice_answer()` 各有一条 `hub.broadcast`）。松判据下，你在这页
+      打字的同时驾驶监测页来了一条预警，预警就会被当成回音填进"正在想…"那一行。
+      按原文比对，别人问的话这一页自动不认。
+   ⚠️ 认不出就**什么都不做**（`SAY_WAIT` 也留着，让兜底计时器去收），
+      不要顺手把它清掉 —— 那会让真回音到达时已经没人在等。 */
+function onSay(d) {
+  if (!d || !d.text) return;
+  if (!SAY_WAIT || d.user !== SAY_WAIT) return;
+  clearTimeout(SAY_TIMER);
+  SAY_WAIT = '';
+  xqPush(d.text);                       // who 缺省就是 'xq'
+}
+
+/* 输入框那一行的绑定。和 `detail.html` 的 `bindTalk()` 是同一件事，
+   差别只有一个：这一页**没有麦克风**（没有 `XQ.asr` 那一路，理由见文件头），
+   所以没有 `XQ.asr.bind`。 */
+function bindSay() {
+  const input = $('xqSay');
+  if (!input) return;
+  const go = () => { if (xqSend(input.value)) input.value = ''; };
+  $('xqSend').onclick = go;
+  input.addEventListener('keydown', (e) => {
+    /* ⚠️ `e.isComposing` 这一条**不能省**：中文输入法里**回车是"选字"**。
+       不挡的话，打字法候选框里按回车确认一个词，就会把那半句话发出去 ——
+       而且是在你还没打完的时候。`keyCode === 229` 是同一件事的老写法，
+       现代浏览器 `isComposing` 就够。 */
+    if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
+      e.preventDefault();
+      go();
+    }
+  });
+}
+
+/* 常驻的三枚 chip，文案是"想干什么"、落到哪一首由 JS 决定。
+   ★ 2026-09-25 起这里会**多出第四枚**「听这首舒缓的」（疲劳时小瑞挑出来的那首，
+   见 calmWatch）—— 它是临时的那一枚，所以不进这张表，由 chipList() 现拼。
+   ⚠️ 四枚也**不用再加 CSS**：`.xq-chips button` 是 `flex:1 1 0` 均分，实测三枚
+   各 152px（1672×940），四枚时各约 112px，「听这首舒缓的」六个字要 98px，
+   仍然装得下一行 —— 四枚是等宽的，不会大小不一。 */
+const XQ_CHIPS = [
+  ['随便挑一首', 'shuffle'], ['下一首', 'next'], ['从头再听', 'restart'],
+];
+
+function chipList() {
+  const out = XQ_CHIPS.slice();
+  if (calmIdx >= 0 && TRACKS[calmIdx]) out.push(['听这首舒缓的', 'calm']);
+  return out;
+}
+
+function renderXq() {
+  xqState(xqSay());        // 最下面那行：永远照"现在在放什么"现算
+  const host = $('xqChips');
+  host.innerHTML = chipList().map(([label, act]) =>
+    `<button type="button" data-act="${act}">${label}</button>`).join('');
+  host.querySelectorAll('button').forEach((c) => { c.onclick = onChip; });
+}
+
+function onChip(e) {
+  const act = e.currentTarget.dataset.act;
+  userAct();               // 用户亲手点的，先记一笔（见 calmWatch 那条护栏）
+  if (!TRACKS.length) { XQ.flash(noLibWhy()); return; }
+  if (act === 'shuffle') playTrack(Math.floor(Math.random() * TRACKS.length));
+  else if (act === 'next') playTrack((idx + 1) % TRACKS.length);
+  else if (act === 'calm') playTrack(calmIdx);   // 「听这首舒缓的」
+  else { au.currentTime = 0; playTrack(idx); }   // 从头再听
+}
+
+/* 用户**亲手**动了一下播放器（点行 / 点播放键 / 拖进度 / 点 chip）。
+   ⚠️ 只在**用户**那个入口记，不在 `playTrack()` 里记 —— 自动推荐也要走
+   `playTrack()`，记在那儿就等于"小瑞自己也算用户操作过"，护栏自己把自己锁死。 */
+function userAct() { lastAct = Date.now(); }
+
+/* ======================================================= 5 · 播放引擎 */
+function fmt(s) {
+  if (!isFinite(s) || s < 0) return '0:00';
+  const m = Math.floor(s / 60), r = Math.floor(s % 60);
+  return m + ':' + String(r).padStart(2, '0');
+}
+
+function noLibWhy() {
+  if (!LIB) return '曲库还没读出来，稍等一下';
+  if (LIB.error) return `读曲库失败：${LIB.error}`;
+  return `没找到这个目录：${LIB.dir || '（没配）'}（内置那份也不在）`
+       + ' —— 在 ui/config.json 的 media.dir 里指到你的音乐目录';
+}
+
+/* 「接着听」记的是**文件名**（不是序号 —— 列表顺序会随目录变）。
+   localStorage 在 file:// 下可能直接抛异常，所以整个包起来。 */
+function saveLast(t) {
+  try { localStorage.setItem('xq.media.last', t.file); } catch (e) { /* 记不住就算了 */ }
+}
+/* ⚠️ 2026-09-24：`lastIndex()` 现在**没有调用方了** —— 它唯一的用户是推荐歌单里
+   那张「接着听」（删推荐歌单时一起没了）。`saveLast()` 还在写，所以这个读函数的
+   留着不碍事、要恢复「接着听」也现成。真要清干净就两个一起删。 */
+function lastIndex() {
+  let name = null;
+  try { name = localStorage.getItem('xq.media.last'); } catch (e) { name = null; }
+  if (!name) return -1;
+  return TRACKS.findIndex((t) => t.file === name);
+}
+
+/* 时长：**一次只读一首，读完再下一首**，不是 155 个 `<audio>` 一起挂上去。
+   ⚠️ 为什么不是"全部一起读"：155 个元素各自开一次文件、各自解一次头，一进页面
+   就是 155 路并发；顺序读几秒钟就读完了，而且**当前在放的那一首不会被挤掉**
+   （探针只读元数据、不播）。
+   ⚠️ **每一首用一个新元素**，不是复用同一个：复用就得靠 `_i` 之类的标记来判断
+   "这次回调是谁的"，而超时兜底会让标记和回调错位 —— 表现是**把 A 的时长写到
+   B 那一行**（安静地写错，最难查）。一个元素一双手工销毁，回调天然对得上。
+   ⚠️ 回来的时候**只改那一行**，不整张重画：整张重画会把列表的滚动位置弹回顶部
+   （155 行的列表里这很烦）。那一行还没渲染出来（元数据先到）就只记在 `t.dur`
+   上，下一次 `renderList` 自己会带上 —— 这就是这里不能只写 `querySelector` 的原因。 */
+const probeQ = [];
+let probeTimer = 0;
+
+function probeDurations() {
+  for (let i = 0; i < TRACKS.length; i++) probeQ.push(i);
+  nextProbe();
+}
+
+function nextProbe() {
+  const i = probeQ.shift();
+  /* 队列排空 = 时长探测收工，这时候才轮到舒缓度扫描（见 calmScan 那段：
+     两件事都在解码同一批文件，排着跑而不是抢着跑）。 */
+  if (i == null) { listNote(); calmScan(); return; }
+  const a = new Audio();
+  a.preload = 'metadata';
+  let done = false;
+  const settle = (dur) => {
+    if (done) return;                    // 超时和事件撞车时只算第一次
+    done = true;
+    clearTimeout(probeTimer);
+    a.onloadedmetadata = null;
+    a.onerror = null;
+    a.removeAttribute('src');            // 松开这个文件句柄
+    const t = TRACKS[i];
+    if (dur == null) t.bad = true; else { t.dur = dur; t.bad = false; }
+    const row = $('tracks').querySelector(`li[data-i="${i}"]`);
+    const cell = row && row.querySelector('.dur');
+    if (cell) cell.textContent = t.bad ? '读不到' : (t.dur ? fmt(t.dur) : '—');
+    /* 每 10 首刷一次右上角那句进度，全读完再刷一次（收尾那一次在 nextProbe 里）。 */
+    if (probeQ.length % 10 === 0) listNote();
+    nextProbe();
+  };
+  a.onloadedmetadata = () => settle(a.duration);
+  a.onerror = () => settle(null);
+  a.src = fileUrl(TRACKS[i]);
+  /* 兜底：极个别文件既不 loadedmetadata 也不 error，那样整个队列会停在这儿。
+     1.5 秒不动就当它读不出来 —— 顺序读的正常值是几十毫秒，这个窗口不会误伤。 */
+  clearTimeout(probeTimer);
+  probeTimer = setTimeout(() => settle(null), 1500);
+}
+
+function listNote() {
+  /* ★ 2026-09-25 用户点名：「共 155 首 · 内置 30 · 点一行就放（列表可以滚）这些字
+     去掉」。所以**常态（曲库读完、没有坏文件）这一格是空的** —— 那张卡的卡头
+     就只剩「我的音乐」四个字，跟旁边「小瑞 · 音乐推荐」同一副样子。
+     ⚠️ 但这一格**不删**：它还是"读曲库中 / 曲库没接上 / 曲库是空的 / 有 N 个
+        文件读不到 / 读时长… N/M"唯一的落点。用户要去掉的是那句**常态读数**，
+        不是"出错时如实说"这条规矩 —— 曲库接不上还一声不吭，那是骗人。
+     ⚠️ 被去掉的那组数字**没有失去验证**：它在 DOM 上的机器可读位还在
+        （每行的 `data-src`、`/music.json` 本身），`_check_media_lib.py` 的
+        A / A2 两段读的就是它们，不是这行字。而"这行字不许回来"有一条反面钉子
+        —— 见 `_check_media_lib.py` A 段和 `_check_prose.py` 的 GONE 名单。 */
+  const el = $('listNote');
+  if (!LIB) { el.textContent = '读曲库…'; return; }
+  if (!LIB.ok) { el.textContent = '曲库没接上'; return; }
+  if (!TRACKS.length) { el.textContent = '曲库是空的'; return; }
+  const bad = TRACKS.filter((t) => t.bad).length;
+  if (bad) { el.textContent = `有 ${bad} 个文件读不到`; return; }
+  const ok = TRACKS.filter((t) => t.dur).length;
+  el.textContent = ok === TRACKS.length ? '' : `读时长… ${ok}/${TRACKS.length}`;
+}
+
+/* 真实峰值。
+   ⚠️ **只取文件开头一段**（`Range: bytes=0-2MB`），不是整首：一首 10 分钟的
+   mp3 整段解码出来是 200MB 左右的 PCM，在浏览器里解一遍要几秒、还可能把
+   内存顶到 pagefile 上（这台机器的 C 盘只剩几 GB）。开头 2MB 在 320kbps 下
+   也是 ~50 秒的音频，画一条 150 根的波形绰绰有余 —— 而且服务端那条
+   `/music/<文件名>` 本来就带 Range（拖进度条靠的就是它）。
+   ⚠️ 用 **OfflineAudioContext**，不要用 `new AudioContext()`：后者在没有用户手势
+   的时候创建，Chrome 会打一条 "The AudioContext was not allowed to start" 的
+   警告（本项目的老规矩是控制台零报错）。`decodeAudioData` 定义在
+   BaseAudioContext 上，离线上下文一样能解码，而且**不参与自动播放策略**。
+      顺带：离线上下文按它的采样率重采样（这里 16 kHz），44.1k 的 mp3 解出来
+      也只有 1/3 的样本数，内存又省一截。
+   ⚠️ 失败要**安静地退回等宽柱子**：`file://` 直接打开时 fetch 会被挡掉，
+   那时候波形画不出来是意料之中的，不该在控制台刷一片红。所以 catch 住不打印。 */
+/* mp3 开头常常挂着 ID3v2 标签（里面是专辑图，几百 KB 到几 MB）。
+   ⚠️ **按固定长度盲取"文件开头一段"会整段都是标签、一个音频样本都没有**：
+      内置那 30 首实测有 3 首的标签比取的那一段还长（537 KB / 954 KB / 1.56 MB），
+      解码出来 0 个样本 —— 而这**不是**"这首歌量不出来"，是"我取错地方了"。
+      （症状很有迷惑性：那 3 首恰好都是慢歌，会让人以为"慢歌算不出来"。）
+   所以先花 10 个字节问一下标签多长，从**音频真正开始的地方**取。
+   不是 ID3v2（wav/flac/没标签/ID3v1）就返回 0，照常从文件开头取。
+   ⚠️ 那 10 个字节**不能省**：省了就得把窗口放大到"比最大的标签还大"，
+      而标签能有多大是没有上限的（2MB 只是今天没踩到）。 */
+async function audioStart(url) {
+  try {
+    const r = await fetch(url, { headers: { Range: 'bytes=0-9' } });
+    if (!r.ok && r.status !== 206) return 0;
+    const h = new Uint8Array(await r.arrayBuffer());
+    if (h.length < 10 || h[0] !== 0x49 || h[1] !== 0x44 || h[2] !== 0x33) return 0;
+    /* ID3v2 的长度是 4 个**去掉最高位**的字节（synchsafe），**不含**这 10 字节头。 */
+    const n = ((h[6] & 0x7f) << 21) | ((h[7] & 0x7f) << 14)
+            | ((h[8] & 0x7f) << 7) | (h[9] & 0x7f);
+    return 10 + n + ((h[5] & 0x10) ? 10 : 0);   // 标志位 0x10 = 有 footer，再加 10
+  } catch (e) {
+    return 0;      // 问不出来就照老办法从头取，不要因为这一步把整件事弄挂
+  }
+}
+
+async function loadPeaks(url) {
+  try {
+    const off = await audioStart(url);
+    const r = await fetch(url, {
+      headers: { Range: 'bytes=' + off + '-' + (off + PEAK_BYTES - 1) },
+    });
+    if (!r.ok && r.status !== 206) return null;
+    const buf = await r.arrayBuffer();
+    const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ac = new AC(1, 1, 16000);
+    const ab = await ac.decodeAudioData(buf);
+    const ch = ab.getChannelData(0);
+    const step = Math.max(1, Math.floor(ch.length / BUCKETS));
+    const out = [];
+    for (let i = 0; i < BUCKETS; i++) {
+      let m = 0;
+      const s = i * step, e = Math.min(ch.length, s + step);
+      for (let j = s; j < e; j++) { const v = Math.abs(ch[j]); if (v > m) m = v; }
+      out.push(m);
+    }
+    return out;
+  } catch (e) {
+    return null;
+  }
+}
+
+function drawWave(arr) {
+  const host = $('wave');
+  if (arr && arr.length) {
+    const mx = Math.max.apply(null, arr) || 1;
+    host.innerHTML = arr.map((v) => {
+      const h = Math.max(6, Math.round((v / mx) * 100));
+      return `<i style="height:${h}%"></i>`;
+    }).join('');
+  } else {
+    /* 拿不到峰值就画等宽柱子（视觉上是个"还没测量"的样子），
+       而不是画一个假波形 —— 假波形会被当成真的。 */
+    host.innerHTML = Array.from({ length: BUCKETS }, () => '<i style="height:34%"></i>').join('');
+  }
+  paint();
+}
+
+/* 进度：把走过的柱子染色。用"柱子序号"而不是百分比遮罩，横向才对得齐。 */
+function paint() {
+  const d = au.duration || 0;
+  const p = d ? au.currentTime / d : 0;
+  const want = Math.round(p * BUCKETS);
+  const bars = $('wave').children;
+  for (let i = 0; i < bars.length; i++) {
+    const on = i < want;
+    if (bars[i].classList.contains('done') !== on) bars[i].classList.toggle('done', on);
+  }
+  $('tCur').textContent = fmt(au.currentTime);
+  $('tDur').textContent = fmt(d);
+}
+
+function renderList() {
+  const ul = $('tracks');
+  if (!LIB) { ul.innerHTML = '<li class="empty">读曲库…</li>'; return; }
+  if (!TRACKS.length) { ul.innerHTML = `<li class="empty">${XQ.esc(noLibWhy())}</li>`; return; }
+  /* ★ 2026-09-25：`<b>歌名</b><i>歌手</i>` 两段（用户：「统一字段：歌曲名 | 歌手，
+     去掉多余文字」）—— 中间的「·」不是文本，是 `i::before` 给的，
+     所以 `.tx` 的 textContent 是干干净净的两段。
+     ⚠️ `data-src` 是 2026-09-25 加的那枚「内置」小标**删掉之后留下的机器可读位**：
+       人看的「内置 30」在卡头 `#listNote`、`#tFmt` 各有一份，而**脚本要的那一份**
+       （内置那批是否仍排在列表最前面 / 舒缓音乐只在内置那批里挑）就靠这个属性，
+       所以别顺手把它删掉 —— `_check_media_lib.py` A2 段和 `calmScan()` 都读它。 */
+  ul.innerHTML = TRACKS.map((t, i) => `
+    <li data-i="${i}" data-src="${XQ.esc(t.src || '')}" class="${i === idx ? 'on' : ''}${i === idx && au.src ? ' playing' : ''}">
+      <span class="no">${i === idx ? '▶' : i + 1}</span>
+      ${XQ.icon('music')}
+      <span class="tx"><b>${XQ.esc(t.title)}</b>${t.artist ? `<i>${XQ.esc(t.artist)}</i>` : ''}</span>
+      <span class="dur">${t.bad ? '读不到' : (t.dur ? fmt(t.dur) : '—')}</span>
+      <span class="eq"><i></i><i></i><i></i></span>
+    </li>`).join('');
+  ul.querySelectorAll('li[data-i]').forEach((li) => {
+    /* `userAct()` 在 `playTrack` **之前**记 —— 见 calmWatch 那条护栏。 */
+    li.onclick = () => { userAct(); playTrack(+li.dataset.i); };
+  });
+}
+
+/* ⚠️ 切歌 / 暂停时**只有这几行要改**，不要把 `renderList()` 拉进来 ——
+   整张列表重画会把它滚到的位置弹回顶部（155 行）。 */
+function markRow() {
+  $('tracks').querySelectorAll('li[data-i]').forEach((li) => {
+    const i = +li.dataset.i;
+    const on = i === idx;
+    const playing = on && au.src;
+    li.classList.toggle('on', on);
+    li.classList.toggle('playing', playing);
+    const no = li.querySelector('.no');
+    if (no) no.textContent = on ? '▶' : (i + 1);
+  });
+}
+
+/* 底栏那一句「小瑞 正在播放《…》」。**没有在播就直说待机**，
+   不许在暂停的时候还挂着"正在播放"。 */
+function renderTalk() {
+  const t = TRACKS[idx];
+  const st = !t || !au.src ? '待机中'
+    : (au.paused ? `已暂停 · ${t.title}` : `正在播放《${t.title}》`);
+  $('talkNow').innerHTML = `小瑞 <b>${XQ.esc(st)}</b>`;
+}
+
+/* ★ 2026-09-25 深夜：「正在播放」那张封面里的**音乐标志**换成用户给的那张图。
+   原话：「多媒体音乐标志换成…图片效果…中的多媒体音乐标志.png 在多媒体页那个」。
+   "在多媒体页那个" = 这一张 14rem 的方形封面（`.now-row .art` / `#art`），
+   不是左导航那一格里 1.05rem 的小音符 —— 那张图是 **2048x2048 的方形**
+   （圆盘 + 声波 + 中心一个发光音符），本来就是照着"封面"给的尺寸；
+   导航/列表里那些小音符是 `XQ.icon('music')` 画的**字形**，放大到 20px 以外
+   就糊，也不该跟着换。
+   ⚠️ 图走 `$('art').innerHTML = ...` 这一处，**两个分支各有一句**（没曲目 /
+   有曲目），只改一处的话"曲库没接上"的时候还是那个蓝音符。
+   ⚠️ 用 `alt=""`（空）而不是 `alt="音乐"`：歌名就在右边紧挨着，
+      这块是**装饰**，读屏软件念一遍"音乐"再念歌名是噪音。 */
+const ART_HTML = '<img src="assets/media_logo.jpg" alt="" draggable="false">';
+
+function renderNow() {
+  const t = TRACKS[idx];
+  if (!t) {
+    $('tName').textContent = '—';
+    $('tSub').textContent = LIB && LIB.ok ? '这个目录里没有音频文件' : '曲库没接上';
+    $('art').innerHTML = ART_HTML;
+    $('tFmt').textContent = '—';
+    $('stateNote').textContent = '未开始';
+    $('ppBtn').innerHTML = XQ.icon('play');
+    return;
+  }
+  $('tName').textContent = t.title;
+  $('tSub').textContent = (t.artist ? t.artist + ' · ' : '') + t.mb + ' MB';
+  $('art').innerHTML = ART_HTML;
+  $('tFmt').textContent = extOf(t.file) + (t.src === '内置' ? ' · 内置文件' : ' · 本机文件');
+  /* ⚠️ 这里原来还有一句 `$('tRate').textContent = t.mb + ' MB'` —— 容量在这一行
+     和上一行 `#tSub`（「歌手 · N MB」）里写了**两遍**，用户点掉的就是这一句。
+     别再把它加回来，`#tRate` 这个元素在 markup 里也已经删了（空引用会当场抛）。 */
+  /* `au.src` 一开始是空的 —— 那时候说"已暂停"不算撒谎但也不对（压根没开始），
+     说"未开始"才对。 */
+  $('stateNote').textContent = !au.src ? '未开始' : (au.paused ? '已暂停' : '播放中');
+  $('ppBtn').innerHTML = XQ.icon(au.paused ? 'play' : 'pause');
+}
+
+function renderAll() { renderList(); listNote(); renderNow(); renderTalk(); }
+
+/* 放不出来**必须说一句**。
+   ⚠️ 别写成 `au.play().catch(() => {})` —— 空 catch 的表现是"点了播放键什么都
+   没发生"，而按钮外观也不会变（`play` 事件没触发，`renderNow` 就没跑），
+   这正是最像"这个键坏了"的失败方式。`play()` 被拒的常见原因就是浏览器的
+   自动播放策略，出路是**人来再点一下**，所以提示里要写清楚这一点。 */
+async function tryPlay() {
+  /* ⚠️ 2026-09-25：这里原来先 `ensureEq()` 建 WebAudio 那张图、再 `resume()`、
+     最后才 `play()`（顺序反了会把声音卡在 suspended 的上下文里）。均衡器删掉
+     之后**没有图了**，声音直接从 `<audio>` 出来，只剩下面这一步 —— 这个函数
+     保留下来的意义就是"别写成空 catch"（见上面那段）。
+   ★ 2026-09-25：返回值从"一个一定 resolve 的 promise"改成**真话**（放起来了 true /
+   被浏览器挡了 false）。疲劳联动要靠它 —— 自动放那一首被挡的时候，小瑞得说
+   "点一下才能放"，而不是假装放上了（那是**看着像坏了**的那种失败）。 */
+  try {
+    await au.play();
+    return true;
+  } catch (e) {
+    XQ.flash('浏览器没让这首音频自己响起来 —— 再点一下播放键');
+    return false;
+  }
+}
+
+/* ⚠️ `noPlay` 是给**跨页恢复**用的（见 `resumeFrom()`）：回到这一页时要是刚才
+   是「暂停着离开的」，就得把这首歌摆回去、但**不许响一下**。写成"先 play 再
+   pause"会在屏幕上留几百毫秒的声音 —— 那不是恢复，是偷袭。
+   默认（不传）行为和以前一模一样，返回值 `ok` 的含义也不变。 */
+async function playTrack(i, noPlay) {
+  const t = TRACKS[i];
+  if (!t) { XQ.flash(noLibWhy()); return; }
+  const changed = (i !== idx) || !au.src;
+  idx = i;
+  if (changed) {
+    au.src = fileUrl(t);
+    /* ⚠️ **先把播放键按下，再去解波形**（旧版是反的：`await loadPeaks()` 挡在
+       `tryPlay()` 前面）。这批歌单首最大 12.8MB，解一次要等，而"按了播放键
+       半秒没动静"正是最像卡住的样子。所以：先出声音，波形随后到。
+       `peakTok` 是给"连续切歌"兜底的 —— 前一首的波形晚回来时不许画到新的
+       这一首上（那会是一条对不上的假波形）。 */
+    const tok = ++peakTok;
+    peaks = null;
+    drawWave(null);
+    loadPeaks(fileUrl(t)).then((a) => {
+      if (!a || tok !== peakTok) return;
+      peaks = a;
+      drawWave(a);
+    });
+  }
+  saveLast(t);
+  /* ⚠️ 顺序：`tryPlay()` 的返回值要先接下来，四行刷新放在它**后面**再 `return` ——
+     写成 `return await tryPlay()` 会把那四行跳过（切歌之后界面不更新）。 */
+  const ok = noPlay ? false : await tryPlay();
+  renderNow(); renderTalk(); markRow(); renderXq();
+  return ok;      // 真放起来了没有。疲劳联动要靠它说实话（见 recommendCalm）
+}
+
+/* ★★ 2026-09-25 晚：从别的页面回来时**接着放**（跨页播放的另一半，模块在
+   `ui/web/player.js`，理由和取舍都写在那个文件的头上）。
+   `XQP.resume()` 给的就是离开时那一秒 —— 存档按秒节流，所以最差差 1 秒。
+   ⚠️ **只认曲库里有的文件**：换了机器 / 用户目录没了的时候，存档里那一首可能
+      已经不在列表里。那时**什么都不放、不报错、不吭声** —— 这是顺手接上的东西，
+      接不上就退回普通开局，不该变成一条错误信息（用户没要求过"上次那首"）。 */
+function resumeFrom() {
+  const st = XQP.resume && XQP.resume();
+  if (!st || !st.file) return;
+  const i = TRACKS.findIndex((t) => t.file === st.file);
+  if (i < 0) return;
+  /* 音量先恢复：它和"放哪一首"不一样，是**用户调过的偏好**，滑块和 audio 都要跟上
+     （只写 au.volume 的话，界面上那个滑块会显示成 80，和实际不一致）。 */
+  const v = Math.round((typeof st.vol === 'number' ? st.vol : 0.8) * 100);
+  $('vol').value = String(Math.min(100, Math.max(0, v)));
+  au.volume = (+$('vol').value) / 100;
+  /* ⚠️ 位置必须在 `playTrack()` **之后**写：它内部会换 `au.src`，而换源会把
+     `currentTime` 归零 —— 先写就被它抹掉了。 */
+  playTrack(i, !st.playing).then(() => {
+    if (st.pos > 0) au.currentTime = st.pos;
+    if (!st.playing) renderNow();      // 摆回暂停的样子（状态行/播放键都跟着）
+  });
+}
+
+/* ============================================== 6 · 状态联动（DMS → 音乐） */
+/* ★ 2026-09-25 用户点名的"答辩大亮点"：
+   「当DMS监测疲劳时，小瑞自动在这里推荐舒缓音乐，把多媒体和疲劳监测模块打通，
+     这个是答辩大亮点！不是孤立的音乐播放器，是感知驾驶员状态的情感化座舱」。
+   这一节干的事就一句：**收到疲劳档位 → 从内置那批里挑一首舒缓的 → 说出来**。
+   ★ 2026-09-25 晚改：挑法从"永远取第一名"改成"**在最舒缓的那一档里摇**"，理由
+     写在 `pickCalm()` 上面（用户实测：轻度、中度两档推的是同一首）。
+
+   一、为什么只在**内置**那 30 首里挑
+     演示机上未必有用户的音乐目录（`ui/config.json` 的 `media.dir` 指到
+     D:\CloudMusic），而内置那 30 首是跟着项目走的，换台机器一定放得出来。
+     推荐一首放不出来的歌比不推荐更糟 —— 所以宁可把池子缩小。
+     （同一件事在 `renderList` 的 `data-src` 上也写着。）
+
+   二、凭什么说哪一首"舒缓" —— 量出来的，不是猜的
+     曲库表里**没有曲风字段**（只有 file/title/artist/mb/src），不能靠标签；
+     这台机器的 Python 环境里也没有能解码音频的库（没有 ffmpeg/librosa/soundfile），
+     **唯一能解码的地方就是浏览器自己** —— 所以复用 `loadPeaks()` 那条已经跑通的
+     路（量出音频真正开始的位置 → fetch 一段 → OfflineAudioContext 解码），
+     在真解出来的 PCM 上量三个量：
+       · bpm —— 起音包络做自相关，45~180 之间找峰，再修一次倍速
+       · rms —— 整段的平均能量
+       · dyn —— 包络的变异系数（起伏大的一般更"吵"）
+     排序 = 0.6·(bpm 低) + 0.25·(rms 低) + 0.15·(dyn 低)，三项都先归一到 0..1。
+   ⚠️ **这是启发式，不是音乐学。** 它的验收标准是"排前面那几首听着确实比排后面
+      的安静"，不是"BPM 算得准"。所以界面上写的是"最舒缓的那几首"，**不许**写成
+      "最适合你的" —— 后者是我给不出来的承诺。
+   ⚠️ 这话**只说给"最舒缓的那一档"**，不是"第一名"：摇过之后挑中的未必正好是
+      `score` 最高的那一首（见 `pickCalm()`）。话术跟着放宽了一点，免得为了保住
+      "最"字又把随机改回确定性。
+   ⚠️ 量不出来（还没量完 / 解不开）时**不许硬推**：如实说，那枚 chip 也不出现。
+      宁可不说，也不能推一首炸场的。
+   ⚠️ 一轮要几十秒（30 首各自 fetch + 解码），所以结果缓存在 localStorage，
+      键里带曲库指纹；并且**排在时长探测之后**跑 —— 两件事都在解码同一个文件，
+      抢着跑只会让正在放的那一首卡。 */
+/* ⚠️ 那张表存在 `XQP.CALM_KEY`（`ui/web/player.js`）—— **读它、不要另写一份字
+   符串**：别的页面（驾驶监测那颗「播放舒缓音乐」）读的是同一个键，见下面
+   `calmScan()` 末尾那行 `localStorage.setItem`。
+   ⚠️ 键里那个版本号**改算法就要跟着换**（v1 → v2 就是 2026-09-25 补上"跳过 ID3
+      标签"那一下）：不换的话，新算法跑出来的表和旧表长得一模一样、指纹也一样，
+      于是机器上那份**用旧方法算的**结果会被一直用下去 —— 而旧方法漏了 3 首慢歌。 */
+const CALM_BYTES = 512 * 1024;   // 每首只看开头这一段（跳过标签后，128kbps 下约 33 秒）
+const CALM_AC = 8000;            // 解码采样率。起音包络只需要几十 Hz 的分辨率
+const CALM_WAIT = 6;             // 秒：用户刚动过播放器就先别抢（见 recommendCalm）
+const CALM_LEAD = {              // 按档位换一句开场，别四档都用同一句
+  mild: '检测到你有些疲劳',
+  moderate: '闭眼时间变长了',
+  severe: '这个状态别硬撑',
+};
+/* 档位序号。**这张表只用来判"是不是更重了一档"**，配色/取值一律走 XQ.LV ——
+   不要拿它当 level 用（那是上一版混在一起的那条轴，已经拆了）。 */
+const SEV_ORD = { normal: 0, mild: 1, moderate: 2, severe: 3 };
+let lastOrd = null;             // 上一次的档位序号，null = 还没收到过 state
+
+/* 曲库指纹（首数 + 内置数 + 文件名清单）和"读那张表"这两件事，★ 2026-09-25 晚
+   **搬去了 `XQP.calmPrint()` / `XQP.calmItems()`**（`ui/web/player.js`）——
+   驾驶监测页那颗「播放舒缓音乐」要在**没有 media.html 的页面上**读同一张表。
+   ⚠️ 指纹必须两边算出来一模一样，所以这里调的就是那边那一个函数，**不许在这边
+      再留一份实现**（原版那两行 `let h = TRACKS.length + ':' + …` 里还有个真 bug，
+      见 player.js 上那条注释：那算出来是 NaN，指纹从来没对上过）。
+   ⚠️ 用列表顺序算，所以仅仅是**顺序**变了也会重测 —— 认了，总比拿旧表配新歌单强。 */
+
+/* 量一首。返回 {bpm, rms, dyn}，量不出来返回 null（**不抛**：解不开一首不该
+   把整轮扫描打断）。 */
+async function calmMeasure(url) {
+  const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  /* ⚠️ 从**音频开始的地方**取，不是从文件开头（见 audioStart 那段：盲取会把
+     整段标签当成音频，3/30 首就是这么被漏掉的）。 */
+  const off = await audioStart(url);
+  const r = await fetch(url, {
+    headers: { Range: 'bytes=' + off + '-' + (off + CALM_BYTES - 1) },
+  });
+  if (!r.ok && r.status !== 206) return null;
+  const ac = new AC(1, 1, CALM_AC);
+  const ab = await ac.decodeAudioData(await r.arrayBuffer());
+  const ch = ab.getChannelData(0);
+  const N = 128;                                   // 一帧 128 个样本 = 16 ms
+  const F = Math.floor(ch.length / N);
+  if (F < 64) return null;                         // 不到 1 秒，量不了
+  const env = new Float32Array(F);
+  for (let i = 0; i < F; i++) {
+    let s = 0;
+    for (let j = i * N; j < (i + 1) * N; j++) s += ch[j] * ch[j];
+    env[i] = Math.sqrt(s / N);
+  }
+  let mean = 0;
+  for (let i = 0; i < F; i++) mean += env[i];
+  mean /= F;
+  if (mean < 1e-4) return null;                    // 整段近乎无声：量不出速度，也不该推
+  let v = 0;
+  for (let i = 0; i < F; i++) { const d = env[i] - mean; v += d * d; }
+  const dyn = Math.sqrt(v / F) / mean;             // 变异系数：跟整体音量无关
+
+  /* 速度。用**起音**包络（只留上升的那一半）做自相关，而不是原始包络 ——
+     原始包络的自相关会被"整段哪儿响哪儿轻"带着走，出来的往往是段落长度。 */
+  const on = new Float32Array(F);
+  for (let i = 1; i < F; i++) on[i] = Math.max(0, env[i] - env[i - 1]);
+  const fps = CALM_AC / N;
+  let best = -1, lag = 0;
+  const kLo = Math.round(fps * 60 / 180), kHi = Math.round(fps * 60 / 45);
+  for (let k = kLo; k <= kHi; k++) {
+    let s = 0;
+    for (let i = k; i < F; i++) s += on[i] * on[i - k];
+    s /= (F - k);                                  // 各 lag 的样本数不同，先摊平
+    if (s > best) { best = s; lag = k; }
+  }
+  let bpm = lag ? 60 * fps / lag : 0;
+  /* 倍速修正：自相关在 T/2、T、2T 上都有峰，主峰常常落在半拍或双拍上。挪进
+     70~160 这一档；这一步错了也只是整体偏一个八度，排序不受影响。 */
+  while (bpm > 0 && bpm < 70) bpm *= 2;
+  while (bpm > 160) bpm /= 2;
+  return { bpm: bpm, rms: mean, dyn: dyn };
+}
+
+/* 一首一首量完内置那批。**不并发**：30 路同时解码会把主线程和磁盘一起堵上，
+   而这一页正中间在放歌（用户听得见）。 */
+async function calmScan() {
+  if (calmBusy || !TRACKS.length) return;
+  const cand = [];
+  for (let i = 0; i < TRACKS.length; i++) if (TRACKS[i].src === '内置') cand.push(i);
+  if (!cand.length) return;
+  const print = XQP.calmPrint(TRACKS, (LIB && LIB.bundled) || 0);
+  const cached = XQP.calmItems(print);
+  if (cached) { calmTable = { print: print, items: cached }; calmBackfill(); return; }
+  calmBusy = true;
+  const items = {};
+  for (let k = 0; k < cand.length; k++) {
+    const t = TRACKS[cand[k]];
+    try {
+      const m = await calmMeasure(fileUrl(t));
+      if (m) items[t.file] = m;
+    } catch (e) { /* 解不开就当没量到 —— 见上面"不许硬推" */ }
+  }
+  calmBusy = false;
+  if (!Object.keys(items).length) return;   // 一首都没量出来：不写缓存、不吭声
+  calmTable = { print: print, items: items };
+  try { localStorage.setItem(XQP.CALM_KEY, JSON.stringify(calmTable)); } catch (e) { /* 存不住算了 */ }
+  calmBackfill();
+}
+
+/* 从量出来的那批里挑一首，返回 TRACKS 下标（-1 = 还没得挑）。
+   ★★ 2026-09-25 晚，用户实测报了这条：「为啥两个状态都是自动放我好想你间奏这首
+   歌 还不如不同状态随机给歌 但不要每次都一样 我歌那么多 随机更好」。
+   根因就是这里原来 `return rows[0].i` —— **确定性**的：轻度推它、中度还推它、
+   再累一次还是它，看上去就像"小瑞只会这一首"。他的要求两条都要满足：
+     · 「不同状态随机给歌」→ 摇；
+     · 「但不要每次都一样」→ 摇的时候避开刚推过的。
+   ⚠️ **随机不是从整张曲库里摇。** 这一节存在的理由就是"感知到疲劳 → 给舒缓的"，
+      摇一首重金属出来是另一个 bug。所以在**舒缓度排序的最前面那一档**里摇：
+      前 1/3（至少 3 首、最多 10 首）当池子 —— 它们都够舒缓，谁先谁后本来就是
+      小数点后的差别（`score` 那三项各自归一化，见上）。
+   ⚠️ 避开三样：**正在放的那首**（换歌换回同一首等于没换）、最近推过的
+      `CALM_AVOID` 首。全被避开了（池子太小、或者一直在同一档里来回）就退回池子
+      本身 —— 宁可重复，也不能"挑不出来"。
+   ★ 2026-09-25 晚**这一段的算法整个搬去了 `XQP.pickCalmIdx()`**
+   （`ui/web/player.js`），理由和上面那两件事一样：驾驶监测页那颗
+   「播放舒缓音乐」要在没有 `TRACKS` 的页面上摇同一张表、同一个池子。
+   这里只剩"把本页的三样东西喂进去"——**算法本身一行都不在这边了**，
+   要改池子大小/权重请改 player.js 那一份，别在这儿再抄一份出来。
+   ⚠️ 传进去的是**文件名**不是下标：那份"刚推过谁"的账是和别的页面共用的
+      （`XQP.calmNote`），两边的下标坐标系不一样。 */
+function pickCalm() {
+  if (!calmTable || !calmTable.items) return -1;
+  const cur = TRACKS[idx] ? TRACKS[idx].file : null;
+  return XQP.pickCalmIdx(TRACKS, calmTable.items, cur, XQP.calmRecent());
+}
+
+/* 记一笔"刚推过这首"，供 pickCalm 避开。
+   ★ 账本本身也搬去了 `XQP.calmNote`（和驾驶监测那颗按钮**共用一份** —— 用户要的
+   是"不要每次都一样"，在多媒体页听过的那首，换个页面点也不该又摇到它）。
+   这里只负责"下标 → 文件名"：本页从头到尾用的都是下标。 */
+function calmNote(i) {
+  if (i >= 0 && TRACKS[i]) XQP.calmNote(TRACKS[i].file);
+}
+
+/* 挑一首说出来。`firstTime` = "页面打开时就已经在疲劳里"，`later` = "刚才没得挑，
+   现在量完了补一句"。 */
+function recommendCalm(sev, firstTime, later) {
+  const lead = CALM_LEAD[sev] || CALM_LEAD.mild;
+  const i = pickCalm();
+  if (i < 0) {
+    if (!TRACKS.length) xqPush(`主人，${lead} —— 曲库还在读，读完我挑一首给你。`);
+    else if (calmTable) xqPush(`主人，${lead} —— 内置那批里我没量出哪一首更舒缓，你先挑一首慢的听？`);
+    else xqPush(`主人，${lead} —— 舒缓那几首还在量（要几十秒），量好了我挑给你。`);
+    return;
+  }
+  calmIdx = i;
+  calmNote(i);                    // ★ 摇出来的这一首记一笔，下次别再摇到它
+  const t = TRACKS[i];
+  const named = `内置那批里量出来舒缓的《${t.title}》`;
+  /* 该不该**顺手放上**。三件事同时成立才动手，缺一条都只推荐：
+       · 现在没在放 —— 正在放就绝不换。把你正听的歌掐掉不叫体贴，叫自作主张；
+       · 不是"一进页面就已经疲劳"（`firstTime` 为假）—— 那种情况页面还没捂热过
+         任何用户手势，`play()` 必被浏览器拒，硬放只会在屏幕上留一条失败提示；
+       · 用户最近 6 秒没动过播放器（CALM_WAIT）—— 他刚点完一首，别抢。
+     被挡了就说实话（`tryPlay()` 现在会返回真假），**不放哑炮**。 */
+  const grab = (!au.src || au.paused)
+            && !firstTime
+            && (Date.now() - lastAct > CALM_WAIT * 1000);
+  if (!grab) {
+    xqPush(later ? `主人，舒缓那几首量完了 —— ${named}，要不要听这一首？`
+                 : `主人，${lead} —— ${named}，要不要听这一首？`);
+    renderXq();
+    return;
+  }
+  xqPush(`主人，${lead} —— 我挑了《${t.title}》，内置那批里量出来舒缓的那几首之一。`);
+  /* 放起来了就**不再多说一句**：状态行会变成「正在放《X》。」、列表那一行会亮起
+     来并跳出三根柱子、chip 也在 —— 再说一句"已经放上了"是同义重复。被挡了才说话。 */
+  playTrack(i).then((ok) => {
+    if (ok) return;
+    xqPush(`主人，这一首浏览器不让我替你放 —— 点一下「听这首舒缓的」就响了。`);
+    renderXq();
+  });
+}
+
+/* 档位变了才说话。触发时机只有两种：**第一次进疲劳**、**又重了一档**。
+   ⚠️ 一直待在同一档里**不再重复说** —— 每来一帧说一遍不是"感知状态"，是刷屏。 */
+function calmWatch() {
+  if (sevNow == null) return;
+  const ord = SEV_ORD[sevNow] || 0;
+  const prev = lastOrd;
+  lastOrd = ord;
+  if (ord === 0) {
+    /* 回到清醒档：把那枚临时的 chip 收起来。
+       ⚠️ **说过的话不撤** —— 那是对话记录，删掉等于假装没说过（跟"日志只涨不删"
+          是一回事）。回来再累一次会重新推荐。 */
+    if (calmIdx >= 0) { calmIdx = -1; renderXq(); }
+    return;
+  }
+  if (prev !== null && ord <= prev) return;
+  recommendCalm(sevNow, prev === null);
+}
+
+/* 量完（或从缓存读到）之后补一次：要是在这之前就已经疲劳了，那一次只能如实说
+   "还在量"，现在有得挑了就把那句补上。 */
+function calmBackfill() {
+  if (lastOrd !== null && lastOrd > 0 && calmIdx < 0) recommendCalm(sevNow, true, true);
+}
+
+/* ======================================================= 7 · 接上座舱状态 */
+/* ★ 2026-09-25：这一页**开始连 WebSocket 了**（原来不连，两边的理由都写在文件头）。
+   先只接 `state` —— 见效的就两件事：整页跟着档位换色（`body[data-sev]`）+ 第 6 节
+   那套疲劳推荐。
+   ★ 2026-09-25 晚：**又补上了 `onSay`**（用户：「小瑞那可以打字聊天」）。
+     ⚠️ 它接的**不是"主动播报"** —— 是**我打出去那句的回音**。区别全在 onSay 那个
+        过滤器上（`d.user === SAY_WAIT`）：小瑞的主动预警、语音那一路走的都是同一个
+        `say` 广播，不按原文比对就全涌进来了。当年"这一页正放歌时不该突然念一句"
+        那条判断**依然成立**，只是从"整个 say 都不接"收窄成"只接我点过的那句"。
+   ⚠️ `info` **仍然故意不接**：这一页不画角标，服务端的临时话在这一页没有落点。
+   ⚠️ 也没接 `onHello`：这一页不用 TTS（打字聊天**只出字不出声**），
+      也不用画"服务连上没有"的角标。
+   ⚠️ 这页不做语音输入（理由见文件头：没有麦克风那一路）。★ 2026-09-25 左栏那张
+      卡片已全站删除，所以这句现在跟"左栏放不放什么"无关了。 */
+let wasUp = false;     // ⚠️ 必须在 connect() **之前**声明：onDown 可能是同步来的
+                       //    （file:// 下 XQ.connect 内部当场就 setDown(true)），
+                       //    声明在后面就是 TDZ 报错。
+
+/* 档位喂进来。**所有档位变化都走这一个函数** —— WebSocket 走它，自检也走它
+   （`XQ.mediaLink.feed`），所以"脚本验过的"和"屏幕上看到的"是同一条路。 */
+function feedSev(sev) {
+  if (sev == null) return;                    // 没带档位的 state：当没收到，别乱改色
+  const v = XQ.LV[sev] || 'normal';           // 未知值兜底成 normal（那张表在 live.js）
+  sevNow = v;
+  document.body.dataset.sev = v;
+  calmWatch();
+}
+
+/* ⚠️ 这里要**留下 api 句柄**（`XQ.connect` 的返回值，`live.js` 末尾 `return api`）：
+   打字聊天要 `LINK.send()` 和 `LINK.online`。原来这一页只收不发，所以连返回值
+   都没接 —— 现在接住，别再改回 `XQ.connect({...});`。 */
+const LINK = XQ.connect({
+  onState: (s) => feedSev(s && s.severity),
+  onSay: onSay,
+  onDown: (d) => {
+    /* 断线只说一句，而且**只在"曾经连上过"之后说** —— 打开 file:// 时一上来就是
+       down，那不是"断了"，是本来就没有服务器。 */
+    if (d) {
+      DOWN_N++;                   // ★ 只给检查脚本读：掉线到底是"偶尔一次"还是常态
+      if (wasUp) xqPush('主人，和座舱的连接断了，疲劳推荐暂时收不到 —— 歌照样能放。');
+      /* ⚠️ 断线时**必须把等待作废**：那句「小瑞正在想…」会一直挂到底（兜底计时器
+         要等 20 秒），而且重连之后别人问了一句一模一样的话，还会被当成这句的回音。
+         这里同时要 `paintLog()`，不然等的那一行要等下一次重画才消失。 */
+      if (SAY_WAIT) { clearTimeout(SAY_TIMER); SAY_WAIT = ''; paintLog(); }
+    }
+    else wasUp = true;
+  },
+});
+
+/* 自检用的口子。⚠️ 这里**一个转发层都没有**：`feed()` 就是上面 onState 调的那个
+   函数、`push()` 就是小瑞说话用的那个函数、`stats()` 读的是真状态 ——
+   所以检查脚本验到的东西和用户屏幕上看到的是同一份。
+   见 `_scratch/_check_media_lib.py` 的 I2 / N 两段（I2 靠 push 造 40 轮聊天，
+   专门验"多轮不会崩"）。 */
+XQ.mediaLink = {
+  feed: feedSev,
+  push: xqPush,
+  /* ★ 2026-09-25 晚：打字聊天那一路的**真函数**（和 `feed`/`push` 一样，一个
+     转发层都没有）—— `say` 就是 onSay 本身、`send` 就是 xqSend 本身。
+     检查脚本 O 段靠 `say` 把"别人的话"喂进来，验的是那条过滤器；喂的是同一个
+     入口，所以行为和 WebSocket 真推来一条时**完全一致**。 */
+  say: onSay,
+  send: xqSend,
+  stats: () => ({
+    sev: sevNow,
+    ord: lastOrd,                 // 归一化档位的序号（-1 都不算，0=清醒）
+    calm: calmIdx,
+    calmTitle: (calmIdx >= 0 && TRACKS[calmIdx]) ? TRACKS[calmIdx].title : null,
+    calmSrc: (calmIdx >= 0 && TRACKS[calmIdx]) ? TRACKS[calmIdx].src : null,
+    measured: calmTable ? Object.keys(calmTable.items).length : 0,
+    busy: calmBusy,
+    /* ★ 舒缓那一档摇过谁（新→旧）。Q 段连着喂两档疲劳，靠它验"两次不许摇到
+       同一首" —— 用户实测报的就是这条（两档都推了《我好想你间奏》）。
+       ⚠️ 账本是 `XQP.calmNote` 里那份**文件名**清单（和驾驶监测那颗按钮共用），
+          这里是本页的坐标系（下标），所以要翻一道 —— 别把它改成文件名，
+          Q 段读的就是下标（`recent[0] == calm`）。 */
+    calmRecent: XQP.calmRecent()
+      .map((f) => TRACKS.findIndex((t) => t.file === f))
+      .filter((i) => i >= 0),
+    log: XQ_LOG.length,
+    /* 打字聊天那一路的读数（检查脚本 O 段用）。`wait` 是我打出去还没等到回音的
+       那句话原文，`me` 是对话里"主人说的"条数 —— 两者都是页面自己的真状态，
+       没有转发层。 */
+    wait: SAY_WAIT,
+    why: SAY_WHY,                 // 上一次没发出去的原因（'' = 发出去了）
+    online: LINK.online,          // 打字的守卫看的就是它（O 段红过一次，原因在此）
+    downN: DOWN_N,                // 整场断过几次（判断"掉线是不是常态"）
+    me: XQ_LOG.filter((m) => m.who === 'me').length,
+    chips: chipList().map((c) => c[1]),
+  }),
+};
+
+/* ---------------------------------------------------------------- 事件 */
+au.addEventListener('timeupdate', () => { paint(); renderTalk(); });
+au.addEventListener('loadedmetadata', () => { paint(); renderNow(); });
+au.addEventListener('play', () => { renderNow(); renderTalk(); markRow(); renderXq(); });
+au.addEventListener('pause', () => { renderNow(); renderTalk(); markRow(); renderXq(); });
+au.addEventListener('ended', () => playTrack((idx + 1) % TRACKS.length));
+au.addEventListener('error', () => {
+  /* 音频加载失败**要说出来**：静默失败的表现是"点了播放键什么都没发生"，
+     而那种现象最容易被当成按钮坏了。
+     ⚠️ 文案里不要再提 `make_audio.py` —— 那三个合成 WAV 已经不放了，
+        现在读不到只可能是曲库目录变了 / 服务端那条路由被挡了。 */
+  const t = TRACKS[idx];
+  XQ.flash(`放不出来：${t ? t.file : '（没有选中）'} 读不到 —— 曲库目录可能变了（ui/config.json 的 media.dir）`);
+  $('stateNote').textContent = '读不到文件';
+});
+
+$('ppBtn').onclick = () => {
+  userAct();
+  if (!TRACKS.length) { XQ.flash(noLibWhy()); return; }
+  if (!au.src) { playTrack(idx); return; }
+  if (au.paused) tryPlay(); else au.pause();     // 走 tryPlay —— 见上面那条注释
+};
+$('prevBtn').onclick = () => {
+  userAct();
+  if (TRACKS.length) playTrack((idx - 1 + TRACKS.length) % TRACKS.length);
+};
+$('nextBtn').onclick = () => {
+  userAct();
+  if (TRACKS.length) playTrack((idx + 1) % TRACKS.length);
+};
+
+$('vol').oninput = (e) => { au.volume = (+e.target.value) / 100; };
+
+/* 点波形 = 真的 seek。用 `getBoundingClientRect` 算比例，别用 offsetX ——
+   点在柱子上时 offsetX 是相对**那根柱子**的，不是相对整条的。 */
+$('wave').onclick = (e) => {
+  const d = au.duration;
+  userAct();
+  if (!d) { XQ.flash('还没读出时长，稍等一下'); return; }
+  const r = $('wave').getBoundingClientRect();
+  const p = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  au.currentTime = p * d;
+  paint();
+};
+
+/* 底栏那颗「语音助手」。**这一页没有语音输入这一路**（ASR 在驾驶监测页那边，
+   要连 WebSocket 才有会话），所以不去假装打开一个麦克风，
+   直接把人送到对话页 —— 那里才有真正的语音输入。 */
+$('talkVa').onclick = () => { location.href = 'chat.html'; };
+
+/* ---------------------------------------------------------------- 起步 */
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${XQ.ICON.chevL}</svg>`;
+$('prevBtn').innerHTML = XQ.icon('prev');
+$('nextBtn').innerHTML = XQ.icon('next');
+$('ppBtn').innerHTML = XQ.icon('play');
+$('volIco').innerHTML = XQ.icon('speaker');
+au.volume = (+$('vol').value) / 100;
+/* ★ 2026-09-25 晚：把跨页播放那一层**接管到这个真播放器上**（`player.js`）。
+   接管的意思是：它只**读**（位置/音量/在放哪一首按秒存下来），不建自己的
+   audio、不画那条悬浮条 —— 这一页自己就是一整个播放器。
+   ⚠️ `meta` 传的是**函数不是值**：`idx` 随时在变，传值等于把它钉死在开局那一首。 */
+XQP.bind(au, () => TRACKS[idx] || null);
+$('listNote').textContent = '读曲库…';
+bindSay();          // ★ 打字聊天那一行（`#xqSay` + `#xqSend`）
+renderXq();
+renderAll();
+/* ⚠️ 首屏那条平坦的柱子是"还没测量"的样子（`drawWave(null)` 画的是等高柱），
+   不是假波形。`mountLib` 拿到曲库之后会在后台解第一首的第一段并画上去，
+   解码失败（file:// 打开 / 解码器不认）依旧是等高柱。 */
+drawWave(null);
+mountLib();
+XQ.mountChrome({ active: 'media' });
+$('mascotSvgHost').innerHTML = XQ.mascotSVG();
+XQ.mascot.bind('mascotImg', 'mascotSvgHost', { cycle: true });
+/* `deck:'h'` = 接 43 张形象库的方形头像那套（点一下换个形象，见 live.js）。 */
+XQ.mascotSlot('talkAvaImg', 'talkAvaSvgHost', { simple: true, deck: 'h' });
+</script>
+</body>
+</html>

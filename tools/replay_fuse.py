@@ -33,7 +33,10 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 PY = sys.executable
 OUT = ROOT / "runs" / "fuse_replay"
-YAWN_MIN = 2.0          # 与 src/face.py 一致；CSV 里 yawn_sec 超过它算触发
+YAWN_MIN = 1.0          # 与 src/face.py 一致（2026-09-26 第二次改小）；CSV 里 yawn_sec 超过它算触发
+                        # ⚠️ 这里是**抄本**不是 import：`import face` 会把 mediapipe
+                        #   拖进来（析构固定 42 s，见 _scratch 里那条记录），
+                        #   而这个脚本只读 CSV。改 src/face.py 那个数要跟着改这里。
 
 
 def read_log(p):

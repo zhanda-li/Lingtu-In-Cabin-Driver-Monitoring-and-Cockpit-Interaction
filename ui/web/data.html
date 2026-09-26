@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>数据详情 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* ---------------- 页面局部样式：只在这一页有意义 ----------------
+   这是一张**调试页**：把三路正在跑的东西原样摊出来看 ——
+     上面三格   心率 / 脉搏波幅度 / PI（和首页、监测页同一个来源 `state`）
+     心率串口   板子打在 console 口上的原文（`ui/serial_hr.py` 那个环）
+     视觉决策   融合器每一帧那一行（服务端 `vision_line()` 拼的）
+
+   ★ 2026-09-26 为什么要有这一页：串口是**独占**的，界面一开，串口助手就
+     打不开；而 `src/fuse.py` 的输出进的是**另一个进程**的控制台。所以"界面
+     开着的时候想看原始输出"这件事以前没有出路 —— 只能关界面。
+     ⚠️ 这一页**不引 `player.js`**：它不是座舱播放页，没有小瑞的立绘和动作，
+        和 cover.html / design.html 同一档。（代价是这一页上没有「常听」那条
+        语音通道 —— `wake.js` 挂在别的页上，从那一页喊是正常的。）
+   ========================================================================= */
+
+/* 三格。**不复用 `.mtiles`**（那是 `1fr 1fr`）：三个指标铺两列会留半行空位，
+   而这三格是并排的三个同类量，等宽三列才对。`.mt` 本身照用（样式一行没改）。 */
+.dtiles{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; }
+
+/* 两块原始输出的框。
+   ⚠️ **等宽字体**：全站别处一处都没有，这两块是刻意的例外 —— 里面的内容是
+      机器打的定宽列（`nor=0.99 fat=0.01`、`D,120,130000,120700`），用比例
+      字体排出来列对不齐，而且数字还在左右跳。
+      颜色仍然全取全站的变量，所以它看着还是这一站的东西，不是贴上去的黑框。
+   ⚠️ `white-space:pre` + `overflow:auto`：**不折行**，长了就横向滚。折行会把
+      "一行 = 一个样本 / 一帧"这件事毁掉，而这一页看的正是"一行一行在不在"。 */
+.dlog{
+  margin-top:.55rem; height:11.5rem; overflow:auto; padding:.5rem .65rem;
+  border-radius:var(--r-md); background:var(--fill-1); border:1px solid var(--line);
+  font-family:ui-monospace,"Cascadia Mono",Consolas,"Courier New",monospace;
+  font-size:.72rem; line-height:1.62; color:var(--ink-3);
+  white-space:pre;
+}
+.dlog::-webkit-scrollbar{ width:.5rem; height:.5rem; }
+.dlog::-webkit-scrollbar-thumb{ background:var(--fill-3); border-radius:1rem; }
+
+@media (max-width:900px){
+  .dtiles{ grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ============ 页标题 ============ -->
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1>数据详情</h1>
+        <span class="spacer"></span>
+        <span class="pill">原始输出</span>
+      </div>
+
+      <!-- ============ 上面三格 ============
+           ⚠️ 这三格和首页 `#rAc`/`#rPi`、监测页 `#mvAc`/`#mvPi` 是**同一份数**
+              （`state` 帧里的 `hr_ac` / `hr_pi`），格式串也逐字一样
+              （交流幅度取整、无量纲 / 百分数两位）。四处各写一份是这个工程的
+              既有现实（各页的失效样式和 DOM 结构都不一样），但**数字的写法
+              不许漂**。
+           ★ 2026-09-26 深夜：中间那一格**原本是 `#dRr`（HRV-RMSSD）**，换掉了
+              —— 它要 NN 连续跨度 ≥ 30 s 才有值，实测那场会话 0.0% 的帧有数。 -->
+      <section class="card card-pad">
+        <div class="dtiles">
+          <div class="mt"><div class="k">心率</div><div class="v na" id="dHr">未接入</div></div>
+          <div class="mt"><div class="k">脉搏波幅度</div><div class="v na" id="dAc">--</div></div>
+          <div class="mt"><div class="k">PI 灌注指数</div><div class="v na" id="dPi">--</div></div>
+        </div>
+      </section>
+
+      <!-- ============ 心率串口 ============
+           内容是**板子原文**，一个字节都没改过：`H` 行每条全留，`D` 行每秒抽 1 行
+           （抽样在 `serial_hr._log_raw` 里按**板子的样本钟**分秒）。`E` 行和
+           `#` 横幅不进这个环 —— 它们走 `board_errors` 那条既有通路。 -->
+      <section class="card card-pad">
+        <div class="card-h"><h3>心率串口</h3></div>
+        <div class="dlog" id="dSer">--</div>
+      </section>
+
+      <!-- ============ 视觉决策 ============
+           一行一帧，列序照 `src/fuse.py:861-866`（服务端 `vision_line()` 拼）。
+           ⚠️ 末尾**没有** `YAWN` / `EYE=` / `HEAD=` 三段：那三条判据的阈值只在
+              fuse.py 里有一份，在这儿重推就等于抄第二份会漂的阈值。 -->
+      <section class="card card-pad">
+        <div class="card-h"><h3>视觉决策</h3></div>
+        <div class="dlog" id="dVis">--</div>
+      </section>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script>
+/* =========================================================================
+   数据详情 —— 三路正在跑的东西原样摊开。
+
+   ⚠️ 三格数字走的是 `onState`（和全站每一页同一条 state 路），两块原始输出走
+      的是 `onMsg('log', …)` —— 那是 `live.js:2077` 留的**通配口子**，专门给
+      "只有某一页关心"的消息用。所以这一页**没有改 live.js 一行**。
+
+   ⚠️ `serial` 那一份是**整份环**（不是增量）：服务端每次把最近 240 行整个发过来，
+      这一页直接覆盖。换来的是**无状态** —— 刷新页面立刻有全部历史，不用游标，
+      也就没有"游标和环不同步 → 少几行而没人发现"那一类 bug。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+const SER_MAX = 240;    /* 和服务端 `serial_hr.LOG_MAX` 同一个数（H 全留 + D 每秒 1 行
+                           ⟹ 稳态 2 行/秒，240 行 ≈ 2 分钟） */
+const VIS_MAX = 120;    /* 视觉那一路是 2 Hz 推的，120 行 = 1 分钟 */
+
+let vis = [];
+
+/* `.v.na` 是「没量到」那一档的灰字样式（pages.css:248 的 `.mt .v.na`）。
+   有真数时必须把类摘掉，否则数字会按"没量到"的样式显示 —— 这一条在这个工程
+   踩过一次（`.mt` 原来**根本没有** `.v.na` 规则，四个字按 1.3rem/600 排）。 */
+const NA = (id, txt, na) => {
+  const e = $(id);
+  if (!e) return;
+  e.textContent = txt;
+  e.classList.toggle('na', !!na);
+};
+
+function paint(s) {
+  /* 心率那一格的三档文案（有数 / 未按压 / -- / 未接入）**只在 `XQ.hrText` 一处**，
+     四个页面共用 —— `hr_finger` 就是它分岔的依据。 */
+  NA('dHr', XQ.hrText(s), s.hr == null);
+  NA('dAc', s.hr_ac == null ? '--' : s.hr_ac.toFixed(0), s.hr_ac == null);
+  NA('dPi', s.hr_pi == null ? '--' : s.hr_pi.toFixed(2) + ' %', s.hr_pi == null);
+}
+
+/** 把一串行铺进框里并**自动贴底**。
+    整块 `textContent` 一次写掉（不是一行一个 DOM 节点）：240 行的框 2 Hz 重建，
+    逐个节点会在滚动条位置上抖，而且行数一多就是几百个节点的重排。 */
+function paintLog(el, rows) {
+  el.textContent = rows.length ? rows.join('\n') : '--';
+  el.scrollTop = el.scrollHeight;
+}
+
+$('backBtn').innerHTML = '<svg viewBox="0 0 24 24">' + XQ.ICON.chevL + '</svg>';
+/* `active: ''` —— 这一页不挂在左导航里，一项都不点亮（和 about.html 同一种做法）。
+   进去的路只有两条：首页那一格、驾驶监测页那个「数据详情」。 */
+XQ.mountChrome({ active: '' });
+
+XQ.connect({
+  onState: paint,
+  onMsg: (type, d) => {
+    if (type !== 'log') return;
+    paintLog($('dSer'), d.serial || []);
+    if (d.vision) {
+      vis.push(d.vision);
+      if (vis.length > VIS_MAX) vis.splice(0, vis.length - VIS_MAX);
+    }
+    paintLog($('dVis'), vis);
+  },
+  /* 断线时三格退回"没量到"。两块原始输出**不清** —— 那是刚才真收到的东西，
+     清掉等于把现场抹了；而框里那些行本来就带时间戳，看得出是哪一段。
+     ⚠️ 这里走的是和 `onState` **同一个 `paint()`**：另写一段"断线专用渲染"
+     迟早和正常那一路漂开，而漂的表现是"断线时某几格显示得不对"。 */
+  onDown: (down) => { if (down) paint({ hr: null, hr_ac: null, hr_pi: null }); },
+});
+</script>
+</body>
+</html>

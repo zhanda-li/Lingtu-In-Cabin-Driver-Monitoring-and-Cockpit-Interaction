@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>设置 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* =========================================================================
+   设置 —— 本页唯一的页面级样式
+   -------------------------------------------------------------------------
+   ★★ 2026-09-25：照 `ui/图片效果/设置.png` **整页重做**（用户：「设置页面做成
+   设置.png样子」）。上一版是"两栏 + 一大段说明 + 只读表"，参考图是**四栏**。
+
+   这一版唯一要守住的原则，也是和参考图**主动分道**的地方：
+   **每一行都真的连着东西。**
+   参考图里有一批行（屏幕亮度、账号信息、登录方式、车辆信息、设备连接、驾驶
+   模式、系统更新、隐私设置、紧急联系人…）在这套系统里**没有对应的东西** ——
+   摆上来的话就是一排"按了没反应"的假控件，而那正是这一页上一版自己写在明面上
+   反对的事（用户 2026-09-24 也亲手删掉过一张同样性质的「数据源」卡片）。
+   所以照搬的是**版式、图标语法、配色、三栏分法**，内容换成真的：
+     · 有真值的 → 直接显示真值（语言 / 分辨率 / 阈值 / 摄像头 / 音色 / 模型…）
+     · 本机读不到的 → 值就写「由系统控制」这类实话，**并且不给 chevron**
+                      （箭头 = 承诺点开有东西，没有就不画）
+     · 参考图有、这里没有的 → **不出现**，不编一个数上去
+   哪些行是"照着参考图的槽位填的真值"、哪些是"参考图有但我们没有"，都写在
+   下面每一块的注释里，不要靠猜。
+
+   ⚠️ 内部横线一律用 `--hair*` / `--track`（浅色下是**深蓝半透明**），
+      **不要用 `--line`** —— 那个在浅色主题下是"白 .62"，白线画在白卡上是看不见的
+      （深色主题那套遗留下来的写法，上一版这一页就是这么坏掉的）。
+   ========================================================================= */
+
+/* ---------------------------------------------------------- 四栏骨架 */
+.set-grid{
+  display:grid; gap:.85rem; align-items:start;
+  /* 四栏宽度照参考图量：320 / 350 / 390 / 340（总 1400，在 1649 宽的参考图上）。
+     第 3 栏最宽 —— 它下面挂着「语音与唤醒 + 通知与提醒 + 关于我们」三块。 */
+  grid-template-columns:minmax(0,1fr) minmax(0,1.09fr) minmax(0,1.22fr) minmax(0,1.06fr);
+}
+.set-col{ display:flex; flex-direction:column; gap:.85rem; min-width:0; }
+/* 屏幕上放不下四栏时退两栏 / 一栏。**投影仪只有 1280 的话四栏会挤成一条**，
+   所以这条不是可选的礼貌，是可用性。 */
+@media (max-width:1520px){ .set-grid{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); } }
+@media (max-width:980px){ .set-grid{ grid-template-columns:minmax(0,1fr); } }
+
+/* ---------------------------------------------------- 行：图标 + 文案 + 值 */
+/* 参考图里的行是"圆角小图标 + 标题/副题 + 右侧值"，**行与行之间没有分隔线**
+   （上一版有一堆 `border-bottom`，那是参考图里根本没有的东西）。 */
+.srow{ display:flex; align-items:center; gap:.62rem; padding:.5rem .15rem; }
+.srow .ic{
+  flex:0 0 auto; width:1.85rem; height:1.85rem; border-radius:.6rem;
+  display:grid; place-items:center; color:var(--accent);
+  background:rgba(var(--rgb),.10); border:1px solid rgba(var(--rgb),.20);
+}
+.srow .ic svg{ width:1rem; height:1rem; }
+.srow .tx{ flex:1 1 auto; min-width:0; }
+.srow .tx b{ display:block; font-size:.85rem; font-weight:600; color:var(--ink); }
+.srow .tx span{ display:block; font-size:.7rem; color:var(--muted); line-height:1.45; margin-top:.08rem; }
+.srow .rt{
+  flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end; gap:.28rem;
+  font-size:.76rem; color:var(--ink-3); text-align:right; font-variant-numeric:tabular-nums;
+}
+.srow .rt svg{ width:.82rem; height:.82rem; color:var(--muted); flex:0 0 auto; }
+/* 只读那一档：值用弱色。**"读起来就不像控件"是这一版的分段逻辑** ——
+   参考图里每一行都带箭头，我们只有真能点开的才画箭头。 */
+.srow .rt.ro{ color:var(--muted); }
+/* 值要换行的那种（个性签名）。 */
+.srow .rt.wrap{ white-space:normal; max-width:54%; line-height:1.4; }
+
+/* ---------------------------------------------------------- 开关 */
+/* 原生 checkbox + `appearance:none` 自己画 —— 不引第三方控件。
+   ⚠️ 上一版的 `background:rgba(255,255,255,.12)` 是**深色主题**的写法，
+      浅色下等于白底上一个白胶囊（截图核实过：开关几乎看不出来）。
+      现在槽底用 `--track`（浅色下是深蓝 .14），关=灰槽白钮、开=品牌蓝槽白钮。 */
+.sw{ position:relative; width:2.9rem; height:1.55rem; flex:0 0 auto; display:block; cursor:pointer; }
+.sw input{ position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; }
+.sw i{
+  position:absolute; inset:0; border-radius:2rem; transition:.25s;
+  background:var(--track); border:1px solid var(--hair-2);
+}
+.sw i::after{
+  content:''; position:absolute; top:.16rem; left:.18rem; width:1.05rem; height:1.05rem;
+  border-radius:50%; background:#fff; transition:.25s;
+  box-shadow:0 .08rem .3rem rgba(23,60,110,.35);
+}
+.sw input:checked + i{ background:rgba(var(--rgb),.78); border-color:rgba(var(--rgb),.88); }
+.sw input:checked + i::after{ left:1.42rem; }
+.sw input:focus-visible + i{ outline:2px solid rgba(var(--rgb),.7); outline-offset:2px; }
+
+/* ---------------------------------------------------------- 按钮 */
+.set-btn{
+  font:inherit; font-size:.75rem; font-weight:600; cursor:pointer;
+  padding:.4rem .85rem; border-radius:2rem; transition:.25s; white-space:nowrap;
+  color:var(--ink-3); background:var(--fill-2); border:1px solid var(--line);
+  text-decoration:none; display:inline-flex; align-items:center; gap:.32rem;
+}
+.set-btn:hover{ color:var(--ink); background:rgba(var(--rgb),.12); border-color:rgba(var(--rgb),.5); }
+.set-btn svg{ width:.9rem; height:.9rem; }
+
+/* 整行宽的那颗（参考图里「修改形象」是描边的、「退出登录」是实心蓝胶囊）。 */
+.wide-btn{
+  width:100%; justify-content:center; font:inherit; font-size:.86rem; font-weight:600;
+  cursor:pointer; padding:.6rem; border-radius:2rem; transition:.25s;
+  color:var(--accent); background:rgba(var(--rgb),.08); border:1px solid rgba(var(--rgb),.45);
+  display:flex; align-items:center; gap:.4rem;
+}
+.wide-btn:hover{ background:rgba(var(--rgb),.16); }
+.wide-btn svg{ width:1rem; height:1rem; }
+.wide-btn.solid{ color:var(--on-accent); background:var(--accent); border-color:transparent; }
+.wide-btn.solid:hover{ filter:brightness(1.07); }
+
+/* -------------------------------------------------- 小瑞档案卡（第 1 栏顶） */
+.xq-head{ display:flex; align-items:center; gap:.8rem; }
+.xq-ava{
+  flex:0 0 auto; width:4.2rem; height:4.2rem; border-radius:50%; overflow:hidden;
+  display:grid; place-items:center;
+  background:radial-gradient(circle at 50% 42%, rgba(var(--rgb),.30), var(--fill-2));
+  border:1px solid rgba(var(--rgb),.35);
+}
+.xq-ava img{ width:100%; height:100%; object-fit:cover; }
+.xq-who{ min-width:0; }
+.xq-who > b{ display:flex; align-items:center; gap:.35rem; font-size:1.15rem; font-weight:600; }
+.xq-who > b button{
+  font:inherit; cursor:pointer; padding:.1rem; border-radius:.35rem; line-height:0;
+  color:var(--muted); background:none; border:none; transition:.25s;
+}
+.xq-who > b button:hover{ color:var(--accent); background:rgba(var(--rgb),.12); }
+.xq-who > b button svg{ width:.85rem; height:.85rem; }
+.xq-who > span{ display:block; font-size:.74rem; color:var(--muted); margin:.12rem 0 .4rem; }
+/* 分隔线：内部线，见文件头那条规矩。 */
+.xq-div{ height:1px; background:var(--hair-2); margin:.7rem 0 .3rem; }
+
+/* -------------------------------------------------- 温度横幅（第 1 栏底） */
+.warm{
+  display:flex; align-items:center; gap:.7rem; padding:.85rem 1rem;
+  border-radius:var(--r-lg);
+  background:rgba(255,255,255,.80); border:1px solid rgba(255,255,255,.88);
+  box-shadow:0 .9rem 2.2rem rgba(23,60,110,.10);
+}
+.warm .art{ flex:0 0 auto; width:3.2rem; height:3.2rem; }
+.warm .art img{ width:100%; height:100%; object-fit:contain; }
+.warm p{ flex:1 1 auto; margin:0; font-size:.86rem; font-weight:600; line-height:1.45; color:var(--ink); }
+.warm .set-btn{ flex:0 0 auto; }
+
+/* -------------------------------------------------- 侧栏立绘（第 4 栏顶） */
+/* 立绘位**用 XQ.mascot.bind 挂上动作层**（不是 mascotSlot）：这样 col4 那个
+   「修改形象」才有真的东西可以演 —— 参考图里那个按钮就是这个意思。
+   ⚠️ 槽高 16rem ≈ 238.9px，正好等于待机动图 238 的高，contain 之后是 1:1，
+      不会被缩放糊掉；改成别的数就会开始插值。 */
+.set-side{ position:relative; overflow:hidden; padding:.9rem 1rem 0; }
+.set-side .mascot{ width:100%; height:16rem; }
+.set-side .cap{ position:absolute; left:1.1rem; top:1.05rem; z-index:2; pointer-events:none; }
+.set-side .cap b{ display:block; font-size:1.15rem; font-weight:600; color:var(--ink); }
+.set-side .cap span{ font-size:.74rem; color:var(--muted); }
+
+/* -------------------------------------------------- 「关于我们」展开区 */
+/* 参考图里「关于我们」是一行带箭头的条目。**它在这套系统里就是"只读那份
+   config"的入口** —— 上一版那一大张「只读 · 来自 config.json」卡片的内容
+   一个字没丢，全部折叠到这里面去了。 */
+.about > summary{ list-style:none; cursor:pointer; }
+.about > summary::-webkit-details-marker{ display:none; }
+.about > summary .rt svg{ transition:.25s; }
+.about[open] > summary .rt svg{ transform:rotate(90deg); }
+.about .ro{ padding-bottom:.2rem; }
+.ro{ display:flex; flex-direction:column; gap:.22rem; }
+.ro > div{
+  display:flex; align-items:baseline; gap:.6rem;
+  padding:.38rem .55rem; border-radius:.5rem; font-size:.74rem;
+  background:var(--fill-1); border:1px solid var(--fill-2);
+}
+.ro .k{ flex:0 0 8rem; color:var(--muted); font-size:.7rem; }
+.ro .v{ flex:1 1 auto; min-width:0; word-break:break-all; font-variant-numeric:tabular-nums; }
+/* ⚠️ 这三个色是**给浅底重新配的**：上一版沿用深色主题的 #e6b26a / #8fd3a8，
+   压在白卡上基本读不出来（黄字白底）。 */
+.ro .v.warn{ color:#A96A12; }
+.ro .v.ok{ color:#1C7A4C; }
+.ro .v.err{ color:#C42B3E; }
+
+/* 页标题那行：齿轮 + 标题 + 参考图那句副标题（副标题在参考图里确实有）。 */
+.ptitle h1 svg{ width:1.45rem; height:1.45rem; color:var(--accent); }
+.ptitle .lead{ font-size:.76rem; color:var(--muted); }
+</style>
+</head>
+<body class="pg-media" data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1><span id="h1ico"></span>设置</h1>
+        <span class="lead">和小瑞一起，定制专属你的智能出行体验 ♡</span>
+        <span class="spacer"></span>
+        <span class="pill" id="connPill">连接中…</span>
+      </div>
+
+      <div class="set-grid">
+
+        <!-- ═════════════════════════════ 第 1 栏 ═════════════════════════════ -->
+        <div class="set-col">
+
+          <!-- 小瑞档案卡。参考图里是"圆形头像 + 名字 + 铅笔 + 一句话 + 在线胶囊
+               + 分隔线 + 个性化设置 ›"。这里**一个字都没改**：头像用
+               `assets/xiaorui_head.png`（方形头像版，圆形裁切），「在线」胶囊
+               真的跟 WebSocket 的连接状态走（onHello/onDown 两个回调驱动），
+               铅笔和「个性化设置」都滚到第 4 栏那张基础信息卡。 -->
+          <section class="card card-pad">
+            <div class="xq-head">
+              <span class="xq-ava"><img src="assets/xq/h/p01.webp" alt="小瑞"></span>
+              <div class="xq-who">
+                <b>小瑞<button id="editName" title="看看小瑞的基础信息"></button></b>
+                <span>你的智能出行伙伴</span>
+                <span class="pill" id="onlinePill">连接中…</span>
+              </div>
+            </div>
+            <div class="xq-div"></div>
+            <div class="srow" id="goInfo" role="button" tabindex="0" style="cursor:pointer">
+              <span class="ic" data-ic="sparkle"></span>
+              <span class="tx"><b>个性化设置</b>
+                <span>昵称、形象与语音，都在这一页往下</span></span>
+              <span class="rt" data-ic="chev"></span>
+            </div>
+          </section>
+
+          <!-- 显示与界面。参考图的四行是 主题模式 / 屏幕亮度 / 语言 / 分辨率。
+               ★ 四行的**槽位照搬，值全部是真的**：
+                 · 主题模式 —— 全站一套浅色版（`html[data-theme="light"]`），
+                   没有深色可切，所以写"固定"而不是画个箭头骗人；
+                 · 屏幕亮度 —— **浏览器读不到显示器亮度**（没有这个 API）。
+                   参考图这里是个滑块，我们**不放**：放了就是一个永远 60% 的假滑块；
+                 · 语言 / 分辨率 —— 都读得出来，`navigator.language` 与 `screen`。
+                   参考图写死 1920*1080，这里显示的是**这台机器真实的数**。 -->
+          <section class="card card-pad">
+            <div class="card-h"><h3><span data-ic="display"></span>显示与界面</h3>
+              <span class="note">后两行是读出来的</span></div>
+            <div class="srow">
+              <span class="ic" data-ic="sparkle"></span>
+              <span class="tx"><b>主题模式</b><span>全站推的是浅色版，没有深色可切</span></span>
+              <span class="rt ro">亮色调 · 固定</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="sun"></span>
+              <span class="tx"><b>屏幕亮度</b><span>浏览器没有读显示器亮度的接口 —— 不放滑块</span></span>
+              <span class="rt ro">由系统控制</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="globe"></span>
+              <span class="tx"><b>语言</b><span>跟随浏览器，界面本身只有简体中文</span></span>
+              <span class="rt" id="rLang">—</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="grid"></span>
+              <span class="tx"><b>分辨率</b><span>屏幕 / 当前窗口</span></span>
+              <span class="rt" id="rRes">—</span>
+            </div>
+          </section>
+
+          <!-- 「让每一次出行 都有温度」那条横幅 + 退出。
+               ⚠️ 参考图那颗写着「退出登录」—— **本系统没有登录体系**，照抄就是
+                  一句假话。同一个位置上换成「退出座舱」，回封面页，是真的能点的。 -->
+          <div class="warm">
+            <span class="art"><img src="assets/xq/h/p01.webp" alt=""></span>
+            <p>让每一次出行<br>都有温度</p>
+            <a class="set-btn" href="/">退出座舱</a>
+          </div>
+        </div>
+
+        <!-- ═════════════════════════════ 第 2 栏 ═════════════════════════════ -->
+        <div class="set-col">
+
+          <!-- 监测与预警。参考图这一栏是「账号与安全 + 车辆与设备」——
+               这两块在这套系统里**都不存在**（没有账号，也没有接整车 CAN）。
+               占着同样位置的是真值：四个阈值全部来自 `hello` 的
+               `severity_cfg` / `alarm_cfg`，也就是 `ui/config.json` 里那两个块。
+               ⚠️ 别把「重度」也做成一行阈值 —— **重度不是一个更高的数**，
+                  它是支路一的类别判决（`src/live.py` 的 CLASS_LEVEL，判据 l1==3），
+                  写成"severe ≥ 0.75"那种是编的。这一条就写在卡片头的 note 里。 -->
+          <section class="card card-pad">
+            <div class="card-h"><h3><span data-ic="alert"></span>监测与预警</h3>
+              <span class="note">重度不在这里</span></div>
+            <div class="srow">
+              <span class="ic" data-ic="eye"></span>
+              <span class="tx"><b>轻度疲劳阈值</b><span>疲劳概率 / PERCLOS 越过任一个就进 L1</span></span>
+              <span class="rt" id="rMild">—</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="alert"></span>
+              <span class="tx"><b>中度疲劳阈值</b><span>同上，越过进 L2</span></span>
+              <span class="rt" id="rMod">—</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="snooze"></span>
+              <span class="tx"><b>打哈欠判定</b><span>支路二的独立告警，和级别解耦</span></span>
+              <span class="rt" id="rYawn">—</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="clock"></span>
+              <span class="tx"><b>告警横幅保持</b><span>哈欠是滚动量，不压住横幅会一秒闪一次</span></span>
+              <span class="rt" id="rHold">—</span>
+            </div>
+          </section>
+
+          <!-- 采集与设备。参考图这里是「车辆信息 / 设备连接 / 驾驶模式 / 系统更新」，
+               同样**一块都没有**（没接整车总线，也没有 OTA）。
+               换成本机这一路真正说得出来的四件事：数据源、摄像头、模型、视频去向。
+               ⚠️ demo 源没有摄像头（`hello.cam` 是 null），这一格会如实说"没有
+                  实时流"，而不是拿演出数据假装是个摄像头。 -->
+          <section class="card card-pad">
+            <div class="card-h"><h3><span data-ic="nearby"></span>采集与设备</h3>
+              <span class="note" id="camNote">等 hello…</span></div>
+            <div class="srow">
+              <span class="ic" data-ic="wave"></span>
+              <span class="tx"><b>数据源</b><span>由启动参数决定，界面上没有切源入口</span></span>
+              <span class="rt" id="rSource">—</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="status"></span>
+              <span class="tx"><b>摄像头</b><span id="rCamNote">等 hello…</span></span>
+              <span class="rt" id="rCam">—</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="brain"></span>
+              <span class="tx"><b>推理模型</b><span>支路一，滑动窗口逐次判决</span></span>
+              <span class="rt" id="rModel">—</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="shield"></span>
+              <span class="tx"><b>视频去向</b><span>只在内存里算，不落盘、不上传</span></span>
+              <span class="rt ro">本机</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- ═════════════════════════════ 第 3 栏 ═════════════════════════════ -->
+        <div class="set-col">
+
+          <!-- 语音与唤醒。参考图是「唤醒词 / 语音包 / 语音音量」。
+               · 唤醒词 —— 真的：`ui/xiaorui.py` 的问候关键词里就有"小瑞"；
+               · 语音包 —— 真的：浏览器此刻挑中的那个中文神经音色，点箭头去试音台换；
+               · 语音音量 —— 参考图是个滑块。**浏览器改不了系统音量**，
+                            所以值写"由系统控制"，同样不放假滑块（同屏幕亮度）。 -->
+          <section class="card card-pad">
+            <div class="card-h"><h3><span data-ic="mic"></span>语音与唤醒</h3>
+              <span class="note">音色随浏览器</span></div>
+            <div class="srow">
+              <span class="ic" data-ic="mic"></span>
+              <span class="tx"><b>唤醒词</b><span>说话里带这个词就能叫醒小瑞</span></span>
+              <span class="rt">你好，小瑞</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="speaker"></span>
+              <span class="tx"><b>语音包</b><span id="rVoiceNote">等 hello…</span></span>
+              <span class="rt">
+                <a class="set-btn" href="voice.html">试音台<span data-ic="chev"></span></a>
+              </span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="wave"></span>
+              <span class="tx"><b>语音音量</b><span>浏览器没有改系统音量的接口 —— 不放滑块</span></span>
+              <span class="rt ro">由系统控制</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="mic"></span>
+              <span class="tx"><b>语音输入</b><span id="asrTxt">等 hello…</span></span>
+              <span class="rt" id="asrNote">—</span>
+            </div>
+          </section>
+
+          <!-- 通知与提醒。参考图是三个开关（消息通知 / 驾驶提醒 / 健康提醒）。
+               这里也是**三个真的开关**，而且**真的会立刻生效**：
+                 · 疲劳横幅 —— 关掉之后顶部不再挂告警横幅（判据一个字不动）；
+                 · 语音播报 —— 全站唯一的静音开关（2026-09-25 左栏那张卡片已删，
+                               现在小瑞出不出声只由这一个开关说了算）；
+                 · 提示条   —— 右下角那种一次性小提示。
+               ⚠️ 三个都**默认开**。默认值一改，全站现有截图与检查脚本的行为
+                  就跟着变，所以"默认关"这种需求必须单独提出来做。
+               ⚠️ 它们住 `live.js` 的 `XQ.prefs`，**不是**这一页的局部变量 ——
+                  开关写了没人照做就是假的，真正照做的是每一页的渲染代码。 -->
+          <section class="card card-pad">
+            <div class="card-h"><h3><span data-ic="bell"></span>通知与提醒</h3>
+              <span class="note">立刻生效</span></div>
+            <div class="srow">
+              <span class="ic" data-ic="bell"></span>
+              <span class="tx"><b>疲劳横幅</b><span>关掉后顶部不再挂告警横幅，判据不变</span></span>
+              <span class="rt"><label class="sw"><input type="checkbox" id="swBanner"><i></i></label></span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="speaker"></span>
+              <span class="tx"><b>语音播报</b><span>小瑞说话的总开关，全站只此一处</span></span>
+              <span class="rt"><label class="sw"><input type="checkbox" id="ttsSw"><i></i></label></span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="info"></span>
+              <span class="tx"><b>提示条</b><span>右下角那种一次性小提示</span></span>
+              <span class="rt"><label class="sw"><input type="checkbox" id="swToast"><i></i></label></span>
+            </div>
+          </section>
+
+          <!-- 关于我们。参考图里是一行带箭头的条目；这里点开是**上一版那一整张
+               「只读 · 来自 config.json」的表**，内容一个字没丢。 -->
+          <section class="card card-pad">
+            <details class="about" id="aboutBox">
+              <summary class="srow">
+                <span class="ic" data-ic="info"></span>
+                <span class="tx"><b>关于我们</b>
+                  <span>了解灵途智行 · 让智能更有温度</span></span>
+                <span class="rt"><span data-ic="chev"></span></span>
+              </summary>
+              <div class="ro" id="ro"></div>
+              <!-- 2026-09-24：删掉「这些值全在 ui/config.json 里…为什么不从网页改」
+                   那一整段说明（用户要求去掉成段说明）。上面那张只读表本身还在。 -->
+            </details>
+          </section>
+        </div>
+
+        <!-- ═════════════════════════════ 第 4 栏 ═════════════════════════════ -->
+        <div class="set-col">
+
+          <!-- 侧栏立绘。**这一格挂了动作层**（`XQ.mascot.bind`），所以待机时是
+               那段循环动图，点下面的「修改形象」会在它身上真的换表情。
+               参考图里这一格是张静态插画 + 「小瑞 / 一直在陪着你~」。 -->
+          <section class="card set-side">
+            <div class="cap"><b>小瑞</b><span>一直在陪着你~</span></div>
+            <div class="mascot">
+              <img class="mascot-img" id="sideArt" alt="小瑞" hidden>
+              <div id="sideArtHost"></div>
+            </div>
+          </section>
+
+          <!-- 小瑞 · 基础信息。参考图这四行是"可改的个人资料"，
+               但**这些不是设置，是这个形象自己的设定**（用户给的形象稿就是这么写的）。
+               所以这一格是**只读**的，卡片头那句 note 就是说明；
+               真要改形象，用的是下面那颗按钮。 -->
+          <section class="card card-pad" id="xqInfo">
+            <div class="card-h"><h3><span data-ic="user"></span>小瑞 · 基础信息</h3>
+              <span class="note">形象设定</span></div>
+            <div class="srow">
+              <span class="ic" data-ic="user"></span>
+              <span class="tx"><b>昵称</b></span>
+              <span class="rt ro">小瑞</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="user"></span>
+              <span class="tx"><b>性别</b></span>
+              <span class="rt ro">男孩</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="clock"></span>
+              <span class="tx"><b>生日</b></span>
+              <span class="rt ro">2024-06-01</span>
+            </div>
+            <div class="srow">
+              <span class="ic" data-ic="sparkle"></span>
+              <span class="tx"><b>个性签名</b></span>
+              <span class="rt ro wrap">你的智能出行伙伴，一路相伴，安全相伴~</span>
+            </div>
+          </section>
+
+          <button class="wide-btn" id="editLook"><span data-ic="edit"></span>修改形象</button>
+
+          <!-- 2026-09-24：删掉「参考图右下角那两行是版本号…」那一整块说明
+               （用户要求去掉成段说明）。这一格本来也**不留空**了 —— 说明没了，
+               留一块空地在那儿反而更怪。 -->
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script>
+/* =========================================================================
+   设置（车机左导航「设置」那一项的目标页）
+   -------------------------------------------------------------------------
+   **要连 WebSocket**：只读表、阈值、摄像头、音色、语音输入那几格的值全部来自
+   `hello`，没有 hello 就只能显示"—"。连上还有一个副作用是必须的：
+   `XQ.connect` 收到 hello 时会调 `XQ.tts.attach(api, d.tts)`，
+   语音开关的初始值（跟着数据源走）就是那儿定的。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+let link = null;
+
+/* 把 `data-ic="名字"` 的占位换成真图标。**统一走这里**，不要在很多个地方各写
+   一遍 `innerHTML = XQ.ICON.x` —— 图标名写错时 `XQ.icon()` 会退成 `info`
+   （见 live.js 的 `XQ.icon`），一处调用就一处能改。 */
+function paintIcons(root) {
+  for (const el of (root || document).querySelectorAll('[data-ic]')) {
+    el.innerHTML = XQ.icon(el.dataset.ic);
+  }
+}
+
+/* ---------------------------------------------------------------- 只读表 */
+function row(k, v, cls) {
+  return `<div><span class="k">${k}</span><span class="v ${cls || ''}">${XQ.esc(v)}</span></div>`;
+}
+
+/* ★ 2026-09-25：**`_` 开头的键要滤掉**。
+   `ui/config.json` 每一块都带一条 `_说明`（写给改配置的人看的长注释），而
+   `hello` 是把整块 `severity` 原样发过来的 —— 不过滤的话「severity 阈值」那一格
+   会把几百字的说明**原样打印在界面上**（上一版就是这样，那一行占了半屏）。
+   同理 `_enabled` / `_mode` 这些。 */
+function pub(o) {
+  const out = {};
+  for (const k of Object.keys(o || {})) if (k[0] !== '_') out[k] = o[k];
+  return out;
+}
+
+function renderRO(d) {
+  const a = d.agent || {};
+  const t = d.tts || {};
+  const st = t.stats || {};
+  const sev = pub(d.severity_cfg);
+  const out = [];
+
+  out.push(row('模型后端', a.mode || '—'));
+  out.push(row('API 是否可用',
+    a.api_ready ? '可用' : '不可用 —— 已降级为本地固定话术',
+    a.api_ready ? 'ok' : 'warn'));
+  out.push(row('模型', a.model || '—'));
+  out.push(row('API key', a.key || '（没配）'));
+  out.push(row('key 来源', a.key_from || '—'));
+  if (a.error) out.push(row('后端报错', a.error, 'err'));
+
+  out.push(row('当前数据源', d.source_spec || d.source || '—'));
+  out.push(row('TTS 音色关键词', t.voice || '—'));
+  out.push(row('TTS 服务端音色', (st.voice || '—') + (t.server_ok ? '' : '（没起来）'),
+    t.server_ok ? 'ok' : 'warn'));
+  out.push(row('TTS 当前源默认', t.default_on ? '开' : '关',
+    t.default_on ? 'ok' : 'warn'));
+  /* `XQ.asr.desc()` **整句**放这儿：它是"本机识别这条路现在什么状态、怎么装"
+     那段完整的实话，页面上只有这一格放得下（见 renderAsr 上面的注释）。 */
+  out.push(row('语音输入', XQ.asr.desc()));
+
+  const keys = Object.keys(sev);
+  out.push(row('severity 阈值', keys.length
+    ? keys.map((k) => `${k}=${sev[k]}`).join('  ')
+    : '—'));
+
+  $('ro').innerHTML = out.join('');
+}
+
+function clearRO(why) {
+  $('ro').innerHTML = row('状态', why, 'warn');
+}
+
+/* ------------------------------------------------- 第 2 栏那两块真值 */
+/* 全部来自 `hello`。**每一项都单独判空**：缺字段就显示「—」，
+   不要用默认值把"没读到"伪装成一个合理的数（`XQ.num` 那条注释里的同一条规矩）。 */
+function renderReal(d) {
+  const sev = pub(d.severity_cfg);
+  const al = pub(d.alarm_cfg);
+  const cam = d.cam;
+
+  const pair = (p, q) => (p == null && q == null) ? '—'
+    : `${XQ.num(p, 2)} · ${q == null ? '—' : (q * 100).toFixed(1) + '%'}`;
+  $('rMild').textContent = pair(sev.mild_p_fat, sev.mild_perclos);
+  $('rMod').textContent = pair(sev.moderate_p_fat, sev.moderate_perclos);
+  $('rYawn').textContent = al.yawn_min == null ? '—' : `≥ ${XQ.num(al.yawn_min, 1)} s`;
+  $('rHold').textContent = al.hold_sec == null ? '—' : `${XQ.num(al.hold_sec, 1)} s`;
+
+  $('rSource').textContent = d.source_spec || d.source || '—';
+  if (cam && cam.frames) {
+    $('rCam').textContent = `${cam.frames} 帧 · ${XQ.num(cam.fps, 1)} fps`;
+    $('rCamNote').textContent = cam.replay ? '回放视频，不是活摄像头' : '实时采集中';
+    $('rModel').textContent = cam.model || '—';
+    $('camNote').textContent = '有实时流';
+  } else {
+    /* demo 源没有摄像头（`CamSource.info` 只有摄像头/回放那一路有）。
+       **如实说没有**，不拿演出数据冒充一个摄像头。 */
+    $('rCam').textContent = '没有实时流';
+    $('rCamNote').textContent = 'demo 数据源，画面是演的 —— 界面上已标明';
+    $('rModel').textContent = 'demo';
+    $('camNote').textContent = '当前数据源没有摄像头';
+  }
+}
+
+/* --------------------------------------------- 语言 / 分辨率（本机读出来的） */
+/* 参考图这两行写死「简体中文 / 1920*1080」，这里显示的**是这台机器真实的数**。
+   读不出来时（很老的浏览器）退回「—」，不硬编。 */
+function renderLocal() {
+  const lang = navigator.language || '';
+  const CN = { 'zh-CN': '简体中文', 'zh': '简体中文', 'zh-TW': '繁體中文',
+               'zh-HK': '繁體中文', 'en-US': 'English (US)', 'en': 'English' };
+  $('rLang').textContent = CN[lang] || lang || '—';
+
+  const s = window.screen || {};
+  $('rRes').textContent = (s.width && s.height)
+    ? `${s.width}*${s.height}　窗口 ${window.innerWidth}×${window.innerHeight}`
+    : `窗口 ${window.innerWidth}×${window.innerHeight}`;
+}
+
+/* ---------------------------------------------------------------- 语音那两行 */
+function renderTts() {
+  const sw = $('ttsSw');
+  sw.checked = !!XQ.tts.on;
+  sw.disabled = false;                    // 永不置灰：置灰了人就不知道为什么
+
+  /* ⚠️ 这一格是"行内副标题"，宽度只有半个卡片 —— 浏览器音色的**全名**有
+     60 多个字符（`Microsoft 晓晓 Online (Natural) - Chinese (Mandarin,
+     Simplified)`），整句塞进去会把这行撑成 5 行高、还把右边的「试音台」
+     挤到换行。这里只取"括注之前那一段"，**完整名字在「关于我们」那张只读表里
+     一个字没少**（`renderRO` 那条 `TTS 服务端音色` / `TTS 音色关键词`）。 */
+  const v = XQ.tts.voice;
+  $('rVoiceNote').textContent = v
+    ? String(v.name || '').replace(/^Microsoft\s+/, '').split(' (')[0]
+      + (v.localService ? ' · 本地' : ' · 要联网')
+    : '这台浏览器上还没挑到中文音色';
+}
+
+/* 语音输入那一行。**这是只读的**：按钮在座舱主界面底部和对话页上，
+   而"本机识别能不能用"取决于装没装，装法只有 ui\install_asr.bat 一条路
+   —— 不在网页里放开关，因为那是要动 Python 环境的事，网页上按一下解决不了。
+   ★ 2026-09-25：上一版把 `XQ.asr.desc()` **整句**塞在这格的副标题里，在四栏版式
+   下那是一个窄栏，一整句 60 多字撑成 3~4 行。现在这里只给一句短的，**完整那句
+   搬进「关于我们」的只读表**（`renderRO` 的 `语音输入` 行）—— 话一个字没少，
+   只是换了个放得下的地方。
+   ⚠️ `_scratch/_check_asr_ui.py` 断言这两格**都不是「—」**且 note 里有
+      「可用 / 只有浏览器」—— 下面这两句都还在这个口径里，别改成别的说法。 */
+function renderAsr() {
+  const c = XQ.asr.cfg;
+  $('asrNote').textContent = !c ? '等 hello…' : (c.ok ? '本机识别可用' : '只有浏览器那条路');
+  $('asrTxt').textContent = !c ? '等 hello…'
+    : (c.ok ? '浏览器那条路优先，本机那条兜底' : '本机兜底没装，只走浏览器那条路');
+}
+
+/* ---------------------------------------------------------------- 三个开关 */
+/* 横幅与提示条住 `XQ.prefs`（live.js），语音播报住 `XQ.tts` ——
+   **两处都别在这一页自己写 localStorage**：各写各的迟早不一致，
+   而表现是"开关跳回去了"。 */
+function renderSwitches() {
+  $('swBanner').checked = XQ.prefs.get('banner');
+  $('swToast').checked = XQ.prefs.get('toast');
+}
+
+$('swBanner').onchange = (e) => {
+  XQ.prefs.set('banner', e.target.checked);
+  XQ.flash(e.target.checked ? '疲劳横幅会挂出来了' : '疲劳横幅已收起（判据不变）');
+};
+/* ⚠️ 先写偏好再提醒：`XQ.flash` 本身受「提示条」这个开关管，
+   所以关掉提示条的那一下**用 flash 报信等于什么都没说**。 */
+$('swToast').onchange = (e) => {
+  XQ.prefs.set('toast', e.target.checked);
+  if (e.target.checked) XQ.flash('提示条回来了');
+};
+$('ttsSw').onchange = (e) => {
+  XQ.tts.set(e.target.checked);
+  renderTts();
+  XQ.flash(e.target.checked ? '小瑞会说话了' : '小瑞已静音');
+  if (e.target.checked) XQ.speak('好的，我会说话了。', { emotion: 'normal' });
+};
+
+/* ---------------------------------------------------------------- 在线胶囊 */
+/* 跟 WebSocket 的连接状态走 —— 参考图里那个「在线」胶囊在这里是**真的状态**。
+   ⚠️ 两个胶囊的文案**不一样，别合并**：
+     · `#connPill`（页标题右边）是"连没连上"，值必须是「已连接 / 未连接」——
+       `_scratch/_check_pages.py` 逐字断言 `== "已连接"`；
+     · `#onlinePill`（小瑞档案卡里）是参考图那句「在线」，是人话不是状态码。
+   一开始这里图省事给两个都写了同一个字符串，`connPill` 就变成了「在线」，
+   那条断言当场红。 */
+function setOnline(on, why) {
+  if ($('onlinePill')) $('onlinePill').textContent = on ? '在线' : '离线';
+  if ($('connPill')) $('connPill').textContent = on ? '已连接' : '未连接';
+  if (!on && why && $('connPill')) $('connPill').title = why;
+}
+
+/* ---------------------------------------------------------------- 修改形象 */
+/* 在第 4 栏那格立绘上**真的**换表情（那一格用 `XQ.mascot.bind` 挂了动作层）。
+   动作名与顺序来自 `XQ.mascot.ACTS`，那张表是"动作库有哪 10 格"的唯一出处。 */
+const ACT_CN = { happy: '开心', wink: '眨眼', wow: '惊讶', shy: '害羞', angry: '生气',
+                 think: '思考', sad: '难过', sleep: '犯困', like: '点赞', heart: '比心' };
+let actIdx = -1;
+$('editLook').onclick = () => {
+  const acts = XQ.mascot.ACTS;
+  actIdx = (actIdx + 1) % acts.length;
+  const name = acts[actIdx];
+  XQ.mascot.play(name);
+  XQ.flash('小瑞：' + (ACT_CN[name] || name));
+};
+
+/* 铅笔 / 「个性化设置」都滚到基础信息那张卡。用 scrollIntoView 而不是
+   `<a href="#xqInfo">`：后者会在地址栏留一个 hash，`_check_pages.py` 那类
+   脚本按 URL 找页面时多一个尾巴。 */
+function goInfo() {
+  const el = $('xqInfo');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+$('goInfo').onclick = goInfo;
+$('goInfo').onkeydown = (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goInfo(); }
+};
+
+/* ---------------------------------------------------------------- 连接 */
+paintIcons();
+$('h1ico').innerHTML = XQ.icon('gear');
+$('editName').innerHTML = XQ.icon('edit');
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${XQ.ICON.chevL}</svg>`;
+renderLocal();
+renderTts();
+renderAsr();
+renderSwitches();
+
+/* 立绘那格挂动作层。**`cycle:true`**：点一下换一个动作（和驾驶监测页同一种手感）。
+   `src` 走 `bind` 的默认底图 = 待机循环动图，高度 238 与槽高对得上，见页内 CSS。 */
+$('sideArtHost').innerHTML = XQ.mascotSVG();
+XQ.mascot.bind('sideArt', 'sideArtHost', { cycle: true });
+
+/* 另外两处小瑞：第 1 栏顶上那个圆头像（`.xq-ava`）和「退出座舱」那条横幅里的
+   方图（`.warm .art`）。★ 2026-09-25：用户「把那些出现小瑞的地方都变成可以
+   变化的」—— 这两处在这次改版之前是**两张写死的 `xiaorui_head.png`**。
+   `deck:'h'` = 43 张形象库里的**方形头像版**（192x192）：这两格一个是 4.2rem
+   的圆形裁切、一个是 3.2rem 的小方图，立绘那套（210x288）塞进来会被
+   object-fit 截得只剩一截身子。
+   ⚠️ 两处**各点各的**（各是各的 deck，不共享进度）—— 它们隔着一整栏，没有
+      "同一只小瑞"的观感；而且头像点一下换的是头像、横幅点一下换的是横幅，
+      各换各的更符合"手点哪儿改哪儿"。
+   ⚠️ `poseDeck` 是拿 `im.parentNode` 当宿主的（这里就是 `.xq-ava` / `.art`
+      本身），加的是**委托式的 click**；`.xq-ava` 有 `overflow:hidden`，但它
+      只裁 `xqSwap` 那 7% 的位移，圆形裁切本来就要裁，不影响点击区域。
+   ⚠️ 这两张 img 的 `src` 在 HTML 里已经写成 `assets/xq/h/p01.webp`，和这里
+      的 `base:'p01'` 必须对得上（对不上表现为"第一下点下去和没点一样"）。 */
+[['.xq-ava img', '.xq-ava'], ['.warm .art img', '.warm .art']].forEach(([q, hq]) => {
+  const im = document.querySelector(q);
+  const host = document.querySelector(hq);
+  if (im && host) XQ.poseDeck(im, host, { size: 'h', base: 'p01' });
+});
+
+link = XQ.connect({
+  onHello: (d) => {
+    renderRO(d);
+    renderReal(d);
+    renderTts();                       // attach 已经把配置灌进 XQ.tts 了
+    renderAsr();                       // 同理：XQ.asr.attach 在 onHello 之前跑
+    setOnline(true);
+  },
+  onInfo: XQ.flash,
+  onDown: (down) => {
+    if (down) {
+      setOnline(false);
+      clearRO(XQ.isFile()
+        ? '这一页是 file:// 直接打开的，没有服务端可连'
+        : '连不上座舱服务（用 run_ui.bat 启动）');
+    }
+  },
+});
+
+XQ.mountChrome({ active: 'set' });
+</script>
+</body>
+</html>

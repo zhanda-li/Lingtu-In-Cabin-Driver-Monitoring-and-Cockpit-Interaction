@@ -46,6 +46,7 @@ CACHE = ROOT / "_scratch" / "_ear_raw.npz"
 # 正例用 yawn_open（不捂嘴），捂嘴的 yawn 只作为**局限**列出来
 POS, NEG, LIMIT = "yawn_open", "talking", "yawn"
 TRAIN_GROUPS = ("normal", "glance", "phone", "fatigue")
+MINCAP_HI = 2.0          # 【2b】里"可行 MIN"右侧那一栏的展示上限（不是判据）
 
 
 def load(npz):
@@ -80,6 +81,29 @@ def rollmax(ts, mar, win=1.5):
         if len(w) >= 3:
             best = max(best, float(np.mean(w)))
     return best
+
+
+def roll(ts, mar, win=1.5):
+    """`face.yawn_plateau` 的离线等价物 —— **2026-09-26 起的生产判据就是它**。
+
+    ⚠️ 生产里那份在 `src/face.py`，这里重写一遍只是为了能**一次扫多个阈值**。
+       改判据时两边一起看；【3】【4】【5】【6】用的都是这一条，【2】/【2b】用的是
+       旧的单帧判据（留着是为了说明"为什么不换判据就降不下来幅度"）。
+    """
+    mar = np.asarray(mar, float)
+    out = np.full(len(mar), np.nan)
+    j = 0
+    for i in range(len(mar)):
+        if not np.isfinite(mar[i]):
+            continue
+        lo = ts[i] - win
+        while ts[j] < lo and j < i:
+            j += 1
+        w = mar[(ts >= lo) & (ts <= ts[i])]
+        w = w[np.isfinite(w)]
+        if len(w) >= 3:
+            out[i] = float(np.mean(w))
+    return out
 
 
 def main():
@@ -117,7 +141,8 @@ def main():
         print()
 
     # ── 阈值扫描 ────────────────────────────────────────────────────
-    print(f"【2】阈值扫描：判据 = min({POS} 最长张嘴) − max({NEG} 最长张嘴)")
+    print(f"【2】阈值扫描（**单帧判据**，是历史对照，不是 2026-09-26 起生产在用的那条）："
+          f"判据 = min({POS} 最长张嘴) − max({NEG} 最长张嘴)")
     print(f"{'thr':>6}{POS + ' 最短':>16}{NEG + ' 最长':>16}{'间隔':>10}   判据")
     print("-" * 66)
     for thr in (0.45, 0.50, 0.55, 0.60, 0.65, 0.70):
@@ -127,33 +152,90 @@ def main():
         print(f"{thr:>6.2f}{min(p):>16.2f}{max(n):>16.2f}{gap:>+10.2f}   "
               + ("✅ 分离" if gap > 1.0 else ("勉强" if gap > 0 else "❌ 重叠")))
 
+    # ── 二维扫描：幅度 THR 与时长 MIN 一起动（用户 2026-09-26 的要求）────
+    #   「张嘴需要的幅度适当减小 对应的时间也适当减小」
+    #   ⚠️ 两个数**不能各调各的**：THR 降下去，说话那一侧的最长张嘴也会变长，
+    #      于是 MIN 的地板跟着抬。所以必须在这个二维表上挑格子，而不是分别扫。
+    print("\n【2b】二维扫描：THR 与 MIN 一起动（正例 5 段要全触发、负例 5 段要全不触发）")
+    print(f"{'thr':>6}{POS + '最短':>11}{NEG + '最长':>11}{'间隔':>8}"
+          f"{'MIN 地板':>10}{'MIN 上限':>10}   可行 MIN")
+    print("-" * 72)
+    for thr in (0.40, 0.45, 0.50, 0.55, 0.60):
+        p = [longest(ts, mar, thr) for _, ts, mar in D[POS]]
+        n = [longest(ts, mar, thr) for _, ts, mar in D[NEG]]
+        floor, cap = max(n), min(p)          # MIN 必须 > floor 且 ≤ cap
+        lo = np.ceil(floor * 20) / 20 + 0.05  # 往上取到 0.05 的整倍数再加一档
+        print(f"{thr:>6.2f}{min(p):>11.2f}{max(n):>11.2f}{min(p) - max(n):>+8.2f}"
+              f"{floor:>10.2f}{cap:>10.2f}   {lo:.2f} ~ {min(cap, MINCAP_HI):.2f}"
+              + ("   ← 当前" if abs(thr - YAWN_THR) < 1e-9 else ""))
+    print("  「MIN 地板」= 负例最长张嘴（MIN 必须**大于**它）；"
+          "「上限」= 正例最短张嘴（MIN 不能超过它，否则正例漏报）")
+
+    # ── 换判据：单帧 MAR → **1.5 s 滚动均值**（2026-09-26 实际采用的那一版）──
+    #   用户原话「张嘴需要的幅度适当减小 对应的时间也适当减小」。上面【2b】证明了
+    #   **只降单帧阈值不行**：0.50/0.55 上 glance_05 会报出 5.33 s 的假哈欠。
+    #   这一段量的是"换成滚动均值之后，幅度能降到哪"。
+    print("\n【2c】换判据：判据 = 「1.5 s 滚动均值 > thr」的最长连续时长")
+    print(f"{'thr':>6}{POS + '触发':>12}{POS + '最短':>11}"
+          f"{NEG + '最长':>11}{'glance最长':>11}{'normal最长':>11}"
+          f"{'phone+fatigue':>15}")
+
+    print("-" * 84)
+    for thr in (0.45, 0.50, 0.55, 0.60, 0.65, 0.70):
+        P = [longest(ts, roll(ts, mar), thr) for _, ts, mar in D[POS]]
+        N = [longest(ts, roll(ts, mar), thr) for _, ts, mar in D[NEG]]
+        G = [longest(ts, roll(ts, mar), thr) for _, ts, mar in D.get("glance", [])]
+        Z = [longest(ts, roll(ts, mar), thr) for _, ts, mar in D.get("normal", [])]
+        PF = [longest(ts, roll(ts, mar), thr)
+              for g in ("phone", "fatigue") for _, ts, mar in D.get(g, [])]
+        print(f"{thr:>6.2f}{f'{sum(d >= 1.0 for d in P)}/{len(P)}':>12}{min(P):>11.2f}"
+              f"{max(N):>11.2f}{max(G):>11.2f}{max(Z):>11.2f}"
+              f"{f'{sum(d >= 1.0 for d in PF)}/{len(PF)}':>15}"
+              + ("   ← 当前" if abs(thr - YAWN_THR) < 1e-9 else ""))
+    print("  取 0.55 的理由：负例三组最长只到 0.60 s、正例最短 4.60 s → 间隔 +4.00 s；")
+    print("  同一张表里 0.60 把说话压到 0.00 s，留的余量太大、白丢敏感度。")
+
     # ── YAWN_MIN 扫描（thr 固定为当前值）────────────────────────────
-    print(f"\n【3】YAWN_MIN 扫描（thr={YAWN_THR}）：正例要全部触发，负例要全部不触发")
+    # ⚠️ 这几节**必须挂在生产判据（滚动均值）上**：挂单帧判据的话，扫出来的
+    #    余量和生产里真正在用的那条式子对不上 —— 而下面【6】那句结论
+    #    （"训练集里一段哈欠都没有"）是要写进报告的，更难容忍口径不一致。
+    print(f"\n【3】YAWN_MIN 扫描（判据 = 1.5 s 滚动均值 > {YAWN_THR}；"
+          f"正例要全部触发，负例要全部不触发）")
     print(f"{'MIN(s)':>8}{POS + ' 触发':>14}{NEG + ' 触发':>14}{'两侧余量':>22}")
     print("-" * 60)
-    p = [longest(ts, mar, YAWN_THR) for _, ts, mar in D[POS]]
-    n = [longest(ts, mar, YAWN_THR) for _, ts, mar in D[NEG]]
+    p = [longest(ts, roll(ts, mar), YAWN_THR) for _, ts, mar in D[POS]]
+    n = [longest(ts, roll(ts, mar), YAWN_THR) for _, ts, mar in D[NEG]]
     for mn in mins:
         pt, nt = sum(d >= mn for d in p), sum(d >= mn for d in n)
         print(f"{mn:>8.1f}{f'{pt}/{len(p)}':>14}{f'{nt}/{len(n)}':>14}"
               f"{f'{min(p)-mn:+.2f} / {mn-max(n):+.2f}':>22}"
               + ("   ← 当前" if abs(mn - YAWN_MIN) < 1e-9 else ""))
-    print("  余量 = (正例最短 − MIN) / (MIN − 负例最长)，两个都为正才分得开")
+    print("  余量 = (正例最短 − MIN) / (MIN − talking 最长)，两个都为正才分得开"
+          "（最坏的负例是 normal，见【4】下面那行）")
 
     # ── 结论 ────────────────────────────────────────────────────────
     gap = min(p) - max(n)
     ok_pos = sum(d >= YAWN_MIN for d in p)
     ok_neg = sum(d >= YAWN_MIN for d in n)
-    print(f"\n【4】结论（thr={YAWN_THR} / MIN={YAWN_MIN}）")
+    print(f"\n【4】结论（判据 = 1.5 s 滚动均值 > {YAWN_THR}；MIN={YAWN_MIN}）")
     print(f"  正例触发 {ok_pos}/{len(p)}   负例触发 {ok_neg}/{len(n)}   "
-          f"间隔 {gap:+.2f} s")
+          f"间隔 {gap:+.2f} s（只算 talking）")
+    # ⚠️ 上面那个间隔**只减了 talking**，而真正压着 MIN 地板的是 normal_21
+    #    （0.60 s）。`src/face.py` 的标定注释引用的是后者，所以这里必须也印出来
+    #    —— 两个数不一样，不印就会变成"注释里的 +4.00 和工具里的 +4.47 对不上"。
+    neg_all = [longest(ts, roll(ts, mar), YAWN_THR)
+               for g in ("talking", "glance", "normal") for _, ts, mar in D.get(g, [])]
+    if neg_all:
+        print(f"  三组负例（talking+glance+normal 共 {len(neg_all)} 段）最长 "
+              f"{max(neg_all):.2f} s → **真实间隔 {min(p) - max(neg_all):+.2f} s**"
+              "（src/face.py 的注释引用的就是这个数）")
     if ok_pos == len(p) and ok_neg == 0 and gap > 1.0:
         print("  ✅ 分得开 → 哈欠规则按「抬到 L1」实现（src/fuse.py 的 YAWN_ACTION=\"level\"）")
     else:
         print("  ❌ 分不开 → 哈欠降级为「只显示 + 只写日志」，不动级别"
               "（src/fuse.py 的 YAWN_ACTION=\"display\"）")
 
-    lp = [longest(ts, mar, YAWN_THR) for _, ts, mar in D[LIMIT]]
+    lp = [longest(ts, roll(ts, mar), YAWN_THR) for _, ts, mar in D[LIMIT]]
     print(f"\n【5】⚠️ 局限：捂嘴哈欠 {LIMIT} 组 "
           f"{sum(d >= YAWN_MIN for d in lp)}/{len(lp)} 触发，最长只有 {max(lp):.2f} s")
     print("  捂嘴时嘴部几何量被手挡住，MAR 读不出来。这不是阈值问题，是模态问题。")
@@ -165,7 +247,7 @@ def main():
     for g in TRAIN_GROUPS:
         for k, ts, mar in D.get(g, []):
             tot += 1
-            if longest(ts, mar, YAWN_THR) >= YAWN_MIN:
+            if longest(ts, roll(ts, mar), YAWN_THR) >= YAWN_MIN:
                 trig += 1
     print(f"\n【6】训练集（{'+'.join(TRAIN_GROUPS)}）{tot} 段里触发哈欠事件的：{trig} 段")
     print("  这就是 tools/ablate_feats.py 里\"yawn 列恒等于 0、系数 0.000\"的来源 ——")

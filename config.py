@@ -24,8 +24,34 @@ RUNS = ROOT / "runs"                      # 训练输出、图表
 
 # ---------------- 类别 ----------------
 # 顺序即标签 id。改了它已训练的权重要重训，模型权重和这个顺序绑定。
-CLASSES = ["normal", "glance", "phone", "fatigue"]
-CLASS_NAMES_CN = ["正常驾驶", "短暂扭头", "持续低头看手机", "疲劳点头"]
+#
+# ★ 2026-09-24：四类 -> 三类，**`glance`（短暂扭头=分心）删除**。
+# 用户原话：「后端改一下 我们只做疲劳」「phone 直接归为重度疲劳 fatigue依旧是
+# 疲劳 glance删掉」「轻度疲劳就是支路2的闭眼时间变长 打哈欠那些」「重度疲劳就是
+# 点头 低头 头部倾倒这些」。
+# 于是：**看手机 = 持续低头 = 重度疲劳**，点和点是同一件事的两种姿态。
+#
+# ★ 2026-09-25：三类 -> 二类，**`phone` 并入 `fatigue`**。
+# 用户原话：「点头这个 直接 疲劳瞌睡点头和头部持续低头变成一路吧」
+#        「glance不参与训练了 phone和fatigue数据集相当于一种」。
+# 三条理由（详见 plans/transient-sleeping-llama.md）：
+#   · 界面上"疲劳瞌睡点头"和"头部持续低垂"两根条并排，模型老把两者搞混
+#     （三类下测试集 45 个错里 24 个是这一对），而产品口径里它们**本来就同属
+#     重度疲劳**（`src/live.py` 的 CLASS_LEVEL 把两者都落 L3）—— 分开只是
+#     徒增一处误报来源。
+#   · 合并后 `ema[normal] + ema[fatigue] = 1`，于是
+#     `ema[fatigue] > ENTER_TH` **等价于** `ema[normal] < EXIT_TH`，
+#     也就是"闸门关闭 ⟺ 判重度"这两件事从代数上合成了一件。
+#   · 但这条恒等式**放宽了**重度的触发（原先要"某一类过 0.60"，现在是
+#     "非正常这一类过 0.60"，而 `ema[normal]` 掉到 0.40 就够）—— 所以
+#     `glance` 那 27 段退掉的样本要当**负对照**量一遍，见验收 1.6。
+#
+# 数据侧**非破坏**：`data/pose/{glance,phone}/` 与 `data/raw/{glance,phone}/`
+# 全部原地保留，只是 `tools/build_dataset.py` 按目录打新标签
+# （`DIR_CLASS`：phone 目录 -> fatigue 类）。想回到三类就把 CLASSES 改回去、
+# 并把 `DIR_CLASS` 里的 phone 还原，再重训（旧权重在 runs/fatigue3/ 下留着）。
+CLASSES = ["normal", "fatigue"]
+CLASS_NAMES_CN = ["正常驾驶", "疲劳"]
 NUM_CLASSES = len(CLASSES)
 
 # ---------------- 骨骼 ----------------

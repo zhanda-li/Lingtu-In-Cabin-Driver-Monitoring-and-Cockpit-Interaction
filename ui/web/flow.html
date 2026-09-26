@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>完整交互流程图 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* ---------------- 页面局部样式：只在这一页有意义 ----------------
+   下面 .flow-band 的间距：这页的 band 是跟在某一节后面的脚注，不是独立一段。
+   ★ 2026-09-25：这里原来还有一组 `.fn.off`（虚线 = 未实现）+ `.off-tag`
+   （「未实现」小标），随末尾那一节一起删了（用户「把这个去了」）。它当初**故意**
+   只放这一页：那个视觉约定只有放在这张流程图上才读得懂，塞进 pages.css 会让
+   04 / 05 拿到一组永远用不上的类。**这一页现在一个虚线节点都没有了。** */
+/* 节点里被强调的那半句。`.fn span` 整段是 --muted，直接加 <b> 只会变粗不会变亮，
+   强调等于没强调 —— 所以这里把颜色提回来一点（不是提到主文字亮度，它仍是次要信息）。 */
+.fn span b{ color:#c8d8e4; font-weight:600; }
+.flow > .card{ padding:.9rem 1.05rem; }
+.flow > .flow-band{ margin-top:-.35rem; }      /* 脚注要贴着它解释的那一节 */
+</style>
+</head>
+<body data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ============ 页标题 ============ -->
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1>完整交互流程图</h1>
+        <span class="spacer"></span>
+        <span class="pill">算法 → 状态 → UI → 情绪 → 行为 → 安全</span>
+      </div>
+
+      <!-- 流程图由下面的 BANDS 表生成（见脚本）。**不用手写 HTML**：
+           手写 20 多个节点 + 20 多个箭头，迟早漏一个箭头或者重一个编号，
+           而"流程图缺个箭头"在投影上看起来就像流程断了。 -->
+      <div class="flow" id="flow"></div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script>
+/* =========================================================================
+   07 完整交互流程图
+   -------------------------------------------------------------------------
+   这是一张**说明书**，不是演示页：它画的是这个仓库里真实的流水线，
+   连每个数字都取自代码（窗口 45 帧、进 0.60 / 退 0.40、HIST_SEC = 27 s…）。
+
+   ★ 2026-09-25：原来下面还有一条规矩 ——「方案里写了、仓库里没有的，画出来但标
+   虚线」，末尾挂着一节「方案里有、仓库里没有」（YOLOv8n 分心检测 / MediaPipe
+   手势 / HPM+MAX30102 心率，引 runs/_spec_579.txt 的模块 3/4/5）。
+   **用户当天原话「把这个去了」—— 整节删除**，连带虚线那套（`.fn.off` /
+   `.off-tag` / 渲染里 `flag === 'off'` 那一支）一起清干净：留着一组没人用的
+   选择器，下次改版会让人以为这页还有虚线节点。要往回加，样式得跟着一起写回来。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+/* ---------------------------------------------------------------- 流程图 */
+/* 一节 = 一个 .card：标题行 + 一行 .fn 节点 + 可选的 .flow-band 脚注。
+   环节号跨节连续，渲染时自动编（`n`），表里不写。 */
+const BANDS = [
+  {
+    h: '感知 · 单目摄像头喂两条支路',
+    icon: 'eye',
+    note: '一支摄像头 · 两个 MediaPipe 任务',
+    nodes: [
+      ['USB 摄像头', 'UVC 免驱 · 被本进程独占，别的程序再打开只能拿到全黑'],
+      ['MediaPipe Pose', '33 点骨架 + 可见性；某一帧没检到人就沿用上一帧'],
+      ['MediaPipe FaceMesh', '478 点面部 → EAR / MAR / 头部欧拉角'],
+      ['15 Hz 节拍重采样', '按墙上时钟取样，**不是"来一帧喂一帧"** —— 本机摄像头实测只有 10~11 fps，'
+                         + '来一帧塞一帧的话 45 帧窗口会被拉成 4 秒多，时序就废了', 'hot'],
+    ],
+  },
+  {
+    h: '支路一 · 姿态时序',
+    icon: 'brain',
+    note: '看的是姿态周期性，看不见眼睛',
+    nodes: [
+      ['45 帧滑窗', '45 帧 @ 15 fps ≈ 3.0 秒；推理时每帧都评（STRIDE_INFER = 1）'],
+      ['时序 Transformer', 'd_model 64 · 4 头 · 3 层，[CLS] token 出 3 类'],
+      ['三类 EMA', '正常 / 低头看手机 / 疲劳点头，三类概率和为 1'],
+      ['迟滞状态机', '进 0.60 / 退 0.40；升级要稳 0.25 s，降级要等 1.0 s —— **降故意比升慢**', 'hot'],
+      ['l1 · 支路一的级别', '它只有两个落点：正常 → L0，"低头看手机 / 疲劳点头" → L3。'
+                          + '中间那两级是支路二给的，支路一给不出来'],
+    ],
+  },
+  {
+    h: '支路二 · 面部路',
+    icon: 'eye',
+    note: '看的是眼睑闭合和哈欠，看不见头在干什么',
+    nodes: [
+      ['闸门', '支路一 argmax = "正常" 且 EMA[正常] ≥ 0.60 才放行（0.60 是推导的，不是拍的）', 'hot'],
+      ['EAR / MAR / 欧拉角', 'FaceMesh 派生的三个原始量'],
+      ['逐段滚动 p75 归一化', '基线用 p75 **不用中位数**：闭眼占比过半时中位数会被闭眼自己拽塌，'
+                            + '比值恒为 1 —— 越疲劳越读不出来'],
+      ['4 个统计量', 'PERCLOS / 眨眼频率 / 点头次数 / 哈欠时长'],
+      ['逻辑回归', '只有 3 个进模型：哈欠那列在 96 段训练集上恒为 0，系数必然是 0'],
+      ['P(疲劳) → l2', '再过一层迟滞，结果封顶 L2'],
+    ],
+  },
+  /* 2026-09-24：删掉这里一条 band（「闸门一关 fb.clear() 就把缓冲清空…」
+     约 200 字的说明段）。用户要求去掉成段说明文字。备份见
+     web/_bak_20260924_prose/flow.html。 */
+  {
+    h: '融合 · 两条支路合一个级别',
+    icon: 'shield',
+    note: '低头/点头交给支路一，闭眼和哈欠交给支路二',
+    nodes: [
+      ['L_fused = max(L1, min(L2, 2))', '支路二封顶 L2：它只有 5+5 段自己录的标定集，'
+                                      + '证据量级撑不起"紧急"', 'hot'],
+      ['哈欠规则', 'L_fused = max(L_fused, 1)：哈欠**不进逻辑回归**，走规则'],
+      ['灯光 / 语音 / 警示', 'L1 起就出声（SPEAK_FROM = 1）—— 哈欠和闭眼变长是真实疲劳'
+                          + '征兆，压着不念反而丢掉了最有用的那条提示'],
+    ],
+  },
+  /* 2026-09-24：删掉这里一条 band（「这就是两级权限…」约 110 字）。 */
+  {
+    h: '情感化交互 · 情感通道',
+    icon: 'sparkle',
+    note: 'severity（档位）与 L_fused（安全通道）：一个决定怎么说，一个决定亮不亮',
+    nodes: [
+      ['severity', 'normal / mild / moderate / severe（清醒 / 轻度 / 中度 / 重度）。'
+                 + '数值阈值只有两条：PERCLOS 0.187 / 0.426（需求文档的 18.7% / 42.6%）、'
+                 + 'P(疲劳) 0.35 / 0.55 —— 都在 ui/config.json 的 severity 段；'
+                 + '**重度没有数**，它是支路一判出来的类别（低头 / 点头）'],
+      ['氛围', '背景色、呼吸光晕、对比度随档位变 —— 界面本身就是提示'],
+      /* ⚠️ 2026-09-24「只做疲劳」再改一次：原来是「小瑞四态 正常/分心/看手机/疲劳，
+         跟的是安全通道」。两条轴合成一条之后小瑞跟的是**疲劳档位**（severity），
+         四档一一对应，不再有"程度进轻度档时另说一套"那种特例。 */
+      ['小瑞四态', '清醒 / 轻度 / 中度 / 重度 —— 跟的是**疲劳档位**（severity）；'
+                 + '配色、大标题、表情、语音语气全跟它', 'hot'],
+      ['主动对话', '跨档才开口（重度要这一档稳住 2.5 s 才念），同一档 20 s 冷却；'
+                 + '不打断，只应答'],
+      ['多端联动', '手机推送 / 家属上报 —— 见作品 06 那一页'],
+    ],
+  },
+  /* ★ 2026-09-25：**这里原来还有一节「方案里有、仓库里没有」**（图标 info，
+     note「模块清单见 runs/_spec_579.txt，代码在 src/ 下找不到」，`off: true`），
+     三个虚线节点：
+       模块 3  YOLOv8n 分心物体检测 · 识别手机、水杯 → 判定驾驶分心
+       模块 4  MediaPipe 手势识别 · OK 关告警 / 滑动调音量 / 揉眼扶额辅助评估
+       模块 5  HPM5300 + MAX30102 心率 · 硬件心率：state.hr 至今恒为 None，
+               界面一律显示「未接入」
+       ★ 2026-09-26 追记：**模块 5 后来做出来了**（`hr/firmware` +
+         `ui/serial_hr.py`），所以上面那句引文里的「恒为 None」到这一天为止
+         不再成立 —— 引文照旧留着，因为它是**当初为什么删掉这一节**的记录。
+     模块 3 那两句是**计划书原文**（runs/_spec_579.txt:24/27），「分心」二字当年
+     只被允许出现在这里（`_check_grade.py` 的 B 段按 ALLOW 白名单豁免）。
+     **用户 2026-09-25 原话：「把这个去了」—— 整节删除。**
+     ⚠️ 代价记在这里，别当成漏写：删掉之后，**全站再没有一处说明这三项是"方案里
+        有、仓库里没有"**（about.html 本来就明文不写这三项，见那边的注释）。那一节
+        当初的用处是"防身"—— 评委指到"物体检测呢"，答案印在图上；现在这个问题
+        在纸面上没有答案了。
+     ⚠️ 跟着一起删的还有：`.fn.off` / `.off-tag` 那组样式、上面渲染里
+        `flag === 'off'` 那一支、以及 `_check_grade.py` 里只为这一节存在的
+        `ALLOW` 引文白名单。要往回加，这几处得一起写回来。
+     ⚠️ 再往上还有一条 2026-09-24 的注释（「最后这一节不是谦虚，是防身…」那条
+        约 90 字的 band），指的是更早删掉的一行脚注 —— 一并收掉了。 */
+];
+
+/* 箭头。用现有的 chev 图标，别为一张图再画一套 —— 和左导航、列表行是同一个箭头。 */
+const ARROW = `<span class="fa">${XQ.icon('chev')}</span>`;
+
+/* 上面 BANDS 表里的 `**…**` 换成 <b>。写的是"半个句子重点标一下"，
+   不想为了它把每段拆成三个字段。
+   ⚠️ 这些字符串**全是本页写死的字面量**，所以直接拼 innerHTML 是安全的。
+      这张表里不许掺任何来自 state / 模型 / 用户输入的内容 —— 要掺就得先 esc。 */
+const md = (s) => String(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+
+function renderBands() {
+  let n = 0;                                     // 跨节连续的环节号
+  const html = BANDS.map((b) => {
+    if (b.band) return `<div class="flow-band"><span>${md(b.band)}</span></div>`;
+
+    /* 每个节点 = 环节号 + 标题 + 说明。`flag === 'hot'` 只加一个高亮类。
+       （2026-09-25 之前这里还有第三态 `'off'`：虚线节点 + 「未实现」小标，
+        只为末尾那一节服务，那一节被用户删了，这一支也一并删掉。） */
+    const nodes = b.nodes.map(([bTitle, sub, flag]) => {
+      n += 1;
+      return `<div class="fn${flag === 'hot' ? ' hot' : ''}">`
+           + `<div class="no">${String(n).padStart(2, '0')}</div>`
+           + `<b>${md(bTitle)}</b><span>${md(sub)}</span></div>`;
+    }).join(ARROW);                              // 节点之间自动补箭头
+
+    return `<section class="card card-pad">`
+         + `<div class="card-h"><h3>${XQ.icon(b.icon)}${md(b.h)}</h3>`
+         + `<span class="note">${md(b.note)}</span></div>`
+         + `<div class="flow-row">${nodes}</div></section>`;
+  }).join('');
+  $('flow').innerHTML = html;
+  return n;
+}
+
+/* ---------------------------------------------------------------- 起步 */
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${XQ.ICON.chevL}</svg>`;
+/* 这一页**不连 WebSocket**：它画的是结构，不是实时状态。
+   （chrome.js / live.js 仍然要挂 —— 顶栏、左导航都在那边生成。）
+   旧作品页，不挂在左导航的五项里，`active: ''` 一项都不点亮。 */
+XQ.mountChrome({ active: '' });
+renderBands();
+</script>
+</body>
+</html>

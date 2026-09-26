@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>帮助 &amp; 关于 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* ---------------- 页面局部样式：只在这一页有意义 ----------------
+   这是一张**说明页**（竞赛答辩 / 作品展示时讲原理用）。页面上出现的每个数字
+   都取自仓库里的代码常量，不是估的：
+     四档 + 那栏说明   src/live.py   LEVEL_CN / LEVEL_NOTE
+     进 0.60 退 0.40   src/live.py   ENTER_TH / EXIT_TH（概率先过 EMA，α=0.55）
+     45 帧 @ 15 fps    config.py     WINDOW / TARGET_FPS
+     132 维            config.py     FEAT_DIM = 33 × 4
+     10 s / 75 分位    src/face.py   ROLL_WIN / NORM_Q
+     17 s 统计窗       src/face.py   WIN_SEC
+     27 s 缓冲         src/face.py   HIST_SEC = ROLL_WIN + WIN_SEC
+     0.80 闭眼阈值     src/face.py   BLINK_THR（换归一化后重标定的值）
+     0.55 / 1.0 s      src/face.py   YAWN_THR / YAWN_MIN（判在 1.5 s 滚动均值上）
+     12° / 0.5 s       src/face.py   NOD_DROP / NOD_MIN
+     1.0 s 持续闭眼     src/face.py   CLOSE_EYE_SEC（归一化后 EAR 连续低于 0.80）
+     10° / 2 s 低头     src/face.py   HEAD_DEG / HEAD_WIN（最近 2 s 的 pitch p95 − 抬头位）
+     闸门 + 取高       src/fuse.py   GATE_MIN = 1 − EXIT_TH；L_fused = max(L1, L_face, L_yawn, L_eye, L_head)
+   ⚠️ 改任何一条常量，这一页对应的字要跟着改 —— 它是**引用**，不是复述。
+
+   背景用默认那张（body 不写 `pg-*` 类）—— 和 flow.html 同一种做法，
+   不为一张说明页再去 style.css 里加一条 `--bg-img`。 */
+.flow > .card{ padding:1.05rem 1.25rem 1.2rem; }        /* 比默认宽松一点，这是长文 */
+
+/* 「标签 | 内容」两列。用 grid 不用 flex：标签列要**跨行对齐**，
+   flex 每行各算各的宽度，长短不一的标签会让整列参差。 */
+.ab-rows{ display:grid; gap:.5rem; margin-top:.5rem; }
+.ab-row{ display:grid; grid-template-columns:minmax(5.4rem,auto) minmax(0,1fr);
+         gap:1rem; align-items:baseline; }
+.ab-row > .k{ font-size:.72rem; font-weight:600; color:var(--muted);
+              letter-spacing:.02em; white-space:nowrap; }
+.ab-row > .v{ font-size:.8rem; color:var(--ink-3); line-height:1.7; }
+.ab-row > .v b{ color:var(--ink-2); }
+
+/* 四档色带。颜色取 `var(--sev-*)` —— 不是这页新配的，就是全站那四档
+   （浅色主题下 #1E7FD8 / #A87B00 / #D98212 / #D62B44）。
+   ⚠️ 是**两列**不是一列：四行竖着排时每行右边空出一大半（说明只有十来个字，
+      整行却有一千多像素），第一版截图上那块空白比内容还显眼 ——
+      用户同一天刚说过监测页「不要中间留空白」。两列之后 2×2 铺满。 */
+.ab-sev{ display:grid; grid-template-columns:1fr 1fr; gap:.4rem; margin-top:.65rem; }
+.ab-sev .lv{ display:grid; grid-template-columns:1.5rem minmax(4.6rem,auto) minmax(0,1fr);
+             gap:.7rem; align-items:center; padding:.42rem .7rem; border-radius:.6rem;
+             background:var(--fill-1); border:1px solid var(--line); }
+.ab-sev .dot{ width:.55rem; height:.55rem; border-radius:50%;
+              background:var(--c); justify-self:center; }
+.ab-sev .nm{ font-size:.78rem; font-weight:600; color:var(--c); }
+/* ⚠️ 这一格**不能叫 `.nt`** —— `pages.css:1512` 里有一个公共的 `.nt`
+   （首页那三格「未接入」数字块：`background:var(--fill-2)` + 描边 + 圆角 +
+   `padding:.5rem .4rem` + `text-align:center`）。名字撞上之后，这里的说明文字
+   会被套上一个带底色的居中方块（实测高度 31px 而不是 19px）——
+   `.nt .v` / `.nt .k` 那几条也是公共的，跟着一起漏进来。
+   用 `.ab-` 前缀：全站公共 CSS 里**一个 `.ab-` 都没有**（grep 过），撞不上。 */
+.ab-sev .ab-nt{ font-size:.74rem; color:var(--muted); }
+
+/* 亮点四宫格。**不用 `.flow-row`**：那一条是"顺序节点 + 箭头"的语义，
+   四个亮点是并列的，横着排会被读成一条流程。 */
+.ab-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.55rem; margin-top:.5rem; }
+.ab-cell{ padding:.75rem .9rem; border-radius:.7rem;
+          background:var(--fill-1); border:1px solid var(--line); }
+.ab-cell .t{ display:flex; align-items:center; gap:.45rem;
+             font-size:.8rem; font-weight:600; color:var(--ink-2); }
+.ab-cell .t svg{ width:.95rem; height:.95rem; color:var(--accent); flex:0 0 auto; }
+.ab-cell p{ margin:.35rem 0 0; font-size:.74rem; line-height:1.7; color:var(--ink-4); }
+.ab-cell p b{ color:var(--ink-2); }
+
+/* 底部两条相关页面。不复用 `.qk`：那一族的重量是给首页快捷格用的，
+   这里只要"一行链接"。 */
+.ab-links{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.55rem; }
+.ab-links a{ display:inline-flex; align-items:center; gap:.45rem;
+             padding:.44rem .85rem; border-radius:2rem; font-size:.76rem;
+             color:var(--ink-3); text-decoration:none;
+             background:var(--fill-1); border:1px solid var(--line); }
+.ab-links a:hover{ background:var(--fill-3); border-color:rgba(var(--rgb),.42);
+                   color:var(--ink-2); }
+.ab-links a .ic{ display:inline-flex; }
+.ab-links a svg{ width:.9rem; height:.9rem; }
+
+@media (max-width:900px){
+  .ab-grid{ grid-template-columns:1fr; }
+  .ab-sev{ grid-template-columns:1fr; }
+  .ab-row{ grid-template-columns:1fr; gap:.15rem; }
+}
+</style>
+</head>
+<body data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ============ 页标题 ============ -->
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1>帮助 &amp; 关于</h1>
+        <span class="spacer"></span>
+        <span class="pill">感知 → 预警 → 干预 → 复盘</span>
+      </div>
+
+      <!-- 正文六节全部由下面的 SECTIONS 表生成（见脚本）。
+           **不手写 HTML**：这一页的每一段都带 `**…**` 重点，
+           手写的话"星号没闭合""漏了一个"没法一眼看出来；
+           而且源码里的换行会在中文句子中间塌成一个空格
+           （HTML 把换行折成空格），拼串就没有这个问题。 -->
+      <div class="flow" id="doc"></div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script>
+/* =========================================================================
+   帮助 & 关于 —— 竞赛答辩 / 作品展示用的项目介绍页
+   -------------------------------------------------------------------------
+   三条规矩，和 04 / 06 那两张说明书一样：
+     · **页面上不出现一个编的数字**。每一条常量都在文件头注释里列了出处
+       （config.py / src/live.py / src/face.py / src/fuse.py）。改代码就回来改字。
+     · **方案里有、仓库里没有的，这页不写**（手势识别、分心物体检测都不在这里）
+       —— 那些在 flow.html 里以虚线节点单列。这页是"已经做到的"清单。
+       ★ 2026-09-26：**心率硬件从这一句里划掉了** —— HPM5300 + MAX30102 已经
+         做出来了（`hr/firmware` + `ui/serial_hr.py`），不再是"方案里
+         有、仓库里没有"。这一页上没为它加格子：它和别的模块不在同一层
+         （不参与疲劳判决，只是个独立读数），加一段说明反而违反"页面上不出现
+         解释句子"。要展示它在驾驶监测页的「心率（实时）」那一格。
+     · 这一页**不连 WebSocket**：它讲结构，不讲实时状态。
+       （chrome.js / live.js 仍要挂 —— 顶栏和左导航在那边生成。）
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+/* `**…**` → <b>。和 flow.html 同一个做法：这些串全是本页写死的字面量，
+   直接拼 innerHTML 是安全的。这一页**不许**掺任何来自 state / 模型 / 用户输入的
+   内容 —— 要掺就得先 esc。
+
+   ⚠️ 第二条 replace 不是洁癖，是**修一个看得见的排版毛病**：
+      `'**头部姿态特征检测。** 姿态关键点…'` 里 `**` 后面那个空格，
+      转换之后会**留在 `</b>` 后面**（它就夹在两个文本节点之间，
+      HTML 不会把中文标点后的空格折掉），页面上读出来是「检测。 姿态关键点」——
+      一个悬在句号后面的空格。规则收紧到"加粗段以中文标点收尾时才吞掉后面的空白"，
+      所以 `**45 帧** 后面这种带空格的西文写法不受影响。 */
+const md = (s) => String(s)
+  .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+  .replace(/([，。；：、）])<\/b>\s+/g, '$1</b>');
+
+/* ------------------------------------------------------------ 正文六节 */
+/* `rows` 用 `[标签, 内容]`，`lv` 是四档色带，`arch` 是架构框图，
+   `feats` 是亮点宫格 —— 一节的形状由它带哪个字段决定，渲染分支在下面。 */
+const SECTIONS = [
+  {
+    h: '一、项目简介', icon: 'info',
+    /* ⚠️ 这一格的注**别写作品名** —— 下面「作品名」那一行就是它，
+       同一句话在一张卡里出现两遍（第一版就是这样，截图上很扎眼）。 */
+    note: '面向竞赛答辩与作品展示',
+    rows: [
+      ['作品名', '灵途智行 · 小瑞情感化智能座舱系统'],
+      ['一句话', '用**一路**单目摄像头实时判定驾驶员的疲劳档位，并让座舱以有形象、'
+        + '有称呼、有语气的方式作出响应 —— 不是多装一个报警器，是多一个同行者。'],
+      ['全流程', '**感知**（摄像头 → 姿态与面部特征）→ **预警**（四档状态 + 分级灯光与语音）'
+        + ' → **干预**（小瑞主动对话、舒缓音乐、休息建议）→ **复盘**（本次会话的状态轨迹与统计）。'
+        + '四个环节在同一套界面里闭环，不依赖任何额外的车载硬件。'],
+      ['规模', '两条并行检测支路 · 四档状态 · 十余个交互页面 · '
+        + '一套本地语音唤醒（「你好，小瑞」）。'],
+    ],
+  },
+  {
+    h: '二、赛道主题适配说明', icon: 'shield',
+    note: '安全赋能 · 情感座舱 · 智能交互',
+    rows: [
+      ['安全赋能', '把「疲劳」从抽象指标落成**可执行的档位**：四档状态与风险等级一一对应，'
+        + '档位改变了才动作，不做无意义的频繁提示 —— 提示越少，每一次提示才越被当回事。'],
+      ['情感座舱', '重度疲劳时不靠刺耳报警，而靠陪伴式提醒：灯光、语音，以及小瑞的一句短话。'
+        + '整套交互的语气按档位走，坐在车里的人听得出来「它知道我现在什么状态」。'],
+      ['智能交互', '唤醒与语音识别都在**本机**完成（唤醒词「你好，小瑞」，识别走本地模型，'
+        + '认不出来时才有兜底）；对话可以接大模型，哪些能力依赖网络、哪些不依赖，'
+        + '界面上如实标注。**说完一句不用再喊唤醒词** —— 它答完之后会留 10 秒'
+        + '「追问窗口」，接着说就接着答，连着说就是连续对话。'
+        + '麦克风默认打开（首次要授权一次），顶栏那颗喇叭随时可停，停了就黏住整个会话。'],
+    ],
+  },
+  {
+    h: '三、小瑞 IP 人设', icon: 'heart',
+    note: '它跟的不是"分几类"，是疲劳档位',
+    rows: [
+      ['人设定位', '称呼「主人」，乖巧温柔；每次开口 40~60 字，句子短、不用 emoji、'
+        + '不刷存在感 —— 只在需要的时候说话。'],
+      ['核心能力', '把「状态」翻译成人能接住的话：同一份判决，换档位就换说法。'
+        + '答复里带着当前档位，所以它说的是「你现在什么情况」，而不是背台词。'],
+      ['差异化交互', '**配色、大标题、表情、语音语气全跟疲劳档位走**，四档一一对应，'
+        + '不再有「程度进某一档时另说一套」的特例。跨档才主动开口；不打断驾驶，只应答。'],
+    ],
+    lv: [
+      ['清醒',     '--sev-normal',   '正常驾驶 · 不做任何提示'],
+      ['轻度疲劳', '--sev-mild',     '检测到打哈欠/闭眼变长'],
+      ['中度疲劳', '--sev-moderate', '检测到持续闭眼'],
+      ['重度疲劳', '--sev-severe',   '检测到低头/点头'],
+    ],
+  },
+  {
+    h: '四、系统核心技术原理', icon: 'brain',
+    note: '两条支路 · 共用同一路画面',
+    rows: [
+      ['支路一', '**头部姿态特征检测。** 姿态关键点 **33 × 4 = 132 维**特征 → '
+        + '**45 帧**窗口（3 秒 @ 15 fps）→ 轻量时序 **Transformer** → 正常 / 疲劳两类概率；'
+        + '概率先做指数平滑（α = 0.55）再进迟滞判决：**升档**要概率 ≥ 0.60 且稳住 0.25 秒，'
+        + '**降档**要跌破 0.40 且稳住 1.0 秒 —— 降得比升得慢是故意的，'
+        + '免得在档位边界上反复横跳。'],
+      ['支路二', '**眼部与嘴部微特征检测。** 同一路画面上的第二个人脸任务，**不加任何硬件**：'
+        + '面部关键点 → **EAR**（眼开合）、**MAR**（嘴开合）、头部欧拉角。原始值先归一化 —— '
+        + '逐点用「它自己往前 **10 秒**」的 **75 分位**做基线，**不是中位数**：'
+        + '闭眼占比一高，中位基线会被闭眼自己拽塌，越疲劳越读不出来（自我抑制）。'
+        + '归一化后的 **17 秒**统计窗里算三项 —— **PERCLOS**、眨眼频率、点头次数，'
+        + '送进逻辑回归。实时缓冲留 **27 秒** = 基线热身 10 s + 统计窗 17 s；'
+        + '这是充要条件不是余量，窗里每个样本都得有自己的完整基线史。'],
+      ['规则侧', '有四个量**不进模型、走规则**，因为它们考的是「持续」而不是「峰值」：'
+        + '**哈欠** = MAR 的 1.5 秒滚动均值高于 0.55 且连续 ≥ 1.0 秒（说话是尖峰、哈欠是平台，'
+        + '单帧上两者完全重叠，只有时长分得开）；**持续闭眼** = 归一化后的 EAR 连续'
+        + '低于 0.80 达 1.0 秒；**低头/点头** = 最近 2 秒内俯仰角相对抬头位的下探量'
+        + '≥ 10°（仰头是负值）。闭眼阈值为 0.80 —— 换了归一化方式就**必须**重标定，不能沿用旧值。'
+        + '⚠️ 后两条**不看闸门、也不需要基线**，所以开机第 2 秒就能出声 —— '
+        + '分类器要 27 秒缓冲才出第一个判决，那一段空白由它们兜着。'],
+      ['融合策略', '不是简单做平均，而是**门控 + 取高**：只有支路一判定驾驶员**正视前方**'
+        + '（正常类概率 ≥ 0.60，即 1 − 退出阈值）时，支路二**那一票**才算数；'
+        + '闸门关着时面部特征照样一直在采（画面是同一路，采集不该有开关），'
+        + '只是这一票作废。融合取各路里较高的定级，且**支路二封顶到中度档** ——'
+        + '重度档是「疲劳驾驶」的终局判定，交给支路一的姿态证据；'
+        + '哈欠命中抬到至少轻度，持续闭眼抬到中度，低头抬到重度。'],
+    ],
+  },
+  {
+    h: '五、系统整体架构框图', icon: 'grid',
+    note: '文字版 · 五层',
+    arch: [
+      ['数据采集层', '单目 USB 摄像头（UVC 免驱），画面统一到 15 fps；不占车辆总线、不接眼动仪'],
+      ['AI 双支路检测层', '支路一 姿态时序 Transformer ｜ 支路二 面部微特征 + 逻辑回归；' +
+        '两条支路共用同一路画面'],
+      ['状态判定融合层', '门控 + 取高 + 哈欠规则 → 四档状态；迟滞防抖，档位不横跳'],
+      ['智能服务干预层', '分级灯光 · 语音播报 · 小瑞主动对话 · 舒缓音乐 · 休息建议'],
+      ['多页面场景展示层', '首页状态摘要 · 驾驶监测详情 · 多媒体 · 设置 · 语音助手'],
+    ],
+  },
+  {
+    h: '六、项目创新亮点', icon: 'sparkle',
+    note: '技术 · 交互 · 场景 · 产品',
+    feats: [
+      ['shield', '技术创新', '**双支路门控融合**：拿「姿态在正前方」当闸门，'
+        + '避免侧头、低头时把面部微特征误读成疲劳证据 —— 这正是单靠堆特征最容易翻车的地方。'],
+      ['heart', '交互创新', '**把状态做成一个角色**：小瑞跟的是疲劳档位，'
+        + '配色、大标题、表情、语气全跟它走；跨档才开口，不刷存在感。'],
+      ['nearby', '场景创新', '**从检测走到「干预 + 复盘」**：不止于报警，'
+        + '还给出可执行的干预动作，并留下本次会话的状态轨迹。'],
+      ['car', '产品贴合度高', '**无额外硬件**：不用眼动仪、不戴任何穿戴设备、不占车辆总线，'
+        + '一路单目摄像头即可；唤醒与识别在本机完成，算力要求低。'],
+    ],
+  },
+];
+
+/* ---------------------------------------------------------------- 渲染 */
+/* 箭头。用现成的 chev 图标，别为一张图再画一套 —— 和左导航、列表行是同一个箭头。 */
+const ARROW = '<span class="fa">' + XQ.icon('chev') + '</span>';
+
+function render() {
+  const html = SECTIONS.map((s) => {
+    let body = '';
+
+    if (s.rows) {
+      body += '<div class="ab-rows">' + s.rows.map(([k, v]) =>
+        '<div class="ab-row"><span class="k">' + md(k) + '</span>'
+        + '<span class="v">' + md(v) + '</span></div>').join('') + '</div>';
+    }
+
+    /* 四档色带。级别名和那一栏说明**逐字取自 src/live.py**：
+         LEVEL_CN   = ["清醒", "轻度疲劳", "中度疲劳", "重度疲劳"]
+         LEVEL_NOTE = ["", "检测到打哈欠/闭眼变长", "检测到持续闭眼", "检测到低头/点头"]
+       第一档的说明代码里是空串（清醒没什么好提示的），这页补一句"不做任何提示"
+       —— 是解释，不是引用。 */
+    if (s.lv) {
+      body += '<div class="ab-sev">' + s.lv.map(([nm, c, nt]) =>
+        '<div class="lv" style="--c:var(' + c + ')"><i class="dot"></i>'
+        + '<span class="nm">' + nm + '</span>'
+        + '<span class="ab-nt">' + nt + '</span></div>').join('') + '</div>';
+    }
+
+    /* 架构框图：五层是**顺序**关系，所以用 .fn 节点 + 箭头
+       （和 flow.html 同一套观感）。箭头自动补，别手写 ——
+       少一个箭头，投影上看着就像流程断了。 */
+    if (s.arch) {
+      body += '<div class="flow-row">' + s.arch.map(([t, d], i) =>
+        '<div class="fn' + (i === 2 ? ' hot' : '') + '">'
+        + '<div class="no">' + String(i + 1).padStart(2, '0') + '</div>'
+        + '<b>' + t + '</b><span>' + md(d) + '</span></div>').join(ARROW) + '</div>';
+    }
+
+    /* 亮点四宫格：并列关系，不用箭头（理由见文件头那段 CSS 注释）。 */
+    if (s.feats) {
+      body += '<div class="ab-grid">' + s.feats.map(([ic, t, d]) =>
+        '<div class="ab-cell"><div class="t">' + XQ.icon(ic) + t + '</div>'
+        + '<p>' + md(d) + '</p></div>').join('') + '</div>';
+    }
+
+    return '<section class="card card-pad">'
+         + '<div class="card-h"><h3>' + XQ.icon(s.icon) + md(s.h) + '</h3>'
+         + '<span class="note">' + md(s.note) + '</span></div>'
+         + body + '</section>';
+  }).join('');
+
+  /* 最后那条：相关页面。**不在 SECTIONS 里** —— 它是导航，不是内容，
+     塞进去会让"六节"这个数字对不上。 */
+  $('doc').innerHTML = html
+    + '<section class="card card-pad">'
+    + '<div class="card-h"><h3>' + XQ.icon('list') + '还想看细节</h3>'
+    + '<span class="note">这两页讲的是同一件事的另一面</span></div>'
+    + '<div class="ab-links">'
+    + '<a href="flow.html"><span class="ic">' + XQ.icon('chev') + '</span>'
+    + '完整交互流程图 —— 从算法到灯光，逐个环节</a>'
+    + '<a href="voice.html"><span class="ic">' + XQ.icon('chev') + '</span>'
+    + '试音台 —— 本地语音这一路怎么走</a>'
+    + '</div></section>';
+}
+
+/* ---------------------------------------------------------------- 起步 */
+$('backBtn').innerHTML = '<svg viewBox="0 0 24 24">' + XQ.ICON.chevL + '</svg>';
+/* `active: ''` —— 这一页不挂在左导航那四项里，一项都不点亮。
+   （进去的路只有一条：首页「快捷功能」里那一格。） */
+XQ.mountChrome({ active: '' });
+render();
+</script>
+</body>
+</html>

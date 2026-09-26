@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小瑞对话 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+
+<style>
+/* ---------------------------------------------------------------------------
+   这一页专有的几小块。pages.css 里已经有 .chat-wrap / .msgs / .chat-head / .rec /
+   .chips —— 能用共用类的全用了，下面这些是它**没有的**：
+   底部输入行、一行安静的小字、右栏立绘的尺寸、对话卡的伸缩。
+   它们都只在这一页出现，写进共用表等于让别的页陪着改。
+   --------------------------------------------------------------------------- */
+
+/* 底部输入行。style.css 里的 `.talk-input` 是**座舱主界面底部那条对话栏**用的：
+   输入框死宽 17rem、发送键是文字胶囊。这一页的输入框要跟着卡片撑开、发送键是
+   圆的（参考稿就是这样），照搬会互相打架，所以就地写一份。 */
+.chat-in{ display:flex; align-items:center; gap:.6rem; padding-top:.85rem; border-top:1px solid var(--line); }
+.chat-in .mic{
+  width:2.9rem; height:2.9rem; flex:0 0 auto; display:grid; place-items:center;
+  color:var(--accent); cursor:pointer; border-radius:50%;
+  background:rgba(255,255,255,.07); border:1px solid rgba(var(--rgb),.45); transition:.25s;
+}
+.chat-in .mic svg{ width:1.2rem; height:1.2rem; }
+.chat-in .mic:hover{ background:rgba(var(--rgb),.2); }
+/* ⚠️ 这条是补的既有缺陷：live.js 给正在录音的按钮加 `.rec`（见 asr._render），
+   但这一页**从来没写过 .rec 的样式** —— 于是点下去按钮一点反应都没有，
+   用的人只能靠底下的文字判断到底录没录。座舱主界面那条对话栏有这段
+   （style.css 的 `.talk-input .mic.rec`），这里是同款，只是选择器不同。 */
+.chat-in .mic.rec{
+  color:#fff; background:rgba(var(--rgb),.5);
+  border-color:var(--accent);
+  animation:micBreath 1.15s ease-in-out infinite;
+}
+/* 尊重"减少动态效果"：不喘气，但**状态还得看得出来**（换成常亮描边）。
+   和 style.css 里那条同一个做法。 */
+@media (prefers-reduced-motion: reduce){
+  .chat-in .mic.rec{ animation:none; box-shadow:0 0 0 .18rem rgba(var(--rgb),.6); }
+}
+.chat-in input{
+  flex:1 1 auto; min-width:0; padding:.85rem 1.15rem;
+  font:inherit; font-size:.88rem; color:var(--ink);
+  background:rgba(255,255,255,.06); border:1px solid var(--line);
+  border-radius:2rem; outline:none; transition:.25s;
+}
+.chat-in input::placeholder{ color:#6d8494; }
+.chat-in input:focus{ border-color:rgba(var(--rgb),.55); background:rgba(255,255,255,.09); }
+.chat-in .send{
+  width:3rem; height:3rem; flex:0 0 auto; display:grid; place-items:center; cursor:pointer;
+  color:#04141b; background:var(--accent); border:none; border-radius:50%;
+  box-shadow:0 0 .9rem rgba(var(--rgb),.45); transition:.25s;
+}
+.chat-in .send svg{ width:1.25rem; height:1.25rem; }
+.chat-in .send:hover{ filter:brightness(1.12); }
+
+/* 页脚小字：输入提示 / 播放器说明。共用表里没有"一行安静的说明"这种东西
+   （.note 只在 .card-h 里有定义），而这两行又不值得各开一个类。 */
+.fine-print{ font-size:.72rem; color:var(--muted); line-height:1.55; }
+
+/* 让对话卡吃掉剩下的高度。`.chat-wrap` 是 .sub-body 的 flex 子项，默认不伸张，
+   页面底部就会空出一块、输入行浮在半空。撑满之后：输入行贴着卡片底（跟参考稿
+   一样），长会话也能多显示几行，而不是挤在 28rem 的固定框里。 */
+.chat-wrap{ flex:1 1 auto; min-height:0; align-items:stretch; }
+.chat-box{ min-height:0; }
+.chat-box .msgs{ max-height:none; }
+
+/* ★★ 2026-09-25：**右栏也得排满**。用户原话：「这个页面要布局满啊
+   右边第三栏下边空白了」。
+   量出来的事实（`_scratch/_shot_layout.py /chat.html 1672 940`）：右栏那个
+   `aside` 外框确实被栅格拉到了 774px（和左边对话卡一样高），但里面三张卡片
+   只排到 707 —— **底下空着 215px**。左栏之所以不空，是因为上面那条
+   `.chat-wrap{flex:1}` 把对话卡真的撑开了；而 aside 只是**被拉长的空壳**，
+   它的内容一点没长。
+   ⚠️ 所以光给 aside 加高度是没用的（它已经有高度了），必须让**某一张卡**
+   把富余的高度吃下去。
+   做法：aside 竖排 flex，卡间距从"卡片自己带 `margin-top`"改成容器 `gap`
+   （数值不变，还是 .7rem；那两条原来写在 HTML 的行内 style 上 —— 行内优先级
+   比这里高，**不挪走就会和 gap 叠成双份间距**，所以下面那两处行内样式一起摘了）。
+   然后只让**最后那张（小瑞 + 那句话）**吃掉富余：它是一张图形卡，内容本来就
+   是居中一行，长高只是把立绘四周的留白摊开，看着是有意的；换成前两张
+   （推荐列表 / 常用语）去撑，多出来的高度会变成卡片**内部末尾的一块死白**
+   —— 那正是用户最讨厌的"中间留空白"。 */
+aside{ display:flex; flex-direction:column; gap:.7rem; }
+aside > section:last-child{ flex:1 1 auto; display:flex; flex-direction:column; }
+/* 这一张卡长到 368px 之后，原来那条**横排**就不合适了：立绘只有 8rem，
+   横排一居中，上下各留 120px 空气，卡里看着还是空的（只解决了栏底那条空白，
+   没解决卡片自己）。所以这一张改成**竖排**：立绘在上、那句话在下当图注，
+   立绘同时放大到 11rem —— 富余的高度被内容吃掉，而不是变成留白。
+   ⚠️ 上面通用那条 `.tip-row{...}` 的注释里写着"横排，因为竖排会多占近 5rem
+      高、把整页撑出滚动条" —— 那个理由**当时成立、现在不成立了**：底部那条
+      播放条已经删掉，页面高度由栅格定死（`_shot_layout.py` 量到文档高正好
+      940 = 视口高，没有滚动条）。所以这里竖排不会撑破任何东西。
+      其余页面上 `.tip-row` 的用法不受影响 —— 这几条只作用于 `aside > section:last-child`。 */
+aside > section:last-child .tip-row{
+  flex:1 1 auto; flex-direction:column; justify-content:center;
+  gap:1rem; align-items:center;
+}
+aside > section:last-child .tip-mascot{ width:11rem; height:11rem; }
+aside > section:last-child .rec-tip{ flex:0 0 auto; text-align:center; }
+
+/* 右栏的小瑞立绘 + 那句话：**横着排**（`.mascot` 是主界面那个 6.6rem 的尺寸，
+   这里容器只管尺寸，不再画圆环 —— 参考稿里它背后是光晕不是圈）。
+   为什么横排：竖排要多占近 5rem 高，整页就会被撑出滚动条，底部播放条那行直接
+   掉出可视区；参考稿里那句话本来也是写在立绘旁边的。 */
+.tip-row{ display:flex; align-items:center; gap:.8rem; }
+.tip-mascot{ width:8rem; height:8rem; flex:0 0 auto; }
+.tip-mascot img,.tip-mascot svg{ width:100%; height:100%; object-fit:contain; }
+.tip-row .rec-tip{ flex:1 1 auto; min-width:0; margin-top:0; }
+
+/* 这里原本有一条 object-position 把整身立绘截出头部 —— 头像版 assets/xiaorui_head.png
+   出来之后就不需要了：那个文件本身就是裁好的正方形（400x400），共用样式的
+   contain 正好贴合。少一条 CSS 覆盖，也少一个"哪个槽该偏上对齐"的隐式约定。 */
+</style>
+</head>
+<body class="pg-chat" data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ============ 页标题 ============ -->
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1>小瑞 · 主动对话</h1>
+        <span class="spacer"></span>
+        <!-- 这枚 pill 显示的是**真实驾驶状态**，不是装饰 —— 对话页不换装，
+             但"小瑞现在在跟一个什么状态的人说话"这件事必须看得见。 -->
+        <span class="pill" id="sevPill">—</span>
+      </div>
+
+      <!-- ============ 左：对话 / 右：推荐 ============ -->
+      <div class="chat-wrap">
+
+        <section class="card card-pad chat-box">
+          <div class="chat-head">
+            <div class="ava" id="xqAvaBox"></div>
+            <div>
+              <b>小瑞 · AI 智能助手</b>
+              <span>有我在，安全一路相伴</span>
+              <!-- 回复到底是谁说的，写在这里，由 hello.agent.api_ready 决定 -->
+              <span id="modeNote" style="display:block">回复来源确认中…</span>
+            </div>
+          </div>
+
+          <div class="msgs" id="msgs"></div>
+
+          <!-- 2026-09-24：删掉「语音条是真的，底部播放条仍是示意」那一整块
+               （用户要求去掉成段说明）。原文备份见 web/_bak_20260924_prose/chat.html。
+               ⚠️ 块里那个 `<span id="honestMode">` 是 hello 回调写的，一并摘了，
+               否则 onHello 里会空引用（见下面 XQ.connect 那一段）。 -->
+
+          <div class="chat-in">
+            <button class="mic" id="mic" title="点一下开始说话，再点一下结束"></button>
+            <input id="sayInput" placeholder="对小瑞说点什么…（试试「我有点困」）" autocomplete="off">
+            <button class="send" id="send" title="发送"></button>
+          </div>
+
+        </section>
+
+        <!-- 右栏：22rem 那一列（宽度在 .chat-wrap 里） -->
+        <aside>
+          <section class="card card-pad">
+            <div class="card-h"><h3>为你推荐</h3><span class="note">点了就执行</span></div>
+            <ul class="rec" id="rec"></ul>
+          </section>
+
+          <!-- ⚠️ 这两张卡**不要再写 `style="margin-top:.7rem"`** —— 间距已经交给
+               `aside{gap}` 管了（见 <style> 里「右栏也得排满」那段）。
+               行内优先级高过类，写回来就是双份间距。 -->
+          <section class="card card-pad">
+            <div class="card-h"><h3>情感化陪伴</h3><span class="note">常用语</span></div>
+            <div class="chips" id="chips"></div>
+          </section>
+
+          <section class="card card-pad">
+            <div class="tip-row">
+              <div class="tip-mascot">
+                <img class="mascot-img" id="tipImg" alt="小瑞" hidden>
+                <div id="tipHost"></div>
+              </div>
+              <!-- 手写体那行用 .rec-tip（那个类本来就带楷体），不是新造样式 -->
+              <div class="rec-tip">别担心，<br>我一直都在~</div>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <!-- 2026-09-25：**底部播放条整块删了**（用户原话：「把那个去掉吧 其实不需要那个」）。
+           它原来是参考稿上那条"示意控件"：▶ 只换图标、心只换颜色、波形不会动，
+           按下去只弹一句"这是示意控件"，不播音乐。用户报的正是它 ——
+           「下边有音乐条 但我点不了 凡是在我浏览器出现的部分 都要有相应的啊 不是摆设」。
+           ⚠️ **删的是这一条，不是播放功能**：真播放器在 `player.js`（左下角那条悬浮条，
+           真 `<audio>`、真曲库、放完自动下一首），本页右栏那颗「播放舒缓音乐」chip
+           走的就是 `XQP.playCalm()`，那条路一个字都没动。
+           样式 `.player` 那一段同时从 `pages.css` 摘掉了（全站只有这一页用过它）。 -->
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script>
+/* =========================================================================
+   05 小瑞主动对话
+   -------------------------------------------------------------------------
+   这一页**三件事是真的**：你打进去的话会被送到服务端，回复真的从那儿回来
+   （配了 API key 就是模型，没配就是固定话术，页面上会写明白是哪一种）；
+   右栏那三行推荐真的会发一个 action 出去，服务端也真的会答一句；
+   小瑞的回复会**念出来**（`XQ.speak`，见 live.js 里那段长注释），
+   气泡里那个播放键重念这一句。
+   只剩**底部播放条**是界面稿上的示意控件：点它只换图标，没有音频文件，
+   页面上写明了，不让人误会。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+const ICON = XQ.ICON;
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const nowHM = () => { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+
+/* ---------------------------------------------------------------- 头像 */
+/* 小瑞的头像：43 张形象库的**方形头像版**（`assets/xq/h/pNN.webp`，192x192），
+   **点一下换一张**。★ 2026-09-25（用户「把那些出现小瑞的地方都变成可以变化的」）
+   —— 这一页原来是一张写死的 `assets/xiaorui_head.png`。
+   用头像版而不是整身：整身是 210x288 的立绘，塞进 2.3rem 的圆里脸只剩一小块。
+   ⚠️ 这里没有用 `XQ.mascotSlot` / `XQ.poseDeck`：那两个 API 都按**固定宿主**
+      工作（换掉那一格的 innerHTML），而对话里每一条消息都要一个头像，id 没法
+      重复。所以这里自己维护一个"当前是第几张"，一次把**所有**小瑞头像重画。
+   ⚠️ 换的是**全场**、不是被点的那一个：所有气泡头像是同一只小瑞的同一张脸，
+      只换一个会变成"一句话里两个小瑞长得不一样"。驾驶员的头（`.msg.me .ava`）
+      一个都不碰 —— `:not(.me)` 不能省，漏了就把驾驶员画成小瑞。
+   ⚠️ `AVA_SEL` 这串和 pages.css 里 `cursor:pointer` 那条是同一件事，
+      改一处就得改另一处（不然会出现"手型光标点不动"或"能点但没光标"）。 */
+const AVA_SEL = '.chat-head .ava, .msg:not(.me) .ava';
+const avaTok = {};                 // `XQ.poseLoad` 的请求序号挂在这个对象上
+let avaPose = 0;                   // 当前第几张（下标进 XQ.POSES）
+let AVA = XQ.mascotSVG({ simple: true });   // 图还没到之前的兜底：内置 SVG
+
+/* 换图那一下的"弹一下"（`xqSwap`，style.css 里那段）。**必须手动挂**：
+   `poseDeck` 是给单张图的槽写的，这里是 N 张，用不上它那套宿主委托。
+   ⚠️ `data-act` 一定要**先摘再挂**，而且中间要强制一次回流（`offsetWidth`）——
+      不这么做的话，第二次点击时属性值没变，浏览器认为动画没有重新开始，
+      表现是"第一下弹、后面几下都不弹"。
+   ⚠️ 620ms 后必须摘掉：`[data-act=...]` 的规则权重比 `.mascot-img` 那条待机
+      呼吸高，不摘的话这一格**点过一次就不动了**（live.js 的 `poseDeck` 里
+      有同一条注释）。这里没有 `.mascot-img` 类，但同理：`img[data-act]` 那条
+      动画是 iteration 1、无 fill-mode，摘掉才回到干净状态。 */
+const AVA_HOLD = 620;
+/* `pop` = 要不要弹那一下。**开页第一次铺图不弹**（`pop` 省掉）：那时人还没点过
+   任何东西，头像自己跳一下是没来由的；只有"点了才换"这件事才配一个动作。 */
+function avaPaint(src, pop) {
+  AVA = '<img src="' + src + '" alt="" title="点一下换个形象">';
+  document.querySelectorAll(AVA_SEL).forEach((a) => { a.innerHTML = AVA; });
+  if (!pop) return;
+  document.querySelectorAll(AVA_SEL + ' img').forEach((im) => {
+    im.removeAttribute('data-act');
+    void im.offsetWidth;
+    im.dataset.act = 'swap';
+    setTimeout(() => im.removeAttribute('data-act'), AVA_HOLD);
+  });
+}
+/* 先探一次 p01：探到了才铺真图（探不到就留着内置 SVG，页面不会坏）。
+   ⚠️ 探针多半比第一条消息慢，所以已经画出来的头像要回头一起换一遍 —— 这就是
+      `avaPaint` 里那个 querySelectorAll 存在的理由，不是"顺便刷新"。 */
+XQ.poseLoad(avaTok, XQ.POSES[avaPose], 'h', (src) => avaPaint(src, false));
+/* 点一下 → 下一张。**委托在 document 上**：气泡是随对话长出来的，逐个挂监听
+   会在每条消息上留一个闭包，而且新气泡还得记得挂 —— 委托一次就够。 */
+document.addEventListener('click', (e) => {
+  const box = e.target && e.target.closest ? e.target.closest(AVA_SEL) : null;
+  if (!box) return;
+  avaPose = (avaPose + 1) % XQ.POSES.length;
+  XQ.poseLoad(avaTok, XQ.POSES[avaPose], 'h', (src) => avaPaint(src, true));
+});
+
+/* 驾驶员那头：★ 2026-09-25 从"就地画一个"换成**主人自己的照片**。用户原话：
+   「我在和小瑞对话时候我的头像是用户头像.jpg」+「还有哪些出现我的头像了 都换成
+   这个」。源图 `ui/图片效果/用户头像.jpg`（1080x1080 方图，148 KB），落到
+   `assets/user_avatar.jpg`。
+   ⚠️ **全站只有这一处是"驾驶员本人的头像"**，改这一处就改完了。别处出现的「我」
+      是气泡角上那两个字（`detail.html` / `monitor.html` / `app.js` 里的
+      `<u>我</u>`），那是文字、没有头像；驾驶监测页那张"示意头像"
+      （`XQ.headSVG`）是**跟着头姿/眼开合动**的数据图，而且没摄像头时是等待卡、
+      有摄像头时被真画面盖住 —— 两样都不是这个东西。
+   ⚠️ 头像框 `.msg .ava` 是正方形、这张照片也是正方形，所以 `pages.css` 那条
+      `object-fit:contain` **不用改**：方图进方框，contain 和 cover 结果相同。
+      将来换一张**非**方图才需要动它，别顺手改。
+   ⚠️ 兜底 SVG 留着：图挂了浏览器画出来的是"破图图标"，看着像坏了而不像没图 ——
+      和小瑞那条"探不到就退内置 SVG"（见 `avaPaint` 上面那段）是同一个道理。 */
+const DRIVER_AVA_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" style="padding:.42rem">'
+  + '<circle cx="12" cy="8.8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/>'
+  + '<path d="M5.2 20a6.8 6.8 0 0 1 13.6 0" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+const DRIVER_AVA = '<img src="assets/user_avatar.jpg" alt="">';
+
+/* 扬声器图标已经进 ICON 表了（live.js 的 XQ.ICON.speaker），
+   本页原来自己画的那份删掉 —— 同一个东西两份，改一份忘一份。 */
+
+/* ---------------------------------------------------------------- 气泡 */
+/* 波形是**按固定序列画的**，不是频谱 —— 底层就没有音频文件，哪来的频谱。
+   写成常量而不是 Math.random()：每次截图长得一样，出问题好比对。
+   （"有 TTS 了"不等于"有频谱"：念出来的是浏览器合成的语音，不是一条可分析的
+   音频；这一条仍然成立，所以波形照旧是画的。） */
+const VOICE_BARS = [4, 7, 11, 6, 13, 9, 5, 12, 8, 14, 6, 10, 7, 12, 5, 9, 11, 6, 8, 4];
+
+/* 气泡里的语音条。`title` 说清楚点了会做什么（会念），别等人猜。
+   ⚠️ 那个时长**不再是写死的**。这里原来写的是 `00:08` —— TTS 做出来之后，
+   那个数字就是个编出来的测量值：它长得像"这句话念了 8 秒"，而实际上从来没测过。
+   现在先显示 `--:--`，真念完一次才把实测秒数填进去（`.len` 上那个 data-len
+   就是给这件事留的钩子）。没测过就显示没测过，这比一个好看的数字诚实。 */
+const voiceHTML = () =>
+  `<div class="voice"><button class="pl" title="重念这一句">${XQ.icon('play')}</button>`
+  + `<span class="wave">${VOICE_BARS.map((h) => `<i style="height:${h}px;flex:0 0 auto"></i>`).join('')}</span>`
+  + `<span class="len" data-len="1">--:--</span>${XQ.icon('speaker', 'spk')}</div>`;
+
+/* 回复不是模型给的就写在时间后面。**别让人以为这话是小瑞"想"出来的。** */
+const srcTag = (backend) => {
+  if (!backend || backend === 'deepseek') return '';
+  return backend.indexOf('scripted') === 0 ? ' · 本地固定话术' : ' · ' + backend;
+};
+
+/* ★★ 2026-09-26：卡头那句 `#modeNote` 以前只认 "配了 key 没有"（`api_ready`），
+   于是**配了 key 但这一句其实是固定话术**的时候，它照样写着「回复来自 DeepSeek
+   模型」—— 那句回复不是模型给的，卡头却在替它认领。用户原话：「撒谎的显示不能有」。
+
+   判据改成**上一句回复自己报的来源**（`ui/xiaorui.py` 的 `Reply.backend`，随每条
+   `say` 一起下来，`ui/server.py:1145`）：`deepseek` 才是模型答的，
+   `scripted(API失败)` 是 `Agent.respond` 抓异常时现改的标记（`xiaorui.py:905`）——
+   只有它表示"模型没答上来"，`scripted`（不带括号）是**设计如此**的动作回执
+   （比如"要"字执行完那一下），不能算模型故障，所以两者必须分开判。
+   ⚠️ 三处（hello / 每条 say / 断线）都要重画同一句，所以只留这一个函数出口。 */
+let AGENT = null;                    // hello.agent 原样留着；modeNote 要用它的 model
+let LAST_BACKEND = '';               // 最近一条回复的 backend（''=还没答过）
+function paintModeNote() {
+  const a = AGENT || {};
+  if (!a.api_ready) {
+    $('modeNote').textContent = '没配 API key · 回复是本地固定话术，不是模型生成的';
+  } else if (LAST_BACKEND.indexOf('scripted(') === 0) {
+    $('modeNote').textContent = '模型没应答 · 上一句是本地固定话术';
+  } else if (LAST_BACKEND === 'deepseek') {
+    $('modeNote').textContent = `回复来自 DeepSeek 模型（${a.model || '—'}）`;
+  } else {
+    /* 还没答过（或刚连上）：这里说的是"模型接上了"，**不是**"这句是它答的"。 */
+    $('modeNote').textContent = `模型已接入（${a.model || '—'}）`;
+  }
+}
+
+const MAX_MSGS = 40;                 // 长会话别把 DOM 撑爆；满了从最老的删
+
+/**
+ * 加一条气泡。tag 会拼在时间后面（"示例文案" / "本地固定话术"）。
+ * ⚠️ 模型说的话一律走 `textContent` —— **别让他进 HTML**。
+ */
+function addMsg(o) {
+  const el = document.createElement('div');
+  el.className = 'msg' + (o.me ? ' me' : '');
+
+  const ava = document.createElement('div');
+  ava.className = 'ava';
+  ava.innerHTML = o.me ? DRIVER_AVA : AVA;      // 这两串是本页自己写的标记，不是模型输出
+  /* 主人那张照片没到位就退回内置人像 —— 小瑞那条兜底在 `avaPaint` 里。 */
+  if (o.me) {
+    const photo = ava.querySelector('img');
+    if (photo) photo.onerror = () => { ava.innerHTML = DRIVER_AVA_SVG; };
+  }
+
+  const bub = document.createElement('div');
+  bub.className = 'bub';
+  bub.appendChild(document.createTextNode(o.text));      // ← 唯一正确的入口
+  if (o.voice) {
+    bub.insertAdjacentHTML('beforeend', voiceHTML());
+    /* 把这一条的原文挂到播放键上，点的时候才念得出**同一句**。
+       ⚠️ 挂在元素的 JS 属性上，**不是 data- 属性**：模型说的话一旦进 HTML 属性
+       就又得操心转义，而这里本来就有 textContent 那条干净的路可走。 */
+    const btn = bub.querySelector('.voice .pl');
+    if (btn) btn.__xqText = o.text;
+  }
+
+  const tm = document.createElement('span');
+  tm.className = 'tm';
+  tm.textContent = o.time + (o.tag || '');
+  bub.appendChild(tm);
+
+  el.appendChild(ava);
+  el.appendChild(bub);
+
+  const box = $('msgs');
+  box.appendChild(el);
+  while (box.children.length > MAX_MSGS) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;             // 新消息永远在视野里
+  return el;
+}
+
+/* 语音条的播放键：真的重念这一句。
+   ⚠️ 念不出来时**必须说出来**，不能点了没反应 —— 用户分不清是"静音开着"、
+   "这一页在后台"还是"这台机器没法念"。三种情况给三种话，各指一条出路。 */
+const fmtLen = (sec) => {
+  const s = Math.max(1, Math.round(sec));
+  return `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+};
+$('msgs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.voice .pl');
+  if (!btn) return;
+  const text = btn.__xqText;
+  if (!text) return;
+  const len = btn.parentNode.querySelector('.len');
+  const started = () => btn.classList.add('speaking');
+  const done = (sec) => {                       // 只有浏览器真念完了才有这个回调
+    btn.classList.remove('speaking');
+    if (len && sec > 0) len.textContent = fmtLen(sec);
+  };
+  const ok = XQ.speak(text, { emotion: 'normal', started, done });
+  if (ok) return;
+  /* ⚠️ 2026-09-25 起左栏那张「小瑞语音」卡片删掉了，静音开关只剩设置页一个，
+     所以这句指路得指到设置页去 —— 再写「点左栏」就是让用户去找一个不存在的东西。 */
+  if (!XQ.tts.on) { XQ.flash('小瑞现在是静音的 —— 去「设置 · 语音播报」打开'); return; }
+  if (document.visibilityState !== 'visible') { XQ.flash('这一页在后台，没有出声'); return; }
+  XQ.flash('这一句没能出声：' + (XQ.tts.lastError || '浏览器和服务端都没念出来'));
+});
+
+/* ---------------------------------------------------------------- 右栏 */
+/* 三行推荐就是设计稿里那三行，id 直接对齐服务端 ACTIONS 的键（见 ui/xiaorui.py），
+   点了发 `action`，由服务端回一句确认话术。 */
+/* 🔴 第二行原来写的副标题是「前方 58 公里 · 京沪高速」—— **那是编的**：
+   这一页根本没查过任何服务区（要查得先有起点、再问高德 `/amap/nearby`）。
+   一个坐在屏幕前的人凭什么知道前方 58 公里有个服务区、还在京沪高速上？
+   现在这行副标题**只说这条路会干什么**，一个数字都不带；真的公里数由导航页
+   查出来之后写在**那一页**（同一个数，一个来源）。 */
+const REC = [
+  ['music', '播放舒缓音乐', '放松身心，缓解疲劳'],
+  ['rest_stop', '导航至最近服务区', '去查最近的服务区并导航'],
+  ['status', '查看驾驶状态', '逐项说明当前判据'],
+];
+$('rec').innerHTML = REC.map(([id, label, sub]) =>
+  `<li data-id="${id}">${XQ.icon(id)}<div class="tx"><b>${label}</b><span>${sub}</span></div>`
+  + `${XQ.icon('chev', 'chev')}</li>`).join('');
+
+/* ---------------------------------------------------------------- 陪伴语 */
+/* 常用语一律当**驾驶员开口**发出去（`say`），让它走模型那条路 ——
+   它们是"人说的话"，不是按钮语义。按钮语义是右栏那三行（`action`）。 */
+const CHIPS = ['我有点困', '我想听歌', '今天天气怎么样', '附近有服务区吗', '我想调低空调'];
+$('chips').innerHTML = CHIPS.map((t) => `<button class="chip">${t}</button>`).join('');
+
+/* ---------------------------------------------------------------- 通信 */
+let link = null;
+
+function submit(text) {
+  text = (text || '').trim();
+  if (!text || !link) return;
+  if (!link.online) { XQ.flash('没连上服务端，这句话发不出去（用 run_ui.bat 启动服务端）'); return; }
+  /* 服务端要拿"当前这一拍状态"去回答，状态还没到它会**直接把这句丢掉**
+     （server.py：`if not text or st is None: return`）。所以先拦一道，
+     免得人对着一个没反应的输入框再敲一遍。 */
+  if (!XQ.Hist.rows.length) { XQ.flash('还在等第一拍驾驶状态，稍等一秒再发'); return; }
+  link.send({ type: 'say', text });
+  $('sayInput').value = '';
+}
+
+$('send').onclick = () => submit($('sayInput').value);
+$('sayInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); submit($('sayInput').value); }
+});
+/* 麦克风：真的语音输入，跟主界面那个 mic 是同一套（`XQ.asr`）。
+   ⚠️ **回调传的是本页自己的 `submit`**，不是 `link.send` —— `XQ.asr` 只管把识别
+   出来的文字交出来，发不发、怎么发由各页自己决定。绕过页面自己的守卫直接
+   `link.send`，页面上的那些检查（比如连通性提示）就全被跳过了。 */
+XQ.asr.bind($('mic'), { submit });
+
+$('rec').querySelectorAll('li').forEach((li) => {
+  li.onclick = () => {
+    if (!link) return;
+    /* 服务端会把这次点击回推成一条 `say`（`user` 是 "[点击] 播放舒缓音乐"），
+       所以这里不用自己画气泡 —— 画了就会重复一次。 */
+    link.send({ type: 'action', id: li.dataset.id });
+    /* ★ 2026-09-25 晚：右栏那行「播放舒缓音乐」**真的放**（用户报的是驾驶监测页，
+       但这是同一颗 chip 的同一份实现 —— 四个页面都接上了，见 player.js 那一节）。
+       本页左下角会冒出那条播放条，音乐留在本页放，**不跳去多媒体页**。 */
+    if (li.dataset.id === 'music' && window.XQP && XQP.playCalm) XQP.playCalm();
+    /* ★★ 2026-09-26：那行「导航至最近服务区」**真的去导航**（用户：「其他页面有
+       导航到最近服务区 或者导航啥的按钮 要真的有这个功能 不是摆设」）。
+       ⚠️ 音乐是"留在这页放"、导航是"跳到那一页"—— 两件事不一样：地图和高德
+          那份服务区数据只在 `nav.html` 上，留在这页没法画。
+       ⚠️ 服务端那条 `action` 照发不误（它会把这次点击回推成一条 `say`，
+          小瑞该说的话还是它说）—— 这里只是**顺手把人送到真能干事的那一页**。 */
+    else if (li.dataset.id === 'rest_stop') location.href = 'nav.html?do=nearby';
+  };
+});
+$('chips').querySelectorAll('.chip').forEach((c) => { c.onclick = () => submit(c.textContent); });
+
+/* ---------------------------------------------------------------- 播放条（已删） */
+/* 2026-09-25：这一节整块删了，连同上面那段 `.player` 的 HTML 和 `pages.css` 里
+   的样式。它当年就是照参考稿画的一条**纯示意**控件 —— ▶ 只换图标、心只换颜色、
+   波形是个固定正弦（`Math.sin(i*1.7)`，不是随机的、更不会跟着音乐动），
+   按下去弹的是"这是示意控件"。用户说「把那个去掉吧 其实不需要那个」。
+   ⚠️ 所以这一页现在**没有任何"看着能点、点了不干活"的东西**了 —— 这是这次
+      改动真正要保住的性质，以后往回加控件时先想清楚它是干什么的。
+   ⚠️ 真播放器不在这里，在 `player.js`：左下角那条悬浮条（真 `<audio>`、真曲库
+      `/music.json`、放完自动接下一首、位置跨页接着走）。本页右栏那颗
+      「播放舒缓音乐」chip 点下去走的就是 `XQP.playCalm()` —— 见上面那一段。
+      `player.js` 这个 `<script>` 因此**必须留着**。 */
+
+/* ---------------------------------------------------------------- 起步 */
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${ICON.chevL}</svg>`;
+$('mic').innerHTML = XQ.icon('mic');
+$('send').innerHTML = XQ.icon('send');
+$('xqAvaBox').innerHTML = AVA;
+$('tipHost').innerHTML = XQ.mascotSVG({ simple: false });
+/* 8rem 方槽 —— 本页**唯一会动**的小瑞，也是十个动作演得最开的那个尺寸
+   （DPR=2 下 160px，而 11.png 的动作格源图只有 129x143 —— 放大 1.24x，会轻
+    微软一档，这是换素材后**已知**的代价，实测可接受才换的）。
+   ⚠️ 换素材前那句"源图正好 1:1"是旧素材(140x175)的事，别再照抄。所以它 bind + 可点。
+   下面那些 2.3rem 的气泡头像走 AVA/`XQ.mascotSVG`，纯静态。 */
+XQ.mascot.bind('tipImg', 'tipHost', { cycle: true });
+/* 左导航里**没有「对话」这一项**（那四项是车机的导航，不是作品目录）。
+   这一页现在是从座舱主界面底部那条对话栏的「展开完整对话」进来的，
+   所以点亮「首页」—— 它是首页那块对话栏的展开，不是去别的地方。
+   ⚠️ 早先这里点的是「导航」；那时候「导航」还没有落地页，点它只是为了挑一个
+   看着最不撒谎的。后来 nav.html 做出来了，点它会变成"明着指错页"。
+   ★ 2026-09-24：用户「把导航页删了吧」，nav.html 和左导航那一项都没了，
+   现在点亮「首页」从哪一头看都是对的。 */
+XQ.mountChrome({ active: 'home' });
+
+/* 开场：问候语（设计稿的固定文案）+ 一轮示例问答。
+   为什么示例那一轮要写死在页面里而不是"打开就自动发一句给服务端"：
+   那会在主界面上凭空多出两条气泡，而且看不出哪句是人说的、哪句是编的。
+   写死 + 标「示例文案」+ 底下那段说明，是这里能给的诚实版本。 */
+addMsg({ text: '你好呀！我是小瑞，很高兴为你服务~', time: nowHM() });
+addMsg({ me: true, text: '小瑞，我有点困。', time: nowHM() });
+addMsg({
+  text: '收到！我会帮你关注状态。如果可以的话，我们找个安全的地方休息一下吧。'
+      + '现在为你推荐附近的服务区，并播放一段舒缓音乐，让你放松一下。',
+  /* `voice` 现在只是个开关（要不要画语音条），不再带一个编出来的时长。
+     这一条**不会自动念**：它是写死的示例文案，不是小瑞真的说过的话，
+     一进页面就替它开口反而更像真的。想听就点那个播放键。 */
+  voice: true, time: nowHM(), tag: ' · 示例文案',
+});
+
+link = XQ.connect({
+  onHello: (d) => {
+    AGENT = d.agent || {};
+    /* 回复到底是谁说的 —— 判据和"这四句话分别什么时候说"全在 `paintModeNote()`。
+       ⚠️ 别退回"只看 api_ready"：那正是 2026-09-26 被点名的那个假话。 */
+    /* 2026-09-24：原来还往 `#honestMode` 写一句来源说明，那块已按用户要求
+       删除，所以这里只写卡头那个短状态 `#modeNote`。 */
+    paintModeNote();
+  },
+  onSay: (d) => {
+    /* 驾驶员那句由服务端回带（`user`），这样"我说了什么"和"它答了什么"
+       是同一份数据，不会因为本地先画一次而两边对不上。 */
+    if (d.user) addMsg({ me: true, text: d.user, time: nowHM() });
+    if (d.text) {
+      addMsg({ text: d.text, time: nowHM(), tag: srcTag(d.backend) });
+      /* 卡头跟着**这一句**的来源走 —— 先记下来再重画，赔上一条气泡的 tag
+         一起说同一件事，别让卡头和气泡各说一套。 */
+      LAST_BACKEND = d.backend || '';
+      paintModeNote();
+    }
+    /* 念出来。emotion 是服务端早就算好、以前一处都没用过的字段
+       （ui/xiaorui.py 的 emotion_for），用它调语速音高。
+       静音开关、后台标签页、服务端兜底都在 XQ.speak 里面判。 */
+    if (d.text) XQ.speak(d.text, { emotion: d.emotion });
+  },
+  onInfo: (t) => XQ.flash(t),
+  onDown: (down) => {
+    /* 重连上来时 hello 会再发一次，modeNote 会被 onHello 盖回正确的那句 ——
+       所以这里可以先写"已连上服务端"，不用在这儿重复判 api_ready。 */
+    $('modeNote').textContent = down ? '没连上服务端 · 收发都不通' : '已连上服务端';
+    if (down) $('sevPill').textContent = '未连接';   // 连回来由下一拍 state 自己盖回去
+    if (down && !XQ.isFile()) XQ.flash('连接断开，正在重连…');
+  },
+  /* 这一页**不换装**（body 固定 data-sev="normal"，青色那一版）。
+     理由不是"参考稿是青的"，而是这一页的定位：**小瑞不承担报警**（见 ui/xiaorui.py
+     开头那段"灯和语音负责安全，小瑞负责情绪和出路"）。进这一页说明人已经停下来了，
+     整页再翻成红色只是重复一次警告，还跟气泡、推荐卡片抢颜色。
+     但也**不装作跟状态无关** —— 状态原样写在标题行那枚 pill 上，实时更新。 */
+  onState: (s) => {
+    /* 这枚 pill 说的是**疲劳档位**，直接用服务端给的 `severity_name`（清醒 /
+       轻度疲劳 / 中度疲劳 / 重度疲劳）—— 全站只有这一个出口，不在这页再编一套。
+       ★ 2026-09-24「只做疲劳」之前这里跟的是**安全级别**那张表，还得为"级别还是
+       L0、程度已经 mild"开一个特例（那时两条轴不一致，按表会说成「状态良好」）。
+       两条轴合成一条之后那个特例连同 `XQ.LV` 的取值在这页都不需要了。 */
+    $('sevPill').textContent = s.severity_name || '—';
+  },
+});
+</script>
+</body>
+</html>

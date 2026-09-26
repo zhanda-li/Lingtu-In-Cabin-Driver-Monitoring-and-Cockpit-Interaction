@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>手机端首页 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* =========================================================================
+   09 手机端首页 —— 本页唯一的页面级样式
+   -------------------------------------------------------------------------
+   四台手机要在同一屏里各显示各的状态色，而 `body[data-sev]` 管的是**整页**
+   （一个文档只有一个 body），所以把 --accent / --rgb 复制到每台手机的外壳上。
+   手机外壳的边框、刘海、阴影、屏内排版全在 pages.css 的 .phone / .ph-* 里，
+   这里一行都没有重复。
+
+   ★ 2026-09-24「只做疲劳」之后这一页**从三键补成四键**，而且键名就是全站
+   那把钥匙（normal / mild / moderate / severe）。以前这里写的是"程度轴"、
+   故意不跟级别轴同名（那时候级别轴是 normal/glance/phone/fatigue 那四类，
+   「轻度疲劳」在那条轴上没有位置）。现在两条轴**合成了一条**：后端的
+   `severity` 就是疲劳档，全站配色、大标题、小瑞都跟它走，所以键名一一对上，
+   色值也逐字等于 style.css 的 `--sev-*`：
+     normal #18D7C5 / mild #FFD400 / moderate #FF9830 / severe #FF4055。
+   四档色的另一处样张在 `design.html` 的「四态视觉」那一节（同一套值，两处
+   都写死，改了要一起改）。
+   ⚠️ 值**不能**改成 `var(--sev-mild)` 这种引用：本页 html 上写着
+   `data-theme="light"`（全站推广时刷的），那些变量在本页会解析成**浅色**那一套，
+   而手机屏是**钉死的深色孤岛**（见 pages.css 的 `.phone .screen`），
+   浅色值压在深屏上就没有对比度了。所以这四行必须是字面量。
+   ========================================================================= */
+.phone[data-sev="normal"]  { --accent:#18D7C5; --rgb:24,215,197; }
+.phone[data-sev="mild"]    { --accent:#FFD400; --rgb:255,212,0;   }
+.phone[data-sev="moderate"]{ --accent:#FF9830; --rgb:255,152,48;  }
+.phone[data-sev="severe"]  { --accent:#FF4055; --rgb:255,64,85;   }
+
+/* 卡片右侧那个数值。pages.css 里 .ph-card .v 没写 flex/nowrap，标题一长
+   它就被挤成两行（"导航中" 断成 "导航 / 中"）。补这一条属于本页排版修正，
+   值本身不吃 flex、也不许换行。 */
+.ph-card .v{ flex:0 0 auto; white-space:nowrap; }
+</style>
+</head>
+<body data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ============ 页标题 ============ -->
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1>手机端首页</h1>
+        <span class="spacer"></span>
+        <span class="pill">设计稿 · 非可运行 App</span>
+      </div>
+
+      <!-- 四台手机由下面的脚本按一张表渲染（表在脚本里，和 04 页的 ADVICE 一个写法） -->
+      <div class="phones" id="phones"></div>
+
+      <!-- 2026-09-24：删掉「这个手机 App 不存在」那段说明（用户要求去掉成段说明）。
+           备份见 web/_bak_20260924_prose/phone.html。顶栏那枚
+           「设计稿 · 非可运行 App」的小牌还在，仍然说明这一页是什么。 -->
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script>
+/* =========================================================================
+   09 手机端首页
+   -------------------------------------------------------------------------
+   四台手机 = 需求里那条主流程的四个落点（逐档升级）：
+     正常 → 轻度疲劳（小瑞主动推）→ 中度疲劳（开始说具体建议）
+     → 重度疲劳（给路线，不给又一句"请休息"）。
+   ⚠️ 轻度那台挂的 PERCLOS 18.7% 与中度那台的 42.6% 就是 `ui/config.json`
+      severity 段的 `mild_perclos` / `moderate_perclos` —— **数照配置写，
+      改了配置这两格也要跟着改**。
+   刻意**不接 WebSocket**：手机端没有真实数据源，接上去只会让人以为它在跑。
+
+   小瑞用 XQ.mascotSlot —— hero 是方槽，拿到的是方形头像版 assets/xiaorui_head.png；
+   图不在时自动退回内置 SVG，页面不会坏。两张图的分工见 live.js 那段注释。
+   ⚠️ 这四格是**静态**的：4.6rem(59px) 上十个动作只是一团糊影，所以不 bind、
+      不接动作、也不可点（只有首页和 chat 那两个大槽会动）。它们照常吃
+      .mascot-img 的待机呼吸 —— 那个位移在这个尺寸下只有约 1px，等于看不见。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+/* 底栏那五个图标：车控 / 监测 / 导航 / 音乐 / 报告。
+   XQ.ICON 里没有 home 和 set（那是车机左导航的），手机底栏就用这五个。 */
+const TABS = ['car', 'status', 'nearby', 'music', 'list'];
+
+const PHONES = [
+  {
+    sev: 'normal',
+    cap: '正常 · 首页',
+    sub: '状态好的时候手机不打扰，只把车机的判决如实复述一遍。',
+    hero: ['状态良好', '今天状态不错，保持专注哦~'],
+    on: 'status',
+    cards: [
+      ['shield', '驾驶状态', '支路一 × 支路二 融合', '正常'],
+      ['eye', 'PERCLOS', '眼睑闭合率 · 15 秒窗', '8.2%'],
+      /* ★ 2026-09-26 删掉了这里一格 `['heart', '心率', ...]`。两条理由：
+           1. 原来那句注释（「本项目没做，就不给数」）现在是**假话** —— 心率
+              这一路接上了（HPM5300 + MAX30102，见 ui/serial_hr.py）。
+           2. 但这一页**没法如实显示它**：`PHONES` 是**写死的分镜**（"9:41"、
+              "5G · 82%"、上面那个 8.2% 全是固定的），不读实时 state。留一格
+              心率就只有两个选择 —— 编一个数字（不行），或者写「未接入」
+              （现在是假话，因为车机那边同一时刻是有数的）。
+              而这一格本来也不在推送 payload 里：`link.html` 推的四项是
+              档位 / PERCLOS / P(fat) / L_fused，没有心率。
+         ⚠️ 要把它加回来，得先把这一页**接到实时 state 上**（现在整页是静态
+            分镜），不能在静态数组里填一个数。 */
+    ],
+  },
+  {
+    sev: 'mild',
+    cap: '疲劳预警 · 小瑞推送',
+    sub: '轻度疲劳时小瑞主动推一条，不弹满屏红色 —— 提醒要温和。',
+    hero: ['轻度疲劳', '检测到你有些疲劳，要不要听一段舒缓音乐？'],
+    on: 'status',
+    cards: [
+      ['alert', '小瑞提醒', '已推送到车机，两边同步', '刚刚'],
+      ['eye', 'PERCLOS', '眼睑闭合率 · 15 秒窗', '18.7%'],
+      ['nearby', '最近服务区', '京沪高速 · 前方 58 公里', '导航'],
+    ],
+  },
+  {
+    sev: 'moderate',
+    cap: '困倦提醒 · 服务区引导',
+    sub: '中度疲劳开始给**具体建议**，hero 逐字用需求口径那句（重度才升级成"立即靠边停车"）。',
+    hero: ['中度疲劳', '检测到困倦，请尽快寻找服务区休整。'],
+    on: 'nearby',
+    cards: [
+      ['eye', 'PERCLOS', '眼睑闭合率 · 15 秒窗', '42.6%'],
+      /* 这条就是支路二独立报的那条 alarm（`ui/state.py:249`，l2>=1 时发），
+         文案逐字用它的 NOTE_FACE，别在这里另编一句带秒数的。 */
+      ['alert', '闭眼判定', '支路二独立告警 · 检测到持续闭眼', '持续闭眼'],
+      ['nearby', '最近服务区', '京沪高速 · 前方 58 公里', '导航'],
+    ],
+  },
+  {
+    sev: 'severe',
+    cap: '安全引导 · 服务区导航',
+    sub: '重度疲劳之后给的是**路线**，不是又一句"请休息"。',
+    hero: ['建议立即休息', '已为你规划到最近服务区的路线'],
+    on: 'nearby',
+    cards: [
+      ['rest_stop', '阳澄湖服务区', '京沪高速 · 58 公里', '导航中'],
+      ['clock', '建议休息时长', '停车后小睡 15~20 分钟', '15 min'],
+      ['shield', '车机联动', '导航已在车机同步打开', '已同步'],
+    ],
+  },
+];
+
+$('phones').innerHTML = PHONES.map((p, i) => `
+  <figure>
+    <div class="phone" data-sev="${p.sev}">
+      <div class="screen">
+        <div class="ph-body">
+          <div class="ph-status"><span>9:41</span><span>5G · 82%</span></div>
+
+          <div class="ph-brand">
+            <img src="/static/assets/chery_mark.png" alt="">
+            <span>小瑞 · 手机端</span>
+          </div>
+
+          <div class="ph-hero">
+            <div class="mascot">
+              <img class="mascot-img" id="phHero${i}Img" alt="小瑞" hidden>
+              <div id="phHero${i}Svg">${XQ.mascotSVG({ simple: true })}</div>
+            </div>
+            <b>${p.hero[0]}</b>
+            <span>${p.hero[1]}</span>
+          </div>
+
+          <div class="ph-cards">
+            ${p.cards.map(([ico, k, sub, v]) => `
+              <div class="ph-card">
+                ${XQ.icon(ico)}
+                <div class="tx"><b>${k}</b><span>${sub}</span></div>
+                <span class="v">${v}</span>
+              </div>`).join('')}
+          </div>
+
+          <div class="ph-bar">
+            ${TABS.map((k) => XQ.icon(k, k === p.on ? 'on' : '')).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption class="phone-cap"><b>${p.cap}</b>${p.sub}</figcaption>
+  </figure>`).join('');
+
+/* 四台手机的 hero 位都是**方槽**，所以用方形头像版（mascotSlot 的默认 src）。
+   必须等 innerHTML 铺完再调，那几个 id 才存在。 */
+/* ★ 2026-09-25：`deck:'h'` = 四个 hero 也接上 43 张形象库的**方形头像**那套。
+   四个各自独立轮换（各是各的 deck），点哪一台就换哪一台的小瑞 —— 这是故意的：
+   四台手机是四个不同的状态示例，形象不该被别的手机带动。 */
+PHONES.forEach((_, i) => XQ.mascotSlot(`phHero${i}Img`, `phHero${i}Svg`,
+                                       { simple: true, deck: 'h' }));
+
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${XQ.ICON.chevL}</svg>`;
+/* 旧作品页（手机遥控），不挂在左导航的五项里 —— `active: ''` 一项都不点亮。
+   ⚠️ 别写 `active: 'media'`：'media' 现在是**多媒体**那一项（media.html），会点亮它。 */
+XQ.mountChrome({ active: '' });
+</script>
+</body>
+</html>

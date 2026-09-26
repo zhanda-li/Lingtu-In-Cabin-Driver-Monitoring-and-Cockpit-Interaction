@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小瑞语音 · 试音台</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+
+<style>
+/* ---------------------------------------------------------------------------
+   试音台专有的几小块。**这是一个工具页，不是作品页** —— 它从来没有挂在左导航里
+   （那些作品编号已经整块删掉了），所以答辩动线里不会出现它。
+   但它确实挂在服务端上（`/voice.html`，见 ui/server.py），随时打得到。
+   --------------------------------------------------------------------------- */
+
+/* 音色列表。一行一个音色：名字 + 标签 + 两个按钮。 */
+.vlist{ display:flex; flex-direction:column; gap:.4rem; }
+.vrow{
+  display:flex; align-items:center; gap:.7rem;
+  padding:.55rem .7rem; border-radius:var(--r-md);
+  background:rgba(255,255,255,.045); border:1px solid var(--line);
+}
+.vrow.on{ background:rgba(var(--rgb),.16); border-color:rgba(var(--rgb),.6); }
+.vrow .vname{ flex:1 1 auto; min-width:0; font-size:.84rem; }
+.vrow .vname em{ display:block; font-style:normal; font-size:.68rem; color:var(--muted); }
+.vtag{
+  flex:0 0 auto; font-size:.64rem; padding:.12rem .45rem; border-radius:1rem;
+  border:1px solid currentColor; opacity:.9;
+}
+.vtag.off{ color:#e6b26a; }        /* 在线：要联网 */
+.vtag.loc{ color:#8fd3a8; }        /* 本地：断网也在 */
+
+/* 按钮：**这一页自己一套**，不借任何全站类名（原来这里是"按 .src-btn 的样子来，
+   但横排、不要 block/width:100%" —— `.src-btn` 2026-09-25 已从 style.css 连根删掉，
+   这条注释跟着改：下面这四条本来就没引用过它，只是照着它的观感手写的）。 */
+.vrow button{
+  flex:0 0 auto; font:inherit; font-size:.72rem; padding:.3rem .6rem; cursor:pointer;
+  color:#b9cbd8; background:rgba(255,255,255,.05);
+  border:1px solid var(--line); border-radius:.5rem; transition:.25s;
+}
+.vrow button:hover{ color:var(--ink); border-color:rgba(var(--rgb),.55); }
+.vrow button.use.on{ color:#04141b; background:var(--accent); border-color:transparent; }
+
+/* 试音那句话的输入框。跟 chat.html 的输入框同款，但这一页只要一行。 */
+.vsay{ display:flex; gap:.6rem; align-items:center; }
+.vsay input{
+  flex:1 1 auto; min-width:0; padding:.6rem .9rem; font:inherit; font-size:.82rem;
+  color:var(--ink); background:rgba(255,255,255,.06);
+  border:1px solid var(--line); border-radius:2rem; outline:none;
+}
+.vsay input:focus{ border-color:rgba(var(--rgb),.55); }
+.vsay button{
+  flex:0 0 auto; font:inherit; font-size:.78rem; padding:.55rem .9rem; cursor:pointer;
+  color:#04141b; background:var(--accent); border:none; border-radius:2rem;
+}
+.vsay button.ghost{ color:#b9cbd8; background:rgba(255,255,255,.06); border:1px solid var(--line); }
+
+/* 那行"选中后要往 config 里填什么"的小代码块 */
+.codesnip{
+  font-family:ui-monospace,Consolas,monospace; font-size:.74rem;
+  padding:.5rem .7rem; border-radius:.5rem; margin-top:.5rem;
+  background:rgba(4,12,20,.6); border:1px dashed var(--line);
+  color:#cfe2ef; word-break:break-all;
+}
+</style>
+</head>
+<body class="pg-voice" data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1>小瑞语音 · 试音台</h1>
+        <span class="spacer"></span>
+        <span class="pill">工具页</span>
+      </div>
+
+      <!-- 2026-09-24：删掉整张「这是干什么用的」卡（含 `#engineNote` 状态行）。
+           用户要求去掉成段说明。音色条数仍在下面「中文音色」的 `#vcount` 上。
+           备份见 web/_bak_20260924_prose/voice.html。 -->
+
+      <section class="card card-pad" style="margin-top:.8rem">
+        <div class="card-h"><h3>试音用哪句话</h3><span class="note">改完对每一行都生效</span></div>
+        <div class="vsay">
+          <input id="sayText" autocomplete="off"
+                 value="前方五十八公里有服务区，要不要停一下？我先陪你聊会儿。">
+          <button id="cancelBtn" class="ghost" type="button">停</button>
+        </div>
+      </section>
+
+      <section class="card card-pad" style="margin-top:.8rem">
+        <div class="card-h">
+          <h3>中文音色</h3><span class="note" id="vcount">—</span>
+        </div>
+        <div class="vlist" id="vlist"></div>
+        <div class="fine-print" id="vfoot" style="margin-top:.6rem">—</div>
+        <div class="codesnip" id="snip" hidden></div>
+        <div class="vsay" style="margin-top:.6rem">
+          <button id="autoBtn" class="ghost" type="button">恢复自动</button>
+        </div>
+      </section>
+
+      <section class="card card-pad" style="margin-top:.8rem">
+        <div class="card-h">
+          <h3>服务端备路</h3><span class="note" id="srvEngine">—</span>
+        </div>
+        <div class="vsay" style="margin-top:.6rem">
+          <button id="srvBtn" type="button">让服务端念一句</button>
+          <span class="fine-print" id="srvNote">—</span>
+        </div>
+        <div class="vlist" id="svlist" style="margin-top:.6rem"></div>
+        <div class="codesnip" id="ssnip" hidden></div>
+        <div class="fine-print" id="svfoot" style="margin-top:.4rem">—</div>
+      </section>
+
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script>
+/* =========================================================================
+   小瑞语音 · 试音台（工具页，不是作品页）
+   -------------------------------------------------------------------------
+   这一页**故意不走 XQ.speak**：那个函数要挑音色、要判静音、要判前后台、
+   还要在没开口时兜底 —— 全是不该打扰试音的逻辑。这里直接调浏览器的
+   `speechSynthesis`，用你点的那一行**指定的**音色念，所见即所得。
+   服务端那一路则直接发一条 `{"type":"tts"}` 出去（跟主界面兜底时发的一样）。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+const LS_VOICE = 'xq.tts.voice';        // 和 live.js 的 XQ.tts.LS.voice 是同一个键
+
+/* 选中的音色：**空 = 自动**（由 XQ.tts._pick 按关键词挑，默认会挑到晓晓）。 */
+const chosen = () => { try { return localStorage.getItem(LS_VOICE) || ''; } catch (e) { return ''; } };
+const setChosen = (name) => {
+  try { name ? localStorage.setItem(LS_VOICE, name) : localStorage.removeItem(LS_VOICE); }
+  catch (e) {}
+};
+
+/* 念一句。**不听静音开关**，理由见上面那段注释。 */
+let cur = null;
+function sayNow(voice) {
+  const t = ($('sayText').value || '').trim();
+  if (!t) { XQ.flash('上面那句试音文本是空的'); return; }
+  if (!voice) { XQ.flash('这个音色这会儿取不到（多半是要联网）'); return; }
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t);
+    u.voice = voice;
+    u.lang = voice.lang || 'zh-CN';
+    // 用配置里那套情感语气（normal 档）。试音听的是**音色**，不是语气，
+    // 但速度差太多也听不准，所以照 normal 来，不自己另定一套。
+    const p = (XQ.tts.prosody || {}).normal || {};
+    if (p.rate) u.rate = p.rate;
+    if (p.pitch) u.pitch = p.pitch;
+    cur = u;
+    speechSynthesis.speak(u);
+  } catch (e) {
+    XQ.flash('念不出来：' + (e && e.message ? e.message : e));
+  }
+}
+
+/* ---------------------------------------------------------------- 列表 */
+let all = [];
+function voices() {
+  try { return speechSynthesis.getVoices() || []; } catch (e) { return []; }
+}
+
+function render() {
+  all = voices();
+  const zh = all.filter((v) => /^zh/i.test(v.lang || ''));
+  const pool = zh.length ? zh : all;
+  const pick = chosen();
+  const auto = XQ.tts._pick ? XQ.tts._pick() : null;
+
+  /* 2026-09-24：`#engineNote` 那块说明已删，写入跟着摘掉。 */
+  $('vcount').textContent = `共 ${pool.length} 个`;
+  $('vlist').innerHTML = pool.map((v, i) => {
+    const on = (pick && v.name === pick) || (!pick && auto && v.name === auto.name);
+    const loc = !!v.localService;
+    return `<div class="vrow${on ? ' on' : ''}" data-i="${i}">
+      <div class="vname">${XQ.esc(v.name)}<em>${XQ.esc(v.lang || '')} · ${loc ? '内置，断网可用' : '在线神经音色，要联网'}</em></div>
+      <span class="vtag ${loc ? 'loc' : 'off'}">${loc ? '本地' : '在线'}</span>
+      <button class="say" type="button">念一句</button>
+      <button class="use${on ? ' on' : ''}" type="button">${on ? '用这个 ✓' : '用这个'}</button>
+    </div>`;
+  }).join('');
+
+  $('vlist').querySelectorAll('.vrow').forEach((row) => {
+    const v = pool[Number(row.dataset.i)];
+    row.querySelector('.say').onclick = () => sayNow(v);
+    row.querySelector('.use').onclick = () => {
+      // 选中的是**这个音色的名字**。live.js 那边按子串匹配，所以这里存全名没问题。
+      setChosen(v.name);
+      if (XQ.tts) { XQ.tts.keyword = v.name; XQ.tts.voice = XQ.tts._pick(); }
+      render();          // snip 那行由 render 按"选没选"统一管，别在这儿也写一遍
+      XQ.flash('已选：' + v.name);
+    };
+  });
+
+  const nOther = all.length - pool.length;
+  $('vfoot').textContent = (nOther > 0 ? `另外还有 ${nOther} 个非中文音色，没列（用不上）。` : '')
+    + (zh.length === 0 && all.length
+        ? ' ⚠️ 一个中文音色都没有 —— 主界面会退回服务端念 Huihui，仍然出声。'
+        : '');
+
+  /* 那行"要往 config 里填什么"：选了才显示，而且显示的是**当前存的值**，
+     不依赖刚才那一下点击 —— 刷新页面后它照样在。 */
+  const cur2 = chosen();
+  $('snip').hidden = !cur2;
+  if (cur2) $('snip').textContent = '"voice": "' + cur2 + '"';
+}
+
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${XQ.ICON.chevL}</svg>`;
+$('cancelBtn').onclick = () => { try { speechSynthesis.cancel(); } catch (e) {} };
+/* 恢复自动：回到 config 里那个关键词（默认"自动"），**不是**硬写一个"自动" ——
+   万一这台机器的 config 把 tts.voice 钉成了别的，那个才是"自动"的含义。
+   cfgKeyword 是 live.js 在 hello 里存下来的。 */
+$('autoBtn').onclick = () => {
+  setChosen('');
+  if (XQ.tts) {
+    XQ.tts.keyword = XQ.tts.cfgKeyword || '自动';
+    XQ.tts.voice = XQ.tts._pick();
+  }
+  render();
+  XQ.flash('已恢复自动（优先晓晓那类神经音色）');
+};
+
+/* ---------------------------------------------------------------- 服务端
+   和上面那块**故意不是一套**：上面选的是浏览器自己的音色（存 localStorage），
+   这一块选的是服务端那条路的音色（存服务端内存，不回写 config.json）。
+
+   ⚠️ 为什么不合并成一个"全局音色"：这是两条独立的通道，名字也**不是一套命名**
+   （`zh-CN-XiaoxiaoNeural` vs `Microsoft Huihui Desktop`），能且只能各选各的。
+   把两边显示成同一个东西，只会让人以为改了一边另一边也变了。
+
+   ⚠️ 服务端换音色**下次念才生效**，正在念的那一句不受影响 —— 所以试听要
+   点"让服务端念一句"，不要指望列表点一下就出声。 */
+let link = null;
+let srvVoices = [];        // 服务端报上来的中文在线音色
+let srvCur = '';           // 服务端此刻在用的音色名
+let srvEngine = '';        // 'edge' | 'sapi'
+
+$('srvBtn').onclick = () => {
+  const t = ($('sayText').value || '').trim();
+  if (!t) { XQ.flash('上面那句试音文本是空的'); return; }
+  if (!link || !link.online) { XQ.flash('没连上服务端，这一路试不了（用 run_ui.bat 启动）'); return; }
+  link.send({ type: 'tts', text: t, emotion: 'normal', reason: 'audition' });
+  XQ.flash(srvEngine === 'sapi'
+    ? '已发给服务端念（SAPI 引擎，用的是 Windows 自带的音色）'
+    : '已发给服务端念（在线音色 ' + (srvCur || '—') + '）');
+};
+
+/* 服务端那份名单。**点了才拉**：它要联网、要几秒，页面一打开就去拉的话，
+   试音台的头两秒会卡在一个没用的请求上（而上面那块浏览器音色是立刻就有的）。
+
+   ⚠️ 一次拉不到就**不要**重试：`why` 里已经写清了是没装 edge-tts 还是断网，
+   反复重试只会让日志里全是同一个错。要重来就刷新页面。 */
+let srvAsked = false;
+function askSrvVoices() {
+  if (srvAsked || !link || !link.online) return;
+  srvAsked = true;
+  $('svfoot').textContent = '正在问服务端要音色名单（要联网，几秒）…';
+  link.send({ type: 'tts_voices' });
+}
+
+function renderSrv() {
+  const host = $('svlist');
+  if (!host) return;
+  if (srvEngine === 'sapi') {
+    // SAPI 引擎下列在线音色是**没有意义的**（那一路上不去），如实说清楚，
+    // 而不是列一堆点了没反应的按钮。
+    host.innerHTML = '';
+    $('svfoot').textContent = '服务端现在是 SAPI 引擎，走的是 Windows 自带音色 '
+      + (srvCur ? '「' + srvCur + '」' : '') + '。';
+    $('ssnip').hidden = true;
+    return;
+  }
+  host.innerHTML = srvVoices.map((v, i) => {
+    const on = v.short === srvCur;
+    return `<div class="vrow${on ? ' on' : ''}" data-i="${i}">
+      <div class="vname">${XQ.esc(v.short)}<em>${XQ.esc(v.locale)} · ${XQ.esc(v.gender)}</em></div>
+      <button class="say" type="button">试听</button>
+      <button class="use${on ? ' on' : ''}" type="button">${on ? '在用 ✓' : '用这个'}</button>
+    </div>`;
+  }).join('');
+  host.querySelectorAll('.vrow').forEach((row) => {
+    const v = srvVoices[Number(row.dataset.i)];
+    row.querySelector('.say').onclick = () => {
+      // 先换再听：服务端换音色不排队，这一下点的就是"用这个音色念这一句"，
+      // 不用点两次（点"用这个"再点"让服务端念一句"是同一个意思，但绕）。
+      link && link.send({ type: 'tts_voice', edge_voice: v.short });
+      const t = ($('sayText').value || '').trim();
+      if (t && link && link.online) {
+        link.send({ type: 'tts', text: t, emotion: 'normal', reason: 'audition' });
+      }
+    };
+    row.querySelector('.use').onclick = () => {
+      if (link && link.online) link.send({ type: 'tts_voice', edge_voice: v.short });
+    };
+  });
+}
+
+/* ---------------------------------------------------------------- 起步 */
+/* ★ 2026-09-25：这里原来写着「不给它挂喇叭按钮：这一页自己就是喇叭」—— 左栏那张
+   卡片整块删了，`voice` 参数也从 railHTML 签名里去掉了，加不上也没得加。
+   ⚠️ 这一页**始终不受那个静音开关管**：`xq.tts.on` 只影响座舱里小瑞说不说话，
+      试音台的按钮是直接调 `speechSynthesis` 试引擎的（下面 render 那一套）。 */
+XQ.mountChrome({ active: 'set' });
+
+/* `getVoices()` 加载瞬间返回空，要等 voiceschanged —— 这个坑见 live.js 里
+   XQ.tts 那段注释的坑 1。这里同样两条路都留：等事件 + 超时兜底。 */
+render();
+try {
+  if (typeof speechSynthesis.addEventListener === 'function') {
+    speechSynthesis.addEventListener('voiceschanged', render);
+  } else {
+    speechSynthesis.onvoiceschanged = render;
+  }
+} catch (e) {}
+setTimeout(render, 1500);
+
+link = XQ.connect({
+  onHello: (d) => {
+    const t = d.tts || {};
+    const st = t.stats || {};
+    srvCur = st.edge_voice || st.voice || '';
+    srvEngine = st.engine || '';
+    $('srvEngine').textContent = st.engine === 'sapi' ? 'Windows 自带音色'
+                                : (st.engine ? '在线神经音色' : '—');
+    $('srvNote').textContent = t.server_ok
+      ? '服务端备路就绪' + (srvCur ? '（' + srvCur + '）' : '')
+      : '服务端备路关着（config.json 的 tts.server_fallback）';
+    // 还没列过名单的话，连上就问一次 —— 试音台打开就是为了挑音色，
+    // 等用户先点一下再拉名单是没道理的。
+    askSrvVoices();
+  },
+  onDown: (down) => {
+    if (down) {
+      $('srvNote').textContent = '没连上服务端';
+      $('svfoot').textContent = '没连上服务端 —— 这一路要有 run_ui.bat 起的那个进程才能试。';
+    }
+    // 掉线时把"问过了"复位：现在这一问多半发进空气里了，重连上要能再问一次
+    // （不复位的话重连后名单永远空着，而且看不出为什么）。
+    if (down) srvAsked = false;
+  },
+  onMsg: (type, d) => {
+    if (type === 'tts_voices') {
+      srvVoices = d.voices || [];
+      if (d.engine) srvEngine = d.engine;
+      if (d.current) srvCur = d.current;
+      renderSrv();
+      $('svfoot').textContent = srvVoices.length
+        ? `服务端这条路上有 ${srvVoices.length} 个中文在线音色。`
+        : (d.why || '服务端没报上来音色名单。');
+    } else if (type === 'tts_set') {
+      if (d.current) srvCur = d.current;
+      renderSrv();
+      XQ.flash(d.ok ? '服务端音色已换成 ' + d.current : ('没换：' + (d.why || '')));
+      // 换了服务端音色，那行"要往 config 里填什么"也得跟着更新
+      $('ssnip').hidden = !d.ok;
+      if (d.ok) $('ssnip').textContent = '"edge_voice": "' + d.current + '"';
+    }
+  },
+});
+</script>
+</body>
+</html>

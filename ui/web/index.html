@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>座舱总览 · 灵途智行</title>
+<!-- 空 favicon：不写这条浏览器会去要 /favicon.ico，控制台白白多一条 404 -->
+<link rel="icon" href="data:,">
+<!-- ⚠️ **两个都要链，顺序不能反**：style.css 是共用骨架（顶栏 / 左导航 / .card /
+    四档配色），pages.css 是各页自己的版式。这一页原来是**只链 style.css 的**
+    唯一一个座舱页 —— 第五次改版把它做成两行栅格的总览页，版式规则放进
+    pages.css（那里已经有 `.card-pad` / `.card-h` 这些现成的零件），所以补上这条。 -->
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+</head>
+<body class="pg-home" data-sev="normal">
+
+<!-- 背景三层：照片 / 状态色渲染 / 光带。换档时只动 tint 的颜色 -->
+<div class="bg" id="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+
+  <!-- 顶栏 / 左导航 / 底栏由 chrome.js 生成（十一个页面共用一份，见那个文件） -->
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main dash">
+
+    <nav class="rail" id="rail"></nav>
+
+    <!-- ===================================================================
+         ★ 第五次改版：这一页从「一页塞下所有实时块」改成了**总览页**
+         （照参考图 首页.png）。搬走的东西去哪了：
+           摄像头画面 / 支路一·二四条概率条 / 支路二四个原始量 / 底部小瑞对话栏
+             -> 全部搬到 `detail.html`（驾驶监测页）。用户拍板的就是这条。
+         留在这一页的是**总览该看的东西**：主视觉 + 驾驶员状态摘要 + 小瑞，
+         加上下面一行三张辅助卡。
+         ⚠️ 搬走之后 `app.js` 里那些写入必须**可选**（见那个文件里的 `on()`），
+            否则这一页第一次 render 就是 `null.textContent`，8 Hz 抛一次、
+            整页再也不动。
+         =================================================================== -->
+    <div class="dash-body">
+
+      <!-- ------------------------------------------------ 上行 -->
+      <div class="dash-row1">
+
+        <!-- ---------- 主视觉 ---------- -->
+        <section class="dash-hero card">
+          <!-- 里面那层圆角面板用的是 `ui/图片效果/首页背景.png`
+               （`assets/home_scene.jpg`，`_scratch/_mk_bg.py` 出的，走同一套水印裁切）。
+               ★ 2026-09-25 用户原话「把**背景图换成** …图片效果中的**首页背景.png**」
+                 —— 所以这里**不再和封面共用** `bg_scene.jpg` 了，两张源图分开出：
+                   封面的底 → `背景.png` → `bg_scene.jpg`
+                   这块的底 → `首页背景.png` → `home_scene.jpg`   ← 本处
+               ⚠️ 换成新图**不是无事发生**：旧图左下角有一辆车（下面 `::after` 那三档白
+                  就是照着它定的），新图内容不同，那层白的比例要按截图重定 ——
+                  见 pages.css 里 `.dash-visual::after` 那段。
+               ⚠️ 图上那辆车不是素材，是这张图本来就有的（在左下角）。 -->
+          <div class="dash-visual">
+            <div class="dash-copy">
+              <!-- ★ 2026-09-25 用户：「**里边那个灵途的标不用放了**」——
+                   原来这里有一个 `.dash-brand`（整张 `lingtu_lockup_ink.png`），
+                   连它的两条 CSS 一起删了。用户要的是这一块**只剩 slogan 那两行字**。
+                   ⚠️ 顶栏那个 lockup **不动**（用户说的是"里边那个"）。
+                   ⚠️ 那张素材本身是**白字**（给深色底做的，用户 09-25 拍板
+                      「不管看不看得见、整张原图直接贴」），压在首页这块**亮天空照片**
+                      上量出来只有 **1.67:1**，基本看不见 —— 挪走它也顺带解决了这条。
+                   删的时候注意：`_check_theme2.py` 里有一条盯 `.dash-brand img`，
+                   它带 `missing` 护栏（别的页没这个东西），所以**不会崩**，
+                   但会**静默变成空判**；那边已经改成"必须不存在"了，别只删这一处。 -->
+              <!-- 品牌口号的**艺术字版**。⚠️ 这里不是 h1 当页面标题用，
+                   而是把那句 slogan 做成主视觉的字。
+                   ★ 2026-09-25 用户：「**我们主题是灵途智行 与你同行**」——
+                     第二行从「与**您**同行」改成「与**你**同行」。
+                   ★ 2026-09-25 晚 用户：「**首页 展示部分 灵途智行 与你同行
+                     这个字改成我给你的艺术字**」—— 原来这里是两行 HTML 文字
+                     （`<b>灵途智行</b><b>与你同行</b>`，第二行缩进一格），
+                     现在换成**用户给的那张艺术字**（`ui/图片效果/9.jpg`，
+                     仓里落成 `assets/lingtu_wordmark_mask.png`）。
+                     做法和封面 `h1`（`pages.css` 的 `.cover-l h1`）**同一套**：
+                     遮罩出形状、CSS 给颜色 —— 所以两页是同一张字、同一族蓝。
+                   ⚠️ 那两行 `<b>` 连同它们的 CSS（`h1 b` / `h1 b + b`）**一起删了**：
+                      艺术字是**一行**，"第二行往右缩一格"那个手写体意图现在在
+                      图里，再留一条 `margin-left` 就成了空规则。
+                   ⚠️ 文字本身**留在 DOM 里**（`font-size:0` 藏形，见 CSS）——
+                      不是空元素：这一块"写的是什么"在 DOM 上仍然是个事实。
+                   ⚠️ 宽高在 CSS 里是**写死**的，改尺寸看那条注释（有个
+                      "max-content = 0"的坑，只写 height 会让字整个消失且不报错）。 -->
+              <h1>灵途智行 与你同行</h1>
+              <p class="dash-sub">情感化智能座舱驾驶员健康监测预警系统</p>
+            </div>
+
+            <!-- 小瑞那张**欢迎人的立绘**（用户原话：「把小瑞其中一个欢迎人的照片
+                 放上去」）。取的是姿势库里 `FS[1]` 的**摊手迎客**姿势
+                 （不是 #0 的招手、也不是 #2 的叉腰，三张并排看过，
+                 `runs/_welcome_candidates.png`）。
+                 ★ 2026-09-25：**换成 43 张形象库里的 `l` 套 `p02`** —— `p02` 就是
+                    `FS[1]` 那张（同一个源图、同一套归一化），所以**看上去一模一样**：
+                    量下来的角色矩形是 233.9x351.8 → 233.7x351.5（见
+                    `_scratch/_probe_dash_rects.py` 的输出），只有水平位置**左移
+                    11.1px**（画布从中缝往上涨了 21.9px 的透明边，人还在中缝上）。
+                    换来的是它接上了 `XQ.poseDeck`：点一下换一张，43 张。
+                 ⚠️ 旧的 `assets/xiaorui_welcome.png`（601x900，紧裁版）**还在磁盘上**
+                    没有删 —— 它是 `_mk_dash_mascot.py` 的产物，留着当"这一张到底是
+                    哪个姿势"的凭证（那个脚本 `POSE_IDX` 那条断言钉着源文件名）。
+                    但**页面上没有任何地方引用它了**，别以为它还在生效。
+                 ⚠️ **绝对定位**，不做 `.dash-copy` 的 flex 兄弟项：`.dash-copy` 是
+                    `max-width:60%`，做兄弟项会被挤扁（见 pages.css 里 `.dash-mascot`）。
+                 ⚠️ `pointer-events` **由下面的脚本开**（`XQ.poseDeck` 挂上之后），
+                    不在 CSS 里写死：这一格原来写的是 `none`（"不能挡住左栏/按钮的
+                    点击"），要让它是**能点**的就得改。开在脚本里是因为"能点"和
+                    "点得动"必须是**同一件事** —— 分开写就会出现"看着能点、点了没反应"
+                    （或者反过来：JS 没跑到时白占一块点击区）。量过接不接管：
+                    见 pages.css 里 `.dash-mascot` 那段。
+                 ⚠️ `alt="小瑞"` 是**全站 mascot 的统一写法**（抄 cover.html 里那个）。 -->
+            <img class="dash-mascot" src="assets/xq/l/p02.webp" alt="小瑞">
+
+            <!-- 右上角那朵手写气泡。**纯装饰的问候语**，不跟数据变 ——
+                 跟着档位变的那一句是 `#xqBubble`（右边小瑞卡里的 `look.bubble`），
+                 两者别混。 -->
+            <div class="dash-say">你好！<br>我是小瑞～</div>
+          </div>
+
+          <div class="dash-strip">
+            <a class="dash-entry" href="detail.html">
+              <span class="dash-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3.4v5.2M12 15.4v5.2M3.4 12h5.2M15.4 12h5.2" stroke="currentColor" stroke-width="1.8"/></svg></span>
+              <span class="dash-entry-t"><b>驾驶监测</b><span>守护驾驶安全</span></span>
+            </a>
+            <a class="dash-entry" href="media.html">
+              <span class="dash-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6.5l10-2v11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="15.5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
+              <span class="dash-entry-t"><b>多媒体</b><span>丰富座舱体验</span></span>
+            </a>
+            <a class="dash-entry" href="settings.html">
+              <span class="dash-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.6l1.4 2.6 2.9-.6.6 2.9 2.6 1.4-1.6 2.5 1.6 2.5-2.6 1.4-.6 2.9-2.9-.6L12 21.4l-1.4-2.6-2.9.6-.6-2.9L4.5 15l1.6-2.5L4.5 10l2.6-1.4.6-2.9 2.9.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+              <span class="dash-entry-t"><b>设置</b><span>个性化配置</span></span>
+            </a>
+            <!-- ★★ 2026-09-25：这颗按钮**原来是「进入座舱 →」（指向 detail.html），
+                 用户点名把它改成「返回展示页」（指向 cover.html）**。原话：
+                   「返回展示页在首页进入座舱那个位置 把进入座舱改成这个」
+                   「搞一个返回展示页的按钮吧 我有时候要返回展示页啊」
+                 为什么需要：开场那条路是**单向**的 —— 根路径 `/` 给的是展示
+                 封面，封面上那颗「进入座舱」把人送进座舱主界面，**进来之后
+                 没有回头路**（左导航恰好四项、里面没有它；页面里那几个返回
+                 箭头是**页与页之间**的回程）。想重看开场那一屏，原来只能
+                 手敲地址。
+
+                 ⚠️ 位置**一个字没动**：还是 `.dash-strip` 里那一颗、还是整条上
+                    最重的那颗（用户点名要这个位置）。改的是文案、href、
+                    以及**箭头方向反了一百八十度**（同一套 path 数据镜向，
+                    和封面那颗「进入座舱」的右箭头成对）。改箭头别只改文案：
+                    留着右箭头的话，一颗写着"返回"的按钮朝右指，看着像"下一步"。
+                 ⚠️ **丢掉的那条捷径不算损失**：这颗原来指的 detail.html，
+                    左边第一张 `.dash-entry`（驾驶监测，`href="detail.html"`）
+                    和左栏那四项里的「驾驶监测」都到得了同一页。
+                 ⚠️ **回程口只有这一处，别在别处再补一颗**：顶栏那颗我加过、
+                    被用户当场改到这儿来（记录在 style.css 的「❌ 已否」一段）。
+                    同一个动作放两处 —— 一个显眼一个不显眼 —— 只会让人在答辩
+                    现场去找那个不显眼的（这条理由是 cover.html 删掉
+                    「‹ 返回座舱主界面」文字链时写的，同一件事）。
+                 ⚠️ 用 `<a href>` 不用 JS 跳转：中键/新标签/右键菜单都还在，
+                    而且这一页不连 socket 也能走（和封面那颗同一个理由）。
+                 ⚠️ 在浅色主题下这颗是**实心蓝胶囊 + 白字**（`.dash-cta`，
+                    pages.css），不要去改它的观感 —— 用户要的是"原来那颗的位置"。 -->
+            <a class="dash-cta" href="cover.html">返回展示页
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12h-14M11 6.5L5.5 12l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+          </div>
+        </section>
+
+        <!-- ---------- 驾驶员状态（摘要） ----------
+             这一张卡里的每一个数字都来自服务端的真实判决（`ui/state.py`），
+             由 `app.js` 每帧写进来。**没有任何一个是这一页自己编的。** -->
+        <section class="status card">
+          <div class="card-h"><h3>驾驶员状态</h3></div>
+
+          <!-- 支路二那两条独立告警（持续闭眼 / 打哈欠）。常驻，判据没了就收。
+               内容由 XQ.alarms 填（见 live.js），这里只是个位置；空的时候带 hidden。
+               排在表情行上面 —— 告警是**归因**：档位说"注意"，这里说清"因为你在打哈欠"。 -->
+          <div class="alarms" id="alarms" hidden></div>
+
+          <div class="hero">
+            <div class="mood" id="mood">
+              <svg viewBox="0 0 64 64" aria-hidden="true">
+                <circle cx="32" cy="32" r="30" fill="currentColor" opacity=".18"/>
+                <circle cx="32" cy="32" r="24" fill="currentColor"/>
+                <circle class="m-eye" cx="23" cy="27" r="3.4" fill="#06202a"/>
+                <circle class="m-eye" cx="41" cy="27" r="3.4" fill="#06202a"/>
+                <path class="m-mouth" d="M22 39 q10 8 20 0" fill="none" stroke="#06202a" stroke-width="3" stroke-linecap="round"/>
+                <path class="m-brow" d="M19 20 q4 -3 8 0M37 20 q4 -3 8 0" fill="none" stroke="#06202a" stroke-width="2.4" stroke-linecap="round" opacity="0"/>
+              </svg>
+            </div>
+            <div class="hero-txt">
+              <b id="sevName">清醒</b>
+              <span class="pill" id="sevPill">安全驾驶</span>
+            </div>
+          </div>
+
+          <div class="rows">
+            <!-- 疲劳程度那根能量条。
+                 ★ 第五次改版：它从 `.hero` 里**搬回了 `.rows` 的第一行**（照
+                   参考图 首页.png）。`#barLevel` 是**全页唯一**那根档位条，
+                   `app.js` 只写它一处，所以它搬到哪儿、哪儿就是"疲劳程度"。
+                 ⚠️ 这一行**故意没有那个词**（参考图上写的是「正常」）：
+                    那个词就是大标题 `#sevName`（两处都取服务端的
+                    `severity_name`），同一张卡里写两遍会自相矛盾 ——
+                    这条口径在 `ui/state.py` 和 app.js 里都写着。 -->
+            <div class="row">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 18.4a8.4 8.4 0 1 1 14.8 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M12 13.6 16.2 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="14.6" r="1.4" fill="currentColor"/></svg>
+              <span class="k">疲劳程度</span>
+              <div class="bar"><i id="barLevel"></i></div>
+            </div>
+
+            <div class="row">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.6 12 5.6 21.5 12 21.5 12 18 18.4 12 18.4 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+              <span class="k">PERclos（眼睑闭合率）</span><b class="v" id="rPc">—</b>
+              <div class="bar"><i id="barPc"></i></div>
+            </div>
+
+            <div class="row hr">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4S3.4 15 3.4 9.2A4.6 4.6 0 0 1 12 6.6a4.6 4.6 0 0 1 8.6 2.6c0 5.8-8.6 11.2-8.6 11.2z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+              <span class="k">心率（实时）</span><b class="v muted" id="rHr">未接入</b>
+              <svg class="ecg" id="ecg" viewBox="0 0 320 46" preserveAspectRatio="none">
+                <path id="ecgPath" d="" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+              </svg>
+            </div>
+
+            <div class="row">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="4.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 20.4a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+              <span class="k">头部姿态</span><b class="v" id="rPose">正常</b>
+            </div>
+
+            <!-- 情绪状态 —— 照参考图 首页.png 那一行。
+                 ⚠️ 它是**同一档位的换词**，不是测出来的情绪：左边那个表情
+                    （`look.mood` 的嘴 / 眉 / 眼）说的就是这件事，`look.moodWord`
+                    只是把它写成字。本项目**没有情绪识别这一路**，
+                    别把这个格子当成一个测量值去引用。 -->
+            <div class="row">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20S4.5 15.3 4.5 10.4A4.4 4.4 0 0 1 12 7.7a4.4 4.4 0 0 1 7.5 2.7C19.5 15.3 12 20 12 20z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+              <span class="k">情绪状态</span><b class="v" id="rMood">平静</b>
+            </div>
+          </div>
+
+          <!-- 参考图 首页.png 下面那三格。**三个数全部未接入**：
+               车速 / 里程要走车辆总线（CAN），这一版没接；安全驾驶时长也一样。
+               口径是用户拍过的「有真数据用真数据，没有的标「未接入」」——
+               所以是灰字小一号的「未接入」，不是"0 km/h"。
+               （把 0 写上去看起来更像样，但那是在编一个没测到的数。） -->
+          <div class="ntiles">
+            <div class="nt">
+              <span class="k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M4 8.4v7.2M20 8.4v7.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>脉搏波幅度</span>
+              <span class="v na" id="rAc">--</span>
+            </div>
+            <div class="nt">
+              <span class="k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12c2.5-6.5 5-6.5 7.5 0s5 6.5 7.5 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>PI 灌注指数</span>
+              <span class="v na" id="rPi">--</span>
+            </div>
+            <a class="nt" href="data.html">
+              <span class="k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>数据详情</span>
+              <span class="v"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:1.05rem;height:1.05rem"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            </a>
+          </div>
+          <div class="ntiles-note" id="rPiHint" hidden></div>
+          <!-- 2026-09-24：删掉「车速/里程/行驶时长需要车辆总线（CAN）数据，本版未接入」
+               那行小结（用户要求去掉成段说明）。上面两格的值本身已经写着「未接入」。
+               ★ 2026-09-26：那三格**本身也删了** —— 换成心率那一路的两个量
+               （脉搏波幅度 / PI）＋ 一个指向 `data.html` 的入口。
+               ★ 2026-09-26 深夜：第一格**原本是 HRV-RMSSD**，换掉了 ——
+               它要 NN 连续跨度 ≥ 30 s 才有值，实测那场会话里 0.0% 的帧有数，
+               屏幕上永远一根横杠。换成交流幅度（`hr_ac`，100% 有数）。
+               为什么加在 `.ntiles` 而不是 `.rows` 里（"就在心率下面"那个位置）：
+               `.status` 卡的高度是量出来的，`.rows` 是唯一允许被缩的子项，
+               加两行会被 `overflow:hidden` **静默**裁掉 —— 账在 `pages.css`
+               的 `.ntiles` 那一段，改前改后都用 `_probe_status_h.py` 量。 -->
+
+          <!-- 底部那一行运行日志。用户明确要求保留 —— 它是"这些数字是怎么来的"
+               的最短说明：安全通道级别、注意力归因、支路二的状态与闸门。 -->
+          <div class="status-foot" id="statusFoot">—</div>
+        </section>
+
+        <!-- ---------- 小瑞 ----------
+             这一格是**会动 + 可点**的那个（手点循环切十个动作、待机呼吸都在
+             app.js 的 XQ.mascot.bind 里接）。别的页面上的小瑞是静态小图。 -->
+        <aside class="xq">
+          <div class="xq-card card" id="xqCard">
+            <div class="xq-head">
+              <div class="mascot" id="mascot">
+                <div class="ring"></div>
+                <div class="ring r2"></div>
+                <!-- 资产槽：底图是**循环动图** assets/xiaorui_live.webp，
+                     探到了就用它，否则退回内置 SVG。
+                     prefers-reduced-motion 命中时底图降级成 xiaorui_live_still.png
+                     （那个分支在 live.js 的 src()）。 -->
+                <img class="mascot-img" id="mascotImg" alt="小瑞" hidden>
+                <div id="mascotSvgHost"></div>
+              </div>
+
+              <div class="xq-meta">
+                <b>小瑞</b>
+                <span class="pill" id="xqPill">状态良好</span>
+                <svg class="eq" viewBox="0 0 60 24" aria-hidden="true">
+                  <g fill="currentColor" opacity=".85">
+                    <rect x="0"  y="9"  width="7" height="6"  rx="2"/>
+                    <rect x="11" y="5"  width="7" height="14" rx="2"/>
+                    <rect x="22" y="8"  width="7" height="8"  rx="2"/>
+                    <rect x="33" y="2"  width="7" height="20" rx="2"/>
+                    <rect x="44" y="7"  width="7" height="10" rx="2"/>
+                    <rect x="55" y="6"  width="5" height="12" rx="2"/>
+                  </g>
+                </svg>
+              </div>
+            </div>
+
+            <div class="xq-note" id="xqNote">有我在，<br>一路都很安心~<span class="swash"></span></div>
+            <div class="xq-bubble" id="xqBubble" hidden></div>
+            <div class="xq-acts" id="xqActs"></div>
+          </div>
+
+          <!-- ★ 第五次改版：「快捷操作」那张卡**从这一页搬走了**。
+               它原来在这里（`.quick` / `#quick` / `#quickBtns`），只在重度档挂出来，
+               内容是「播放舒缓音乐 / 导航服务区 / 查看驾驶状态」那几颗按钮。
+               搬走的两个理由，缺一个都还能商量：
+                 1. 参考图 首页.png 的小瑞卡里**没有**这一块（它到"手写那句话"就完了）；
+                 2. 它**装不下**：`.xq` 是栅格里的单列，卡是定高的，多出来的那块
+                    不报错、直接溢出到下行去（第一版截图里它压在「系统公告」上面）。
+               ⚠️ `#quick` / `#quickBtns` 现在**只该出现在驾驶监测页**（小瑞·驾驶陪伴
+                  那张卡里）。app.js 里那两句已经加了守卫：本页没有就跳过。 -->
+        </aside>
+      </div>
+
+      <!-- ------------------------------------------------ 下行 -->
+      <div class="dash-row2">
+
+        <!-- ---------- 快捷功能 ---------- -->
+        <section class="card card-pad">
+          <div class="card-h">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.9 9 19.5 11l-5.6 2L12 18.5 10.1 13 4.5 11 10.1 9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>快捷功能</h3>
+          </div>
+          <div class="qk-grid">
+            <a class="qk" href="detail.html">
+              <span class="dash-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3.4v5.2M12 15.4v5.2M3.4 12h5.2M15.4 12h5.2" stroke="currentColor" stroke-width="1.8"/></svg></span>
+              <span class="qk-txt"><b>驾驶监测</b><span>实时监测驾驶员状态</span></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            <a class="qk" href="media.html">
+              <span class="dash-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6.5l10-2v11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="15.5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
+              <span class="qk-txt"><b>多媒体</b><span>音乐 / 视频 / 电台</span></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            <!-- ⚠️ 参考图上这一格是「使用指南」。**换成了「语音助手」** ——
+                 两个原因：一是本项目没有使用指南那个页面，写上去点了没反应；
+                 二是底部那条对话栏第五次改版搬去了驾驶监测页，这一页原本
+                 指向 chat.html 的入口（「展开完整对话 ›」）**跟着一起没了**，
+                 完整对话页就没有任何入口了。这一格把这个入口补回来。 -->
+            <a class="qk" href="chat.html">
+              <span class="dash-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3.2" width="6" height="10.4" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.6 11.4a6.4 6.4 0 0 0 12.8 0M12 17.8V21" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+              <span class="qk-txt"><b>语音助手</b><span>和小瑞聊两句</span></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            <a class="qk" href="settings.html">
+              <span class="dash-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.6l1.4 2.6 2.9-.6.6 2.9 2.6 1.4-1.6 2.5 1.6 2.5-2.6 1.4-.6 2.9-2.9-.6L12 21.4l-1.4-2.6-2.9.6-.6-2.9L4.5 15l1.6-2.5L4.5 10l2.6-1.4.6-2.9 2.9.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+              <span class="qk-txt"><b>设置</b><span>个性化配置与管理</span></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            <!-- ★★ 2026-09-25（第十七次改版）：新增「导航」，贴的是 `nav.html`
+                 （挂真高德地图那一页）。用户原话：「并且首页的快捷功能栏要有
+                 导航啊 和帮助与关于同一行 导航在做 帮助与关于在右边」——
+                 **左右顺序是用户点名的**，导航在左、帮助 & 关于在右，别对调。
+                 ⚠️ 图标和左栏「导航」那一项是**同一张图**（`chrome.js` 的 `navi`
+                    那条 `<path>`，一字不差）—— 同一件东西在站内必须是同一张脸。
+                 ⚠️ 同样用 `<a href>`：这一格不连 socket 也走得通。 -->
+            <a class="qk" href="nav.html">
+              <span class="dash-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 3.4 10.4l7 2.2 2.2 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+              <span class="qk-txt"><b>导航</b><span>高德路线 · 逐段引导</span></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            <!-- ★★ 2026-09-25（第十六次改版加的，第十七次改版**取消了跨满**）：
+                 「帮助 & 关于」，用户原话：「放在首页一个按钮吧直接跳转过去」。
+
+                 ★ 为什么不再挂 `qk-full`：跨满是第十六次改版的决定，当时的理由
+                 是**不留洞** —— 那时只有 5 格（4 格铺满 2×2，第 5 格单独一行，
+                 不跨满就在右下角空一格），而用户同一天刚嫌过监测详情页
+                 「中间留空白」。现在补上「导航」正好 6 格 = 3 行 × 2 列，
+                 **跨不跨都不留洞**，而用户点名要这两格同一行，于是取消跨满。
+                 （`.qk-full` 那条规则仍在 `pages.css` 里、现在没人用 —— 说明在那边。）
+
+                 为什么在这一格（第十六次改版的原话，仍然成立）：用户先定的是
+                 「挂设置页一行」，随后**在开工前改口**要首页一个按钮直接跳。
+                 这一格就是首页放按钮的地方 —— 下行那两张卡（快捷功能 / 行驶数据）
+                 里，只有它是**入口**语义的。刻意**没有**动 `.dash-strip` 那颗
+                 「返回展示页」：那颗的位置是用户上次点名钉住的（见上面那段长注释），
+                 而且「回展示页」和「看项目介绍」是两件事，挤成一颗按钮就都不是了。
+
+                 ⚠️ 文案用「帮助 & 关于」：进去那一页的标题就是这个。按钮名和落地页
+                    标题不一致，在答辩现场点错一次就得解释一次。
+                 ⚠️ 用 `<a href>` 不用 JS 跳转：中键、新标签、右键菜单都还在，
+                    而且这一页不连 socket 也能走（和「返回展示页」同一条理由）。
+                 ⚠️ 图标用 `info`（一个圈里的 i）—— 左导航那几项已经有 eye/music/
+                    gear/箭头，这里要的是"说明"而不是"又一个功能"。 -->
+            <a class="qk" href="about.html">
+              <span class="dash-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 11v5.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7.7" r="1.15" fill="currentColor"/></svg></span>
+              <span class="qk-txt"><b>帮助 &amp; 关于</b><span>项目简介 / 技术原理 / 创新亮点</span></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+          </div>
+        </section>
+
+        <!-- ---------- 行驶数据 ----------
+             ⚠️ 三个数**全是「未接入」**，图**只有坐标轴没有曲线**。
+                参考图 首页.png 那张卡里有具体的数（1.2h / 48km/h / 24.6km）
+                和一条曲线 —— **那是画的**。本项目没有车辆总线这一路，
+                照抄就是编数据（口径见上面 `.ntiles` 那段注释）。
+                坐标轴留着：它是这张图将来要接的量纲（0~100 / 00:00~24:00），
+                不是"测到了但很小"。
+             ★ 2026-09-25 加了 `dash-data`：这一页的卡是**定高**的（栅格给的行高），
+                而图是按 `width:100%` + viewBox 比例算高的 —— 卡一宽（那天删掉
+                系统公告、下行从三列变两列）图就跟着长，实测把卡顶破 80px、
+                整页多出 63px 滚动。`dash-data` 把这张卡变成列向 flex，让**图吃掉
+                剩下的高度**（见 pages.css 那条），图再也不会撑破卡。 -->
+        <section class="card card-pad dash-data">
+          <div class="card-h">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h3l2-6 3 12 3-9 2.4 5.4L17 12h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>行驶数据</h3>
+            <span class="note">近 24 小时</span>
+          </div>
+          <div class="dnums">
+            <div class="dnum"><div class="k">今日时长</div><div class="v na">未接入</div></div>
+            <div class="dnum"><div class="k">平均车速</div><div class="v na">未接入</div></div>
+            <div class="dnum"><div class="k">行驶里程</div><div class="v na">未接入</div></div>
+          </div>
+          <svg class="dchart" viewBox="0 0 300 112" aria-hidden="true">
+            <line class="axis" x1="28" y1="86" x2="292" y2="86"/>
+            <line class="grid" x1="28" y1="47" x2="292" y2="47"/>
+            <line class="grid" x1="28" y1="8"  x2="292" y2="8"/>
+            <text class="lbl" x="23" y="89"  text-anchor="end">0</text>
+            <text class="lbl" x="23" y="50"  text-anchor="end">50</text>
+            <text class="lbl" x="23" y="11"  text-anchor="end">100</text>
+            <text class="lbl" x="28"  y="105" text-anchor="start">00:00</text>
+            <text class="lbl" x="94"  y="105" text-anchor="middle">06:00</text>
+            <text class="lbl" x="160" y="105" text-anchor="middle">12:00</text>
+            <text class="lbl" x="226" y="105" text-anchor="middle">18:00</text>
+            <text class="lbl" x="292" y="105" text-anchor="end">24:00</text>
+            <text class="na"  x="160" y="50" text-anchor="middle">车辆总线未接入 · 无历史数据</text>
+          </svg>
+        </section>
+
+        <!-- ★★ 2026-09-25：**这里原来有一张「系统公告」卡，整卡删了。**
+             用户看到的是评委视角的毛病，原话：
+               「现在里面写的是开发日志（内部调试记录：2026-09-23 支路二上线、
+                 小瑞形象替换……）！这个是内部开发笔记！绝对不能留在参赛演示页面！
+                 评委点开主页第一眼就会看到开发记录，非常扣分！」
+             删掉的那四条（都带日期、都是**改版史**的说法）：
+               疲劳判决并入二类 2026-09-24 / 支路二面部路上线 2026-09-23 /
+               小瑞形象整体替换 2026-09-23 / 车速与心率仍未接入 2026-09-22
+
+             ⚠️ 它当初是**故意**写成真事的（见旧注释：参考图上这里是"版本更新公告"，
+                形状照做、内容不编造）。问题不在真假，在**体裁** —— 那是"给下一个
+                改版的人看的记录"，不是"给评委看的产品"。演示页上是前者，就是
+                把自己的施工过程摊在展台上。用户给的另一个办法是改写成行车安全
+                提示（保留模块、换文本），他明确选了删。
+             ⚠️ 删的代价记在这儿，别当成漏项：这一页**再没有一处**"未接入"的集中
+                说明（车速/心率/总线那三条现在只在各自卡片上标「未接入」）；
+                也少了"更多 ›"这个入口（那本是同一张卡头右上角通往 detail.html 的
+                第二个口子；第一个口子是 `.dash-strip` 里那颗「驾驶监测」，还在）。
+             ⚠️ 跟着改的三处：`.dash-row2` 从三列改两列（pages.css，不改会空一格 =
+                右下角一个洞）、`.nv` 那组样式删掉（pages.css）、`_check_grade.py`
+                C 段那条"「低头看手机」只许出现在公告里"的例外**随之作废**
+                （那唯一一处合法出现就在第一条里），改成"首页一处都不许有"。 -->
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

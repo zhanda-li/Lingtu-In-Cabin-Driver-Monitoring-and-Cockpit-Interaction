@@ -1,0 +1,35 @@
+# ---------------------------------------------------------------------------
+# 语音输入（可选）—— 本地 whisper 兜底那一路要的依赖
+#
+# ⚠️ 这一份**故意不并进仓库根目录的 requirements.txt**，两条理由：
+#   1. 那四个包是**演示前彩排就装好**的东西，不是"克隆下来跑一遍"要的东西。
+#      根目录那份的语义是"照它装完，README 的流程能跑通"，语音输入不在那条流程里
+#      （它是个可选功能，不装界面照常能用，只是麦克风那条路只有浏览器一半）。
+#   2. 🔴 **它有把环境弄坏的能力**（见下），所以它必须是一份需要人**主动**去装的
+#      清单，不能藏在主清单里顺手装上。
+#
+# 装法**不是** `pip install -r`，是双击 ui\install_asr.bat。那个 bat 走的是
+# `--no-deps` + 逐包手装 + 把 numpy 钉死在当前版本，下面三行是它的理由：
+#
+#   openai-whisper 依赖 numba → llvmlite，而 llvmlite 对 numpy 有**上界约束**。
+#   本机是 numpy 2.2.6 + torch 2.14 + mediapipe，而 **mediapipe 对 numpy 版本很挑**。
+#   一旦 pip 顺手把 numpy 挪走，坏的**不是语音输入，是 cam 模式直接打不开** ——
+#   一个可选功能装出一个致命故障。所以 install_asr.bat 会：
+#     · whisper 用 --no-deps 装（不让 pip 顺着依赖树去动 numpy）
+#     · 下面这四个包**显式列出来**手装
+#     · 加一个 constraint 把 numpy 钉在装之前那个版本上
+#   钉住之后，万一哪个包真的非要换 numpy，pip 会**当场报冲突**（装不上），
+#   而不是悄悄换掉、等到彩排时才发现摄像头黑屏。**宁可装不上，不可悄悄坏。**
+#
+# 四个包里只有 numba 有风险（它才是那个拉 llvmlite 的）；tiktoken 是个纯
+# Rust 编的 wheel，more-itertools / tqdm 是纯 python。
+#
+# 附：whisper 的 setup.py 里其实还写了 triton，但**只在 Linux x86_64 上生效**，
+# Windows 这条不装（装了也没用）。它也没要 ffmpeg-python —— 这个项目绕开 ffmpeg
+# 靠的是"不把字符串交给 load_audio"，跟 pip 包无关，见 ui/asr.py 文件头。
+# ---------------------------------------------------------------------------
+
+tiktoken
+more-itertools
+tqdm
+numba

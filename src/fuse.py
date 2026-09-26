@@ -59,8 +59,10 @@ yawn/talking/yawn_open 从不进 LR，所以 `yawn` 那一列在 96 段训练片
 那是支路二唯一验不了、只能靠真人的一条（离线片段全都短于 HIST_SEC，
 见 `runs/fuse_replay_full.txt` 的自述）。
 
-⚠️ 闸门一关 `fb.clear()`，支路二 27 秒热身**全部清零**。所以 L4 会话里
-扭头/低头一次就把前面的热身作废了 —— 现场按 `live_fuse.bat` 打印的分段来。
+★ **2026-09-26 起闸门不再清缓冲**（原来这里写着"闸门一关 `fb.clear()`，支路二
+27 秒热身全部清零"）。现在的规则是：**一直采集，闸门只决定投不投票**。所以
+L4 会话里扭头/低头一次**不再**作废前面的热身 —— 倒计时要按墙上时钟读，
+不要再按"上一次闸门关闭"去数。
 
 ⚠️ `--no-face` 不是调试开关而是**回归工具**：它把支路二整条路摘掉，
 此时本脚本应当与 `src/live.py` 逐帧一致。L2 回归就靠它证明"支路一没被改坏"。
@@ -86,9 +88,10 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 import config as C
-from face import (BLINK_THR, FEATURE_NAMES, HIST_SEC, ROLL_WIN, WIN_SEC,
-                  YAWN_MIN, YAWN_THR, FaceBranch, FaceExtractor,
-                  feature_vector, yawn_seconds)
+from face import (BLINK_THR, CLOSE_EYE_SEC, FEATURE_NAMES, HEAD_DEG, HEAD_WIN,
+                  HIST_SEC, ROLL_WIN, WIN_SEC, YAWN_MIN, YAWN_THR, FaceBranch,
+                  FaceExtractor, HeadMotion, close_eye_seconds, feature_vector,
+                  norm_by_time, yawn_seconds)
 from live import (CLASS_LEVEL, DECIDE_HZ, EMA_ALPHA, ENTER_SEC, ENTER_TH,
                   EXIT_SEC, EXIT_TH, LEVEL_BLINK, LEVEL_CN, LEVEL_COLOR,
                   LEVEL_NOTE, SPEAK_FROM, VOICE_COOLDOWN, CameraSource,
@@ -128,10 +131,61 @@ YAWN_ACTION = "level"    # "level" = 抬到 L1（标定成功，tools/calib_yawn
 # 仍然受同一个 VOICE_COOLDOWN 约束：哈欠保持 5 s、冷却 6 s，一次哈欠最多念一句。
 SPEAK_FROM_YAWN = 1
 
+# ── 持续闭眼 / 低头点头：两条**规则**，都不进逻辑回归 ────────────────
+# 2026-09-26 用户拍板加的，起因是同一句话的两个方向：
+#   「支路二 在我低一点头的时候应该也可以看见我的眼啊 这些都要一直采集着啊
+#     我打开摄像头就应该开始采集了啊而不是等十几秒」
+#   「点头低头 为啥有时候不报 还报我健康」「只要我低头就应该报」
+#
+# 结构上的原因：`l2` 要等 `fb.full()`（27 秒）才有值，而**支路一只会给 L0 或 L3**
+# （`live.CLASS_LEVEL = {normal: 0, fatigue: 3}`）—— 于是开机后那 27 秒里屏幕上
+# 只可能是「清醒」或「重度」，中间两档**结构上到不了**。规则就是补这一段的：
+#   · 闭眼规则：最早第 ROLL_WIN + 一点 ≈ 11 秒响（基线要 10 秒，这段不能省 —— 见
+#     `face.CLOSE_EYE_SEC` 的注释；拆掉 ROLL_WIN 会让 p75 被闭眼自己拽塌）
+#   · 低头规则：**不需要基线**，`HEAD_WIN`(2 秒) 就能响 —— 量过最早 1.8 秒
+#
+# ⚠️ 两条都**不看闸门**：闸门是"支路一是否判非正常"，而闭合眼/低头**恰恰会**让它
+#   关上 —— 挂在闸门上等于让规则在被触发的那一刻失效。哈欠规则当初就是这个道理
+#   （见下面哈欠规则那段的注释）。
+EYE_HOLD = 3.0           # 闭眼是持续状态，抬级后保持几秒
+EYE_LEVEL = 2            # 抬到 L2 —— 正好是 B2_MAX_LEVEL，不越支路二自己的顶
+HEAD_HOLD = 0.0          # ★ **0 = 不锁存**（2026-09-26 第四次，用户原话「不要锁存」）。
+                         #   判据怎么判就怎么报：`head_swing >= HEAD_DEG` 那一拍抬到 L3，
+                         #   下一拍掉回 10° 以下就**当场摘掉**，不再"再保持 N 秒"。
+                         #   ★ 为什么可以不要它：锁存当初是为了"别闪"，可判据自己**已经**
+                         #     带 2 秒记忆（`HEAD_WIN` 的 p95）—— 回正后它自己要走 ≈2 秒
+                         #     才落下来。那 2 秒就是自然拖尾，锁存叠在上面**全是多报**。
+                         #     实测这 5 秒有多贵（`runs/session9.csv`，真人一场）：
+                         #       低头1 回平视 t=16.57 → 判据 t≈16.2 已 < 10（松了），
+                         #             屏幕上的 L3 却挂到 t=21.85 —— **多报 5.3 秒**；
+                         #       低头2 回平视 t=44.54 → 挂到 t=47.68 —— **多报 3.1 秒**。
+                         #     用户第二次报延迟的原话就是「我低头回正后还有很长一段时间
+                         #     报重度疲劳」—— 这一条是它的**主因**，不是支路二。
+                         #   ⚠️ 只把这个数写成 0.0、**不动下面那段代码，是个陷阱**：
+                         #     `head_until = mt + 0` 之后 `mt < head_until` **恒为假**，
+                         #     规则会**整条哑掉**（不是"变快"，是再也不报）。所以
+                         #     `:739` 那段里 `head_hold <= 0` 走的是**另一条支**（纯跟随）。
+                         #     改这个数之前先读那段。
+                         #   ⚠️ 上游还有一条，同一天一起修的：判据自己**不能**在持续
+                         #     低头里松掉（`face.head_ref` 的短窗项被低头拖动）。锁存
+                         #     去了之后，"判据自己撑得住"就成了唯一的防线 —— 两条
+                         #     是一件事的两半，别只改一条。
+                         #   ⚠️ 没锁存了，`l_head` 会跟着 `h_swing` 在阈值附近抖。
+                         #     这是**有意的**：屏幕上那个级别的抖动由下游
+                         #     `WarningState`(ENTER_SEC/EXIT_SEC) 兜住，而"多报 5 秒"
+                         #     是它兜不住的。
+HEAD_LEVEL = 3           # ★ **故意**给出 B2_MAX_LEVEL 以上的级别，理由：
+#   `B2_MAX_LEVEL` 封的是**支路二的逻辑回归**（只有两类标注、证据弱，不该单独顶格）；
+#   而低头/点头是用户点名的重度征兆（「重度疲劳就是点头 低头 头部倾倒这些」），
+#   并且他明确要求「12° 就报」「报警」。这是**产品口径**，不是模型的能力上限。
+#   闭眼只给 L2、低头给 L3，差别就在这里 —— 不是随手定的。
+
 # 语音**按来源分文案**。live.LEVEL_NOTE[2] 是"检测到持续低头看手机" ——
 # 级别若是支路二抬上来的（持续闭眼），念那句就是错的。
 NOTE_FACE = {1: "检测到持续闭眼", 2: "检测到持续闭眼，疲劳征兆"}
 NOTE_YAWN = {1: "检测到打哈欠"}
+# 低头/点头规则（见下面 EYE_*/HEAD_* 那段）。只在 L3 出声 —— 它是重度征兆。
+NOTE_HEAD = {3: "检测到持续低头，请注意"}
 
 
 class ScalarState:
@@ -343,6 +397,18 @@ def main():
                     default=YAWN_ACTION,
                     help=f"哈欠标定成功则 level（抬到 L1），否则 display（只显示）")
     ap.add_argument("--yawn-hold", type=float, default=YAWN_HOLD)
+    # 两条规则的开头（见上面 EYE_*/HEAD_* 那段）。全开成开关的理由和哈欠一样：
+    # 阈值是在录制数据上标定的，真人身上要不要更松/更紧只能现场调。
+    ap.add_argument("--eye-sec", type=float, default=CLOSE_EYE_SEC,
+                    help=f"归一化 EAR 连续低于 {BLINK_THR:.2f} 多少秒算一次"
+                         f"持续闭眼（默认 {CLOSE_EYE_SEC}）")
+    ap.add_argument("--eye-hold", type=float, default=EYE_HOLD)
+    ap.add_argument("--eye-level", type=int, default=EYE_LEVEL)
+    ap.add_argument("--head-deg", type=float, default=HEAD_DEG,
+                    help=f"最近 {HEAD_WIN:.0f} 秒内头上下摆多少度算低头/点头"
+                         f"（默认 {HEAD_DEG} 度）")
+    ap.add_argument("--head-hold", type=float, default=HEAD_HOLD)
+    ap.add_argument("--head-level", type=int, default=HEAD_LEVEL)
     ap.add_argument("--selftest", default=None, metavar="CLIP",
                     help="只跑性能门禁然后退出")
 
@@ -401,6 +467,14 @@ def main():
                  if args.yawn_action == "level" else "只显示（不动级别）"))
     else:
         print("支路二已摘除（--no-face），应当逐帧复现 src/live.py")
+    # ★ 这两条**不依赖支路二的模型**（`--no-face` 时一条都不响：闭眼要 EAR、
+    #   低头要 pitch，两个都来自 FaceExtractor），所以印在 if/else 外面。
+    print(f"规则（都不看闸门）  持续闭眼 >={args.eye_sec:.1f} s -> L{args.eye_level}"
+          f" 保持 {args.eye_hold:.0f} s"
+          f"   |   头摆 >={args.head_deg:.0f}° / {HEAD_WIN:.0f} s -> "
+          f"L{args.head_level} "
+          + (f"保持 {args.head_hold:.0f} s" if args.head_hold > 0
+             else "**不锁存**（判据掉下来当场摘）"))
 
     norm = OnlineNormalizer()
     state = WarningState(hyst)
@@ -432,13 +506,22 @@ def main():
     if log_fp:
         log_fp.write("t," + ",".join(C.CLASSES)
                      + ",l1,gate,ema_normal,p_fat,l2,perclos,brate,nod,"
-                       "en_now,d_pitch,yawn_sec,l_fused,ear,mar,"
-                       # ⚠️ pitch 是**绝对**俯仰角，d_pitch 是窗内 p95−p5 极差
-                       #   （face.py 的 window_features）。两者不是一回事，也**不能
-                       #   互相换算**：极差回推不出绝对值。L4 判决的【0】自我否证
-                       #   要 r(en_norm, pitch)，【2】分层要"窗中位贴近中性姿态"，
-                       #   都只有绝对 pitch 才做得出（见 tools/analyze_fuse_l4.py）。
+                       "en_now,d_pitch,yawn_sec,eye_sec,head_swing,l_fused,src,"
+                       "ear,mar,"
+                       # ⚠️ pitch 是**绝对**俯仰角。另有**两个**从它派生的极差量，
+                       #   它们**不是**一回事，也不能互相换算（极差回推不出绝对值）：
+                       #     d_pitch    窗内(WIN_SEC=17 s) p95−p5，要 10 秒基线，
+                       #                且**拖尾**（半分钟前点过的头还拉着它）
+                       #     head_swing 最近 HEAD_WIN=2 s 的 p95−p5，**免基线**，
+                       #                开机 2 秒就有数 —— 低头规则的判据就是它
+                       #   L4 判决的【0】自我否证要 r(en_norm, pitch)，【2】分层要
+                       #   "窗中位贴近中性姿态"，都只有绝对 pitch 才做得出
+                       #   （见 tools/analyze_fuse_l4.py）。
                        # mark = 空格标记，验支路二"闭眼而头不动"时最硬的一条真相。
+                       # src = **是哪条来源把 l_fused 抬起来的**（pose/face/yawn/
+                       #   eye/head）。界面按它报「检测到持续闭眼 / 持续低头」，
+                       #   所以这个字符串是**判据的一部分**，不是调试字段 ——
+                       #   改了它，ui/state.py 的告警就跟着变（ui/ 里没有第二份阈值）。
                        "pitch,mark\n")
 
     last_lm = None
@@ -453,6 +536,7 @@ def main():
     n_decide = 0
     n_b2_up = 0
     n_yawn = 0
+    n_eye = n_head = 0
     infer_ms = collections.deque(maxlen=60)
     py_ms = collections.deque(maxlen=60)
     probs = np.full(len(C.CLASSES), 1.0 / len(C.CLASSES))
@@ -468,13 +552,23 @@ def main():
     en_hist = collections.deque(maxlen=600)
     spoken_at = {}
     yawn_until = -1.0
-    # ⚠️ 这两个必须在循环**之前**给初值：HUD 的预热分支现在也画 YAWN，
+    # ⚠️ 这几个必须在循环**之前**给初值：HUD 的预热分支现在也画 YAWN/EYE/HEAD，
     #   而 HUD 每帧都跑、决策块要等 `len(ring) == window` 才第一次赋值 ——
     #   不初始化的话第一拍之前引用就是 UnboundLocalError（改完第一次跑就崩了）。
     yawn_on = False
     yawn_sec = 0.0
+    # 两条新规则的状态（写法与 yawn 同款：一个 until 时间戳 + 一个布尔 + 一个量）
+    eye_until = -1.0
+    head_until = -1.0
+    eye_on = False
+    head_on = False
+    eye_sec = 0.0
+    h_swing = float("nan")
+    l_eye = l_head = 0
     src_of_level = "pose"
     why = ""
+    # ★ 头姿缓冲：**独立于 fb、永远不看闸门**（理由见 face.HeadMotion 的 docstring）
+    hm = HeadMotion()
 
     def should_speak(level, now, forced=False):
         """按级别冷却地决定要不要出声。
@@ -537,7 +631,7 @@ def main():
             #   差到第三位小数（t=10.600：离线 0.6614 / 在线 0.6226），
             #   而这段的 MAR 有 20/242 帧落在 0.60±0.02 里（其它段只有 4/227、
             #   4/186，talking 0/198），于是"这一段到底算不算一次连续张嘴"
-            #   在两次运行之间是**不稳定**的。两种结果都 ≥ YAWN_MIN=2.0，
+            #   在两次运行之间是**不稳定**的。两种结果都 ≥ YAWN_MIN=1.2，
             #   所以**判决是稳的，数字不是**（见 face.yawn_seconds 的注释）。
             #   丢帧这个改动仍然值得做，但它是另一件事，不是这个数字的原因。
             # 每帧先给 NaN：`--no-face` 时下面整段不执行，而日志要写这两列。
@@ -550,13 +644,21 @@ def main():
                 else:
                     n_face += 1
                     ear, mar, pitch = d["ear"], d["mar"], d["pitch"]
-                # ★ 闸门关闭时不写：扭头/低头期间 EAR 被头姿污染，
-                #   照写的话 17 秒的 PERCLOS 窗会带着污染帧，重开就误报。
-                if gate:
-                    # 没检到脸也塞 NaN（保持 perclos 分母完整，见 FaceBranch.push）
-                    fb.push(mt, ear, mar, pitch)
-                elif fb.n:
-                    fb.clear()
+                # ★ 一直采集，**不看闸门**（2026-09-26 改；原来是 `if gate: push
+                #   else: clear()`）。用户原话：「这些都要一直采集着啊 我打开摄像头
+                #   就应该开始采集了啊而不是等十几秒」。
+                #   原来那条的理由写在 `face.FaceBranch.clear()` 的 docstring 里，
+                #   属于中位归一化时代；p75 滚动基线之后头姿污染已被除法本身消掉
+                #   （实测 phone 18 段归一化后最长"闭眼"中位 0.20 s、EAR/MAR
+                #   有效率 100%），而代价是**低头这个动作本身就会关闸门** ——
+                #   于是缓冲和界面上那个倒计时每次低头都从零重攒，越像疲劳的人
+                #   越攒不满 27 秒。闸门的作用**只剩"投不投票"**（下面 l_face
+                #   仍然要求 `gate`），不再是"收不收集"。
+                # 没检到脸也塞 NaN（保持 perclos 分母完整，见 FaceBranch.push）
+                fb.push(mt, ear, mar, pitch)
+                # 头姿缓冲：同样不看闸门，而且它**必须**不看 —— 低头就是关闸门的
+                # 信号，挂在闸门上等于让低头规则在被触发的那一刻失效。
+                hm.push(mt, pitch)
 
             # ---- 15 Hz 节拍：到点就取"当前最新的一帧" ----
             if first:
@@ -622,26 +724,99 @@ def main():
                 #   而它的哈欠离线量是 4.40 s，A/B/C 三条路径完全一致
                 #   （_scratch/_yawn_e2e_probe.py）。这一条就是那么发现的。
                 yawn_sec = 0.0
+                eye_sec = 0.0
                 if fb.span >= YAWN_MIN + 0.5:
-                    _bt, _, _bm, _ = fb.arrays()
+                    # ★ 只取一次 arrays()，两条规则共用（每拍一次 np.array(deque)）
+                    _bt, _be, _bm, _ = fb.arrays()
                     yawn_sec = float(yawn_seconds(_bt, _bm))
+                    # ---- 持续闭眼规则 ----
+                    # ★ **不挂在 ROLL_WIN(10 s) 上**。基线（p75）从第一帧起就用
+                    #   "现有的历史"算（`norm_by_time` 的窗是 [j, i]，只看过去），
+                    #   量过代价：取 N=1.0 s 时正常 27 段在**前 10 秒内**触发 0 段、
+                    #   说话 0/5，而疲劳 21 段里有 **16 段在前 10 秒内**就抓到、
+                    #   最早 1.8 秒（`_calib_closeeye.py` + 2026-09-26 那次补测）。
+                    #   所以这里只要求"缓冲里有两个量级以上的样本"，不等热身 ——
+                    #   用户原话「我打开摄像头就应该开始采集了啊而不是等十几秒」。
+                    #   ⚠️ 唯一不能省的是**基线长度** ROLL_WIN：窗短于 10 秒时 p75
+                    #     会被闭眼自己拽塌、`ear/基线` 恒为 1（见 norm_by_time）。
+                    #     这里没有省它 —— 省的是"等 10 秒才允许判"。
+                    if fb.span >= CLOSE_EYE_SEC + 1.0:
+                        _en = _be / np.maximum(
+                            norm_by_time(_bt, _be, ROLL_WIN), 1e-6)
+                        eye_sec = float(close_eye_seconds(_bt, _en))
                 if yawn_sec >= YAWN_MIN:
                     if mt >= yawn_until:            # 新的一次哈欠（不是同一次保持）
                         n_yawn += 1
                     yawn_until = mt + args.yawn_hold
                 yawn_on = mt < yawn_until
+                if eye_sec >= args.eye_sec:
+                    if mt >= eye_until:
+                        n_eye += 1
+                    eye_until = mt + args.eye_hold
+                eye_on = mt < eye_until
+
+                # ---- 低头/点头规则（免基线，开机 HEAD_WIN=2 秒就能判）----
+                # 判据 = 最近 HEAD_WIN 秒 pitch 的 p95−p5 >= HEAD_DEG。标定见
+                # `face.HEAD_DEG` 的注释（正常 2/27 误报是用户选"最敏感"那档的代价）。
+                # ⚠️ 读 `hm`（独立缓冲）**不是** `fb`：低头会让闸门关上，而 `fb` 的
+                #   语义正被闸门管着；`hm` 永远收、永远不清。
+                # ⚠️ 也不读 `st["d_pitch"]`：那个要 10 秒基线、窗 17 秒且拖尾。
+                h_swing = hm.swing()
+                hit = bool(np.isfinite(h_swing) and h_swing >= args.head_deg)
+                if args.head_hold <= 0.0:
+                    # ★ **不锁存**（默认，`HEAD_HOLD = 0.0`；理由和实测数字见那个常数的
+                    #   注释）。判据这一拍成立就抬、这一拍不成立就摘 —— 纯跟随。
+                    #   ⚠️ 这里**必须**是单独一条支，不能靠"把 head_hold 设成 0"：
+                    #     那条路算出来是 `mt < mt` 恒假，规则整条哑掉。
+                    #   ⚠️ `n_head` 改数**上升沿**：不锁存时每一拍都成立，按老写法
+                    #     （`mt >= head_until`）持续低头会被数成每拍一次，而这个数
+                    #     要打到屏幕上（`:989` 的收尾汇总）。
+                    if hit and not head_on:
+                        n_head += 1
+                    head_on = hit
+                else:
+                    # `--head-hold N`（N>0）= 老口径，抬到 L3 后再保持 N 秒。
+                    # ★ 保留它是为了能**A/B**：`--head-hold 5` 逐拍复现 2026-09-26
+                    #   之前的行为。两条支对 N>0 是逐字等价的（下面这几行原来就在这儿）。
+                    if hit and mt >= head_until:
+                        n_head += 1
+                    if hit:
+                        head_until = mt + args.head_hold
+                    head_on = mt < head_until
 
                 # ---- 融合 ----
                 l_face = min(l2, B2_MAX_LEVEL) if (face is not None and gate) else 0
                 l_base = max(l1, l_face)
-                l_fused = max(l_base, (1 if (yawn_on and args.yawn_action == "level")
-                                       else 0))
-                if l_face > l1:
-                    src_of_level = "face"
-                elif yawn_on and 1 > l_base and args.yawn_action == "level":
+                l_yawn = 1 if (yawn_on and args.yawn_action == "level") else 0
+                l_eye = args.eye_level if eye_on else 0
+                l_head = args.head_level if head_on else 0
+                # ★ 四条来源取最大。**平局时 `max()` 返回列表里靠前的那个**，
+                #   所以这个顺序就是优先级：**规则赢基线**（低头 > 闭眼 > 哈欠 > 基线票）。
+                # ⚠️ 平局只决定"念哪一句原因"，**级别一模一样** —— `l_fused` 在
+                #   任何平局下都等于那个相等的值，改顺序不会让级别动一下。
+                #   之所以让规则赢：用户要的就是"为什么报"这句话。低头时支路一
+                #   往往**也**给 L3（它本来就判低头），若平局判给基线，屏上就永远
+                #   看不到「检测到持续低头」，而那正是他点名要的那条（演示里
+                #   `l1=3` 与 `l_head=3` 同时成立，就是这么被吞掉的）。
+                # ⚠️ 与 2026-09-26 之前的唯一差别：`yawn_on` 且 `l_base == 1` 时，
+                #   `src` 从 "pose" 变成 "yawn"、语音改念「检测到打哈欠」（旧式子是
+                #   `yawn_on and 1 > l_base`，平局判给基线）。级别不变，界面告警也
+                #   不变（那条走 `yawn_sec` 列，与 `src` 无关）。
+                # ⚠️ **别把这四行写成一个 `max((元组), key=…)`。** 我第一版就是那么
+                #   写的，全零那一拍 `max` 返回列表**第一个** → `src="head"`，
+                #   于是级别 0 却在屏上报「检测到持续低头」（演示 t=0 就复现了）。
+                #   平局规则只在**有级别**时才该生效，所以 `l_fused <= 0` 单独一支。
+                l_fused = max(l_base, l_yawn, l_eye, l_head)
+                if l_fused <= 0:
+                    src_of_level = "pose"
+                elif l_head == l_fused:
+                    src_of_level = "head"
+                elif l_eye == l_fused:
+                    src_of_level = "eye"
+                elif l_yawn == l_fused:
                     src_of_level = "yawn"
                 else:
-                    src_of_level = "pose"
+                    src_of_level = "face" if l_face > l1 else "pose"
 
                 light.set_level(l_fused, mt)
                 if log_fp:
@@ -656,7 +831,11 @@ def main():
                     cols += [_cell(st[k]) if st else "-" for k in FEATURE_NAMES]
                     cols += [_cell(st["en_now"]) if st else "-",
                              _cell(st["d_pitch"], "{:.2f}") if st else "-",
-                             f"{yawn_sec:.2f}", str(l_fused),
+                             f"{yawn_sec:.2f}", f"{eye_sec:.2f}",
+                             _cell(h_swing, "{:.2f}"), str(l_fused),
+                             # `src` 是判据的一部分（界面按它报哪条规则响的），
+                             # 不是调试字段 —— 见上面表头那段。
+                             str(src_of_level),
                              # 原始两路也写下来：L4 现场事后复盘时，"哈欠/闭眼
                              # 到底有没有被采到"只能靠这两列回答（阈值判据都是
                              # 从它们算的）。_scratch/live_face.py 一直这么做。
@@ -676,7 +855,9 @@ def main():
                                 f"L2={l2}"
                                 + (f" P={p_fat:.2f}" if np.isfinite(p_fat) else " P=  -")
                                 + (f" pc={st['perclos']:.2f}" if st else " pc= -")
-                                + (" YAWN" if yawn_on else ""))
+                                + (" YAWN" if yawn_on else "")
+                                + (f" EYE={eye_sec:.1f}s" if eye_on else "")
+                                + (f" HEAD={h_swing:.0f}°" if head_on else ""))
                     print(f"  [{mt:6.1f}s] L{l_fused} {LEVEL_CN[l_fused]:<2}"
                           f" <{src_of_level[:4]:<4}> "
                           + " ".join(f"{c[:3]}={probs[k]:.2f}"
@@ -689,8 +870,19 @@ def main():
                         why = NOTE_FACE.get(l_fused, LEVEL_NOTE[l_fused])
                     elif src_of_level == "yawn":
                         why = NOTE_YAWN.get(l_fused, "")
+                    elif src_of_level == "head":
+                        # 低头/点头是产品口径里的重度征兆，文案自己一份 ——
+                        # `LEVEL_NOTE[3]` 是"检测到头部持续低垂/倾倒"，用在这是对的，
+                        # 但用户要的是"就报"，所以给一句更直接的。
+                        why = NOTE_HEAD.get(l_fused, LEVEL_NOTE[l_fused])
+                    elif src_of_level == "eye":
+                        # 复用支路二那条闭眼文案（`NOTE_FACE`），不另起一句：
+                        # 同一次闭眼不该因为"是规则发现的"就换一种说法。
+                        why = NOTE_FACE.get(l_fused, LEVEL_NOTE[l_fused])
                     else:
                         why = LEVEL_NOTE[l_fused] or LEVEL_CN[l_fused]
+                # 只有哈欠强制出声（它保持 5 s、冷却 6 s，不会被重复刷）；
+                # 低头/闭眼是**持续**状态，强制出声会每拍都念一遍 —— 不强制。
                 if should_speak(l_fused, mt, forced=(src_of_level == "yawn")):
                     if not args.quiet:
                         print(f"  [{mt:6.1f}s] >>> 语音({src_of_level})：{why}")
@@ -723,13 +915,20 @@ def main():
 
             if face is not None:
                 if st is None:
-                    # 热身期间也要显示哈欠 —— 规则只要 2.5 秒缓冲就能判，
-                    # 比这张表上的其它量都早（LR 的概率要等 full()）。
+                    # 热身期间也要显示**三条规则** —— 它们比这张表上的其它量都早
+                    # （LR 的概率要等 full()=27 s）：哈欠 2.5 s 缓冲就能判、低头只要
+                    # HEAD_WIN=2 s、闭眼要 CLOSE_EYE_SEC+1 s。★ 2026-09-26 起这个
+                    # `fb.warm_left()` 是**从开机起单调往下数**的：闸门不再清缓冲，
+                    # 所以低头一次不会让它跳回去（原来是"低头一次就重头数"）。
                     fl = [(f"BRANCH 2   WARMING {fb.warm_left():4.1f}s", (150, 150, 150)),
                           (f"gate {'OPEN' if gate else 'closed'}", (90, 240, 90)
                            if gate else (120, 120, 255)),
                           (f"YAWN      " + (f"YES {yawn_sec:4.1f}s" if yawn_on else "  -"),
-                           (0, 120, 255) if yawn_on else (150, 150, 150))]
+                           (0, 120, 255) if yawn_on else (150, 150, 150)),
+                          (f"EYE  {eye_sec:4.1f}s thr {args.eye_sec:.1f}",
+                           (0, 160, 255) if eye_on else (150, 150, 150)),
+                          (f"HEAD {h_swing:5.1f}° thr {args.head_deg:.0f}",
+                           (255, 120, 0) if head_on else (150, 150, 150))]
                 else:
                     pm = float(np.median(py_ms)) if py_ms else 0.0
                     fl = [
@@ -741,11 +940,19 @@ def main():
                         (f"PERCLOS   {st['perclos']:6.3f}", (0, 220, 255)),
                         (f"BLINK/min {st['brate']:6.1f}   NOD {st['nod']:5.1f}",
                          (0, 220, 255)),
-                        (f"dPITCH    {st['d_pitch']:6.1f} deg  <-- control",
+                        (f"dPITCH    {st['d_pitch']:6.1f} deg  (17 s, 要基线)",
                          (90, 240, 90)),
+                        # ⚠️ 上面 d_pitch 是 17 秒窗、要基线、拖尾；下面是 2 秒窗、
+                        #   免基线 —— 两个数**不一样**，低头规则用的是下面这个。
+                        (f"SWING     {h_swing:6.1f} deg  (2 s, 免基线)",
+                         (255, 120, 0) if head_on else (90, 240, 90)),
                         (f"YAWN      " + (f"YES" if yawn_on else "  -")
                          + (f"  L2={l2}" if l2 else ""),
                          (0, 120, 255) if yawn_on else (150, 150, 150)),
+                        (f"EYE       " + (f"YES {eye_sec:4.1f}s" if eye_on else "  -"),
+                         (0, 160, 255) if eye_on else (150, 150, 150)),
+                        (f"HEAD      " + (f"YES {h_swing:4.1f}°" if head_on else "  -"),
+                         (255, 120, 0) if head_on else (150, 150, 150)),
                         (f"P(fat)    {p_fat:6.3f}" if np.isfinite(p_fat)
                          else "P(fat)        -", (255, 200, 90)),
                         (f"-> L{l_fused}  <{src_of_level}>  ({pm:.1f} ms)",
@@ -799,6 +1006,7 @@ def main():
         print(f"支路二  检到脸 {n_face} / 丢失 {n_face_lost}"
               f"（{100 * n_face / max(1, n_face + n_face_lost):.1f}%）   "
               f"闸门开 {n_gate_open}/{n_decide}"
+              f"  闭眼 {n_eye}  低头 {n_head}"
               f"（{100 * n_gate_open / max(1, n_decide):.0f}%）")
         print(f"        抬级 {n_b2_up} 次   哈欠 {n_yawn} 次   "
               f"推理 {float(np.median(py_ms)) if py_ms else 0:.2f} ms")

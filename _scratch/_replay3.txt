@@ -1,0 +1,260 @@
+D:\sdk_env_v1.12.1\dms_project\src\model.py:38: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.norm_first was True
+  self.encoder = nn.TransformerEncoder(
+模型 runs\fatigue3\best.pt  参数 161,923
+每字符 ≈ 8 帧 ≈ 0.53 s   图例 . 无输出 / n normal / p phone / f fatigue
+
+normal   normal_00      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.752
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_01      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.678
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_02      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.785
+         nnnnnnnnnnnnnnnnnnn
+normal   normal_03      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.799
+         nnnnnnnnnnnnnnnnnnnnn
+normal   normal_04      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.796
+         nnnnnnnnnnnnnnnnnnnn
+normal   normal_05      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.770
+         nnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_06      [test ] 正确率 100.0%  合并 100.0%  P(normal)=0.799
+         nnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_07      [val  ] 正确率 100.0%  合并 100.0%  P(normal)=0.795
+         nnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_08      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.804
+         nnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_09      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.770
+         nnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_10      [val  ] 正确率 100.0%  合并 100.0%  P(normal)=0.771
+         nnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_11      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.749
+         nnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_12      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.764
+         nnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_13      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.770
+         nnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_14      [test ] 正确率  82.0%  合并  82.0%  P(normal)=0.661
+         ffffnnnnnnnnnnnnnnnnnnnn
+normal   normal_15      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.757
+         nnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_16      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.790
+         nnnnnnnnnnnnn
+normal   normal_17      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.792
+         nnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_18      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.788
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_19      [test ] 正确率 100.0%  合并 100.0%  P(normal)=0.785
+         nnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_20      [val  ] 正确率 100.0%  合并 100.0%  P(normal)=0.789
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_21      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.801
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_22      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.749
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_23      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.796
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_24      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.803
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_25      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.794
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+normal   normal_26      [train] 正确率 100.0%  合并 100.0%  P(normal)=0.780
+         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+phone    phone_00       [train] 正确率  95.6%  合并 100.0%  P(phone)=0.506  P(fatigue)=0.435
+         fpppppppppppppppp
+phone    phone_01       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.762  P(fatigue)=0.114
+         ppppppppppppppppppppppppppp
+phone    phone_02       [train] 正确率  86.1%  合并 100.0%  P(phone)=0.633  P(fatigue)=0.302
+         ppppppppppppfff
+phone    phone_03       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.768  P(fatigue)=0.132
+         pppppppppppppp
+phone    phone_04       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.763  P(fatigue)=0.152
+         pppppppppppppppppppppppppppp
+phone    phone_05       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.754  P(fatigue)=0.158
+         pppppppppppppppppppppppppp
+phone    phone_06       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.772  P(fatigue)=0.126
+         ppppppppppppppppppppppppppppppppppppp
+phone    phone_07       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.748  P(fatigue)=0.096
+         ppppppppppppppppppppppppppppp
+phone    phone_08       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.773  P(fatigue)=0.109
+         pppppppppppppppppppppppppppp
+phone    phone_09       [val  ] 正确率 100.0%  合并 100.0%  P(phone)=0.774  P(fatigue)=0.107
+         ppppppppppppppppppppppppppppppppp
+phone    phone_10       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.776  P(fatigue)=0.110
+         ppppppppppppppppppppppppppppppp
+phone    phone_11       [test ] 正确率 100.0%  合并 100.0%  P(phone)=0.770  P(fatigue)=0.123
+         ppppppppppppppppppppppppp
+phone    phone_12       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.771  P(fatigue)=0.104
+         ppppppppppppppppppppppppppppppppppp
+phone    phone_13       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.767  P(fatigue)=0.135
+         pppppppppppppppppppppppp
+phone    phone_14       [val  ] 正确率 100.0%  合并 100.0%  P(phone)=0.742  P(fatigue)=0.133
+         pppppppppppppppppppppppp
+phone    phone_15       [val  ] 正确率   0.0%  合并 100.0%  P(phone)=0.190  P(fatigue)=0.731
+         fffffffffffffff
+phone    phone_16       [test ] 正确率  41.6%  合并 100.0%  P(phone)=0.468  P(fatigue)=0.463
+         pffffffffffffffffffppppppppppppp
+phone    phone_17       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.748  P(fatigue)=0.098
+         pppppppppppppppppppppppppppppppppppp
+phone    phone_18       [train] 正确率  89.9%  合并 100.0%  P(phone)=0.645  P(fatigue)=0.289
+         ffffppppppppppppppppppppppppppppppppppppp
+phone    phone_19       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.671  P(fatigue)=0.258
+         ppppppppppppppppppppppppppppppppppppppppp
+phone    phone_20       [train] 正确率   0.0%  合并 100.0%  P(phone)=0.175  P(fatigue)=0.741
+         fffffffffffffffffffffffffff
+phone    phone_21       [train] 正确率  86.6%  合并 100.0%  P(phone)=0.570  P(fatigue)=0.369
+         ffffppppppppppppppppppppppppp
+phone    phone_22       [train] 正确率  19.6%  合并 100.0%  P(phone)=0.432  P(fatigue)=0.509
+         ffffffppppppppffffffffffffffffffffff
+phone    phone_23       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.762  P(fatigue)=0.149
+         ppppppppppppppppppppppppp
+phone    phone_24       [test ] 正确率   0.0%  合并 100.0%  P(phone)=0.087  P(fatigue)=0.723
+         fffffffffffffffffffffffff
+phone    phone_25       [train] 正确率 100.0%  合并 100.0%  P(phone)=0.727  P(fatigue)=0.199
+         ppppppppppppppppppppppppppppp
+fatigue  fatigue_00     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.735  P(phone)=0.109
+         ffffffffffffffffffffffffffffffff
+fatigue  fatigue_01     [test ] 正确率 100.0%  合并 100.0%  P(fatigue)=0.758  P(phone)=0.143
+         fffffffffffffffffffffffff
+fatigue  fatigue_02     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.751  P(phone)=0.103
+         fffffffffffffffffffffffffffff
+fatigue  fatigue_03     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.760  P(phone)=0.112
+         ffffffffffffffffffffffffffffff
+fatigue  fatigue_04     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.747  P(phone)=0.108
+         ffffffffffffffffffffffffffff
+fatigue  fatigue_05     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.734  P(phone)=0.176
+         ffffffffffffffffffffffffffff
+fatigue  fatigue_06     [val  ] 正确率  36.2%  合并 100.0%  P(fatigue)=0.348  P(phone)=0.544
+         ppppffffppppppppppffffppp
+fatigue  fatigue_07     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.740  P(phone)=0.100
+         ffffffffffffffffffffffff
+fatigue  fatigue_08     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.744  P(phone)=0.164
+         ffffffffffffffffffffffff
+fatigue  fatigue_09     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.738  P(phone)=0.127
+         fffffffffffffffffffffffff
+fatigue  fatigue_10     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.727  P(phone)=0.197
+         fffffffffffffffffffffffff
+fatigue  fatigue_11     [val  ] 正确率  85.2%  合并  85.2%  P(fatigue)=0.672  P(phone)=0.140
+         ffffffffffffffffffffnnnnfff
+fatigue  fatigue_12     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.736  P(phone)=0.115
+         ffffffffffffffffffffffff
+fatigue  fatigue_13     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.740  P(phone)=0.098
+         ffffffffffffffffffffffffff
+fatigue  fatigue_14     [val  ] 正确率 100.0%  合并 100.0%  P(fatigue)=0.746  P(phone)=0.095
+         ffffffffffffffffffffffffff
+fatigue  fatigue_15     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.708  P(phone)=0.103
+         ffffffffffffffffffffffff
+fatigue  fatigue_16     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.729  P(phone)=0.189
+         ffffffffffffffffffffffffffffffff
+fatigue  fatigue_17     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.731  P(phone)=0.172
+         ffffffffffffffffffffffffffffffffffff
+fatigue  fatigue_18     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.728  P(phone)=0.176
+         ffffffffffffffffffffffffffffffffffff
+fatigue  fatigue_19     [test ] 正确率 100.0%  合并 100.0%  P(fatigue)=0.734  P(phone)=0.171
+         fffffffffffffffffffffffffffffffffff
+fatigue  fatigue_20     [test ] 正确率 100.0%  合并 100.0%  P(fatigue)=0.728  P(phone)=0.183
+         fffffffffffffffffffffffffffffffffffffff
+fatigue  fatigue_21     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.690  P(phone)=0.228
+         fffffffffffffffffffffffffffff
+fatigue  fatigue_22     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.708  P(phone)=0.212
+         fffffffffffffffffffffffffffffffffff
+fatigue  fatigue_23     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.725  P(phone)=0.187
+         fffffffffffffffffffffffffffffffff
+fatigue  fatigue_24     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.682  P(phone)=0.234
+         fffffffffffffffffffffffffffffffffffff
+fatigue  fatigue_25     [train] 正确率 100.0%  合并 100.0%  P(fatigue)=0.697  P(phone)=0.114
+         fffffffffffffffffffffffffffffffff
+
+==============================================================================
+类别      片段              划分           正确率        众数    P(真值)     P(易混类)
+normal  normal_00       train     100.0%    normal    0.752          -
+normal  normal_01       train     100.0%    normal    0.678          -
+normal  normal_02       train     100.0%    normal    0.785          -
+normal  normal_03       train     100.0%    normal    0.799          -
+normal  normal_04       train     100.0%    normal    0.796          -
+normal  normal_05       train     100.0%    normal    0.770          -
+normal  normal_06       test      100.0%    normal    0.799          -
+normal  normal_07       val       100.0%    normal    0.795          -
+normal  normal_08       train     100.0%    normal    0.804          -
+normal  normal_09       train     100.0%    normal    0.770          -
+normal  normal_10       val       100.0%    normal    0.771          -
+normal  normal_11       train     100.0%    normal    0.749          -
+normal  normal_12       train     100.0%    normal    0.764          -
+normal  normal_13       train     100.0%    normal    0.770          -
+normal  normal_14       test       82.0%    normal    0.661          -
+normal  normal_15       train     100.0%    normal    0.757          -
+normal  normal_16       train     100.0%    normal    0.790          -
+normal  normal_17       train     100.0%    normal    0.792          -
+normal  normal_18       train     100.0%    normal    0.788          -
+normal  normal_19       test      100.0%    normal    0.785          -
+normal  normal_20       val       100.0%    normal    0.789          -
+normal  normal_21       train     100.0%    normal    0.801          -
+normal  normal_22       train     100.0%    normal    0.749          -
+normal  normal_23       train     100.0%    normal    0.796          -
+normal  normal_24       train     100.0%    normal    0.803          -
+normal  normal_25       train     100.0%    normal    0.794          -
+normal  normal_26       train     100.0%    normal    0.780          -
+phone   phone_00        train      95.6%     phone    0.506      0.435
+phone   phone_01        train     100.0%     phone    0.762      0.114
+phone   phone_02        train      86.1%     phone    0.633      0.302
+phone   phone_03        train     100.0%     phone    0.768      0.132
+phone   phone_04        train     100.0%     phone    0.763      0.152
+phone   phone_05        train     100.0%     phone    0.754      0.158
+phone   phone_06        train     100.0%     phone    0.772      0.126
+phone   phone_07        train     100.0%     phone    0.748      0.096
+phone   phone_08        train     100.0%     phone    0.773      0.109
+phone   phone_09        val       100.0%     phone    0.774      0.107
+phone   phone_10        train     100.0%     phone    0.776      0.110
+phone   phone_11        test      100.0%     phone    0.770      0.123
+phone   phone_12        train     100.0%     phone    0.771      0.104
+phone   phone_13        train     100.0%     phone    0.767      0.135
+phone   phone_14        val       100.0%     phone    0.742      0.133
+phone   phone_15        val         0.0%   fatigue    0.190      0.731
+phone   phone_16        test       41.6%   fatigue    0.468      0.463
+phone   phone_17        train     100.0%     phone    0.748      0.098
+phone   phone_18        train      89.9%     phone    0.645      0.289
+phone   phone_19        train     100.0%     phone    0.671      0.258
+phone   phone_20        train       0.0%   fatigue    0.175      0.741
+phone   phone_21        train      86.6%     phone    0.570      0.369
+phone   phone_22        train      19.6%   fatigue    0.432      0.509
+phone   phone_23        train     100.0%     phone    0.762      0.149
+phone   phone_24        test        0.0%   fatigue    0.087      0.723
+phone   phone_25        train     100.0%     phone    0.727      0.199
+fatigue fatigue_00      train     100.0%   fatigue    0.735      0.109
+fatigue fatigue_01      test      100.0%   fatigue    0.758      0.143
+fatigue fatigue_02      train     100.0%   fatigue    0.751      0.103
+fatigue fatigue_03      train     100.0%   fatigue    0.760      0.112
+fatigue fatigue_04      train     100.0%   fatigue    0.747      0.108
+fatigue fatigue_05      train     100.0%   fatigue    0.734      0.176
+fatigue fatigue_06      val        36.2%     phone    0.348      0.544
+fatigue fatigue_07      train     100.0%   fatigue    0.740      0.100
+fatigue fatigue_08      train     100.0%   fatigue    0.744      0.164
+fatigue fatigue_09      train     100.0%   fatigue    0.738      0.127
+fatigue fatigue_10      train     100.0%   fatigue    0.727      0.197
+fatigue fatigue_11      val        85.2%   fatigue    0.672      0.140
+fatigue fatigue_12      train     100.0%   fatigue    0.736      0.115
+fatigue fatigue_13      train     100.0%   fatigue    0.740      0.098
+fatigue fatigue_14      val       100.0%   fatigue    0.746      0.095
+fatigue fatigue_15      train     100.0%   fatigue    0.708      0.103
+fatigue fatigue_16      train     100.0%   fatigue    0.729      0.189
+fatigue fatigue_17      train     100.0%   fatigue    0.731      0.172
+fatigue fatigue_18      train     100.0%   fatigue    0.728      0.176
+fatigue fatigue_19      test      100.0%   fatigue    0.734      0.171
+fatigue fatigue_20      test      100.0%   fatigue    0.728      0.183
+fatigue fatigue_21      train     100.0%   fatigue    0.690      0.228
+fatigue fatigue_22      train     100.0%   fatigue    0.708      0.212
+fatigue fatigue_23      train     100.0%   fatigue    0.725      0.187
+fatigue fatigue_24      train     100.0%   fatigue    0.682      0.234
+fatigue fatigue_25      train     100.0%   fatigue    0.697      0.114
+  [train] 61 段，平均逐帧正确率 96.4%
+  [val] 9 段，平均逐帧正确率 80.2%
+  [test] 9 段，平均逐帧正确率 80.4%
+
+合并为两类（清醒 / 疲劳）—— 档位、闸门、配色、语音、推送都只看这一层
+  [train] 61/61 段判对，逐帧平均正确率 100.0%
+  [val  ] 9/9 段判对，逐帧平均正确率 98.4%
+  [test ] 9/9 段判对，逐帧平均正确率 98.0%
+  误报（清醒段判成疲劳）0/27 段
+  漏报（疲劳段判成清醒）0/52 段
+
+混淆对概率（诊断用，两类同落 L3，对档位无后果）
+  fatigue 段 的平均 P(phone)  = 0.1654   最大 0.5440
+  phone   段 的平均 P(fatigue)= 0.2640   最大 0.7411
+  两类的低头幅度是一样的，这两个数低才说明模型真在用周期性区分。

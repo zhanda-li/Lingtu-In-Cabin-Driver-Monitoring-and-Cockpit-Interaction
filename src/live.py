@@ -55,14 +55,54 @@ from record import draw_hud, draw_pose, GREEN, RED, YELLOW, WHITE
 
 
 # ---------------------------------------------------------------- 预警级别
-# 级别升序 = 严重度升序。CLASS_LEVEL 把 4 个类别映到 0~3。
-LEVEL_CN = ["正常", "注意", "警告", "紧急"]
-LEVEL_NOTE = ["", "检测到视线偏移", "检测到持续低头看手机", "检测到疲劳驾驶"]
+# 级别升序 = 严重度升序。CLASS_LEVEL 把 3 个类别映到 0~3。
+#
+# ★ 2026-09-24：中文名从"安全通道"（正常/注意/警告/紧急，含"分心"）换成
+# **疲劳程度四档** —— 后端只做疲劳，`glance`（短暂扭头=分心）已从
+# `config.CLASSES` 删除。四档各自的**证据来源**是这次改动的核心，别让它们漂移：
+#   L1 轻度  支路二：闭眼时间变长（perclos 过 18.7%）、打哈欠（规则，不进 LR）
+#   L2 中度  支路二：持续闭眼（perclos 过 42.6% / p_fat 过 0.55）
+#   L3 重度  支路一：低头（phone）/ 点头（fatigue）—— 见下面的 CLASS_LEVEL
+LEVEL_CN = ["清醒", "轻度疲劳", "中度疲劳", "重度疲劳"]
+LEVEL_NOTE = ["", "检测到打哈欠/闭眼变长", "检测到持续闭眼", "检测到低头/点头"]
 LEVEL_COLOR = [(60, 190, 60), (0, 215, 255), (0, 140, 255), (0, 0, 235)]  # BGR
 LEVEL_BLINK = [0.0, 1.2, 3.0, 6.0]      # Hz，0 = 不闪
-CLASS_LEVEL = {"normal": 0, "glance": 1, "phone": 2, "fatigue": 3}
-# 只有 >= SPEAK_FROM 级才出声。1 级（偶尔瞟一眼后视镜）出声会把人烦死。
-SPEAK_FROM = 2
+# ⚠️ 键必须与 `config.CLASSES` 一一对应 —— 下面那段 `_check_level_map()` 会在
+# import 时直接炸掉，而不是等现场跑到某一个 tick 才崩。
+# ★ 2026-09-25 二类：`phone` 并进 `fatigue`，于是这里只剩一个非正常类，它落 L3：
+# 「持续低头」和「疲劳点头」本来就是同一档的两种姿态。这不是图省事 ——
+# `src/fuse.py:102` 的闸门 `ema["normal"] >= GATE_MIN` 是靠"各类 EMA 和为 1"
+# 推出的，只要疲劳类是**非 normal**，闸门在低头/点头时**仍然是关的**，支路二就不会
+# 把低头斜视造成的假闭眼投上来。
+# ⚠️ 但二类下这条恒等式**变得更松**：`ema[normal] + ema[fatigue] = 1` 意味着
+# `ema[fatigue] > ENTER_TH(0.60) ⟺ ema[normal] < 0.40` —— 原先三类要"某一类
+# 过 0.60"，现在"非正常这一类过 0.60"就够。**放宽的代价要用退掉的 27 段 glance
+# （瞟后视镜，不是疲劳）当负对照量一遍**，别只看准确率。
+CLASS_LEVEL = {"normal": 0, "fatigue": 3}
+
+
+def _check_level_map():
+    """CLASS_LEVEL 与 config.CLASSES 必须一一对应，否则早炸早好。
+
+    这里**不是**风格检查：`target_level()` 用 `CLASS_LEVEL[cls]` 直接取键，
+    少一个键 = KeyError、多一个键 = 静默失效（合并/回滚时最容易漏的那一步）。
+    存量教训：三类化时 `phone` 落下了，二类化后它成了永远不会被查到的死键。
+    """
+    missing = [c for c in C.CLASSES if c not in CLASS_LEVEL]
+    extra = [c for c in CLASS_LEVEL if c not in C.CLASSES]
+    if missing or extra:
+        raise RuntimeError(
+            f"CLASS_LEVEL {CLASS_LEVEL} 与 config.CLASSES {C.CLASSES} 不匹配："
+            f"缺少 {missing}，多余 {extra}。"
+            f"改类别时这两个必须一起改（见 config.py 的类别注释）。")
+
+
+_check_level_map()
+# 只有 >= SPEAK_FROM 级才出声。
+# ★ 2026-09-24：2 -> 1。原注释的理由是"1 级（偶尔瞟一眼后视镜）出声会把人烦死"，
+#   而**那个类别（glance）已经被删掉了** —— 现在 L1 是**轻度疲劳**（打哈欠、闭眼
+#   变长），官方口径明确要求"轻度疲劳提醒"，压着不出声反而丢了最有用的那条提示。
+SPEAK_FROM = 1
 
 # 迟滞参数的默认值。改过一轮：原本是 0.6/2.0/0.30/5Hz，用户实测"延迟太长"，
 # 用 tools/lag_breakdown.py 量出来这几项加起来值 0.8 秒（升 3.7s -> 2.9s，

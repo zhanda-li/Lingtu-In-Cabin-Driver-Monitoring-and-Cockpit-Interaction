@@ -22,6 +22,7 @@ runs/fuse_replay/
 runs/*.prefuse-bak.txt
 runs/_*.txt
 runs/_*.csv
+runs/_*.png
 
 # 临时决策日志。live_fuse.bat 正常写的是 runs\sessionN.csv，这两个名字是早期的散落文件
 fuse.csv
@@ -34,6 +35,63 @@ _*.py
 _scratch/*
 !_scratch/*.py
 !_scratch/_face_live_20260922_235417.csv
+# 这两份是**被正文按行号点名的证据记录**，不是本人的面部中间产物：
+#   README.md:300 引 `_scratch/_replay3.txt` 当"合并三类后 79/79"的原始记录；
+#   tools/calib_yawn.py 引 `_scratch/_ear.txt:178` 当"MAR 分不开哈欠"那条的反证。
+# 指针进仓库而证据不进 = 死链，所以放行（都是十几 KB 的纯文本）。
+!_scratch/_ear.txt
+!_scratch/_replay3.txt
+
+# ---------------- 界面 ----------------
+# ui/config.json 里放 DeepSeek 的 API key，**绝对不能进仓库**。
+# 模板是 ui/config.example.json（那个要进，别人照着填）。
+ui/config.json
+# 参考图（6 张 1672x940 的效果图，共 10 MB）：是"照着做"的靶子，不是运行需要的东西。
+# 裁出来的背景 ui/web/assets/bg.jpg 只有 133 KB，那个进仓库，克隆下来就能用。
+ui/图片效果/
+
+# 座舱助手「小瑞」的位图版本 —— **2026-09-23 起不再排除，随仓库走**。
+#
+# 原来这里排除的是 ui/web/assets/xiaoqi{,_head}.png：那是从 7.png 抠的雪宝二创，
+# 而这个仓库是公开的作品集，版权上不能推。**现在换成用户自己的原创形象**
+# （源图 ui/图片效果/10.png，抠图脚本 _scratch/_mk_xiaorui.py），版权问题不存在了，
+# 所以改成进仓库 —— 反过来留着排除才是真缺陷：clone 下来一个形象图都没有，
+# 只剩内置的矢量兜底（XQ.mascotSVG），而那个是早期的占位形象，不是小瑞。
+#
+# 现在进仓库的是这些（都在 ui/web/assets/，由 `_scratch/_mk_xiaorui*.py` 生成）：
+#   xiaorui_hero.png    整身立绘 612x613   —— 封面那个立绘位
+#   xiaorui_head.png    方形头像 400x400   —— 2.2~4.6rem 那几个方槽
+#   xiaorui_live.webp   **循环动图** 200x238 25 帧 83ms/帧(12fps, 2.08s 一轮, 无限循环)
+#                       202 KB —— 会动的槽的待机底图
+#                       （从宣传片 小瑞.mp4 的 f96~f121 抠的，_mk_xiaorui_loop.py；
+#                         羽化椭圆矩形裁切，**不是透明抠图**，别用到浅底上）
+#   xiaorui_live_still.png   动图的第 0 帧静帧 —— prefers-reduced-motion 时替换用
+#   xiaorui_{happy,wink,wow,shy,angry,think,sad,sleep,like,heart}.png
+#                       10 个动作立绘 约 110x120（11.png「表情延展」那 10 格，
+#                       _mk_xiaorui16.py）
+#                       ⚠️ 11.png「动态动作」那 6 格（wave/go/navi/cheer/celebrate/
+#                          love）**没有采纳**：底色是白/极淡蓝、小瑞身体也是白的，
+#                          抠出来下半身是个洞（白残留在深色槽上就是破洞）。定量证据：
+#                          `_scratch/_probe_cheer.py`（身体 R-B 中位 +0 vs 背景 -1，
+#                          最好的一条规则也误判 26% 的身体）、对照图
+#                          `_scratch/_sprite_probe/qa16_checker.png`（棋盘底）。
+#                          要补这 6 个动作，得让美术从 3D 源导一张**透明底**的 PNG。
+#   lingtu_mark.png     顶栏品牌标志（11.png 右下白卡片那组重上色，_mk_mark.py）
+#
+# ⚠️ 上面这套是 **2026-09-23 换素材**之后的清单。旧素材（10.png）那批
+#    xiaorui_{hello,moved,ask}.png 还在本地但**已经没人引用**，别照旧名字加新图。
+# 分工见 live.js 的 XQ.mascotSlot / XQ.mascot 注释。
+# ⚠️ ui/图片效果/（源图 psd/jpg）**仍然排除**（见本文件上面那一行）：源图是素材
+#    不是产物，140 KB 一张的设定图没必要进仓库，重抠要它时本机有就行。
+
+# ---------------- 语音输入的模型 ----------------
+# whisper 的权重（base 约 142 MB）。不进仓库有**两条**理由，任一条都够：
+#   1. 体积：142 MB 是仓库里最大的单个文件，克隆会明显变慢；
+#   2. 来源：它是从 openaipublic.azureedge.net 下的，属于第三方权重，
+#      直接塞进公开作品集仓库不如让人自己跑 install_asr.bat 下一份。
+# 别人克隆之后跑 `ui\install_asr.bat --fetch-model` 就补齐了。
+# ui/asr.py 的 model_local() 就是按这个路径判断"模型在不在本地"的。
+models/whisper/*.pt
 
 # ---------------- Python ----------------
 __pycache__/
@@ -45,3 +103,44 @@ __pycache__/
 .idea/
 Thumbs.db
 desktop.ini
+
+# ---------------- 曲库（2026-09-26 加） ----------------
+# ui/media/ 是 30 首商业 mp3（95 MB）。界面缺了它只是曲库那几行空着，本地文件还在，
+# 别人要听自己往 ui/media/ 里丢。公开的作品集仓库不放有版权的音源 —— 和上面
+# 「版权上不能推」那条是同一个理由。模板配置 ui/media.json 照进。
+ui/media/
+
+# ---------------- 测试浏览器的 profile 转储（2026-09-26 加） ----------------
+# CDP 验收脚本一律 `--user-data-dir=<某个相对路径>`（C: 盘满，tempfile.mkdtemp()
+# 会静默失败，所以都落在 D: 上）。它们跑完不会自己清，一次几百 MB、上万个文件。
+# ⚠️ 其中 runs/_xr_full.npy 是 **142 MB 单文件**，超过 GitHub 单文件 100 MB 的硬上限 ——
+# 不挡住这条，整个 push 会被服务器直接拒收（不是变慢，是失败）。
+runs/_*.npy
+runs/_edge_profile_*/
+runs/_tmp_jump/
+runs/_tmp_halt/
+runs/_pipcache/
+
+# ---------------- 构建产物（2026-09-26 加） ----------------
+# hr/firmware/build.bat 的 BUILD_DIR 从 %~dp0 推，落在工程自己脚下；重编就有。
+hr/firmware/build*/
+
+# ---------------- 逐文件备份副本（2026-09-26 加） ----------------
+# ui/web/ 下 40 个 .bak（app.js/live.js/pages.css/style.css 各带 6~7 个变体）、
+# README.md.bak、.gitignore.bak、ui/web/_bak_20260924_prose/ 整个目录。
+# 加规则前确认过：**当前一个 .bak 都没被跟踪**，所以这条不会把已跟踪的文件踢出去。
+# ⚠️ 用通配 `*.bak*` 一条兜住，**别再按形状枚举**：原来写的是
+#    `*.bak` / `*.bak[0-9]*` / `*.bak-*` 三条，结果 `detail.html.bak_monitor`
+#    那一种（**下划线**分隔）三条都不匹配，**真的被提交进去了**。
+#    全库 `git ls-files | grep -i bak` 除它之外一个都没有，所以通配是安全的。
+*.bak*
+_bak_*/
+_prev/
+
+# ---------------- 明确不进仓库的（2026-09-26 用户拍板） ----------------
+# edge_kiosk_dms/ 是一个 Edge profile（70 MB），代码里没人引用它；
+# ChatTTS-main/ 是下载的 2noise/ChatTTS 仓库，全项目零引用（TTS 走的是别的实现）；
+# max30102信息/ 是传感器厂商资料包（168 MB，含 zip 和它的解压目录，重复的一份）。
+edge_kiosk_dms/
+ChatTTS-main/
+max30102信息/

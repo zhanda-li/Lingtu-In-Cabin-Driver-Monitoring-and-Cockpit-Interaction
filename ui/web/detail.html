@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>驾驶监测 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+</head>
+<body class="pg-dms" data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ============ 页标题 + 实时状态 ============ -->
+      <!-- ★ 第七次改版（照参考图 `ui/图片效果/驾驶监测页.jpg`）：**右上角那排页签整排
+           撤掉了** —— 参考图右上角只有「时钟 + ● 实时监测中」两颗，没有页签。
+           那五项（综合概览/疲劳分析/生理指标/行为特征/历史记录）收进「更多」。
+           ★★ 第八次改版：**「更多」不在这一行上**，它是小瑞卡底下那颗圆钮，
+           而且是一颗**链接**（点它换页去 monitor.html，见那一块的注释）。
+           这一行上仍然只有「时钟 + ● 实时监测中」两颗，和参考图一致。
+           ⚠️ 页签的样式类 `.tabs` / `.tab` **没删** —— `design.html` 还在用
+              （那里是配色样本的页签，和这一页无关）。 -->
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱首页" id="backBtn"></a>
+        <h1>驾驶监测</h1>
+        <span class="spacer"></span>
+        <span class="mon-clock">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.4V12l3.2 1.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span id="monClock">—</span>
+        </span>
+        <!-- 「实时监测中」是**状态**不是装饰：它说的是"这条通道现在真的在收数"。
+             ⚠️ 跟着 onDown 灭、跟着 onState 亮，**不写死成常亮** ——
+                常亮的绿点会在断线时继续撒谎。 -->
+        <span class="mon-live off" id="monLive"><i class="d"></i>连接中…</span>
+        <!-- ⚠️ **这一行上没有「更多」**（★ 用户 2026-09-25 原话：
+             「更多是小瑞智能陪伴下面的更多」）—— 菜单的唯一入口是
+             「小瑞 · 智能陪伴」那张卡底下的第四颗圆钮 `#qkMore`。
+             参考图上这一行右上角也只有「时钟 + ● 实时监测中」两颗。 -->
+      </div>
+
+      <!-- ============ 综合概览（照参考图 ui/图片效果/驾驶监测页.jpg 排） ============ -->
+      <!-- ★ 第七次改版：参考图这一屏只有**三块** —— 左「驾驶员实时画面」、
+           右「实时监测数据」+「小瑞智能助手」。
+           原来那一行 `数据趋势 | 最近事件 | 手写`（`.mon-b`）**整排删掉**，
+           用户原话：「数据趋势 最近事件那些去掉」「只留下摄像头 实时数据监测
+           小瑞智能陪伴」。所以 `.mon-a` 现在是"左一卡 + 右一列两卡"。 -->
+      <div data-tab="overview">
+
+        <!-- ---------- 画面 | 右列（实时监测数据 / 小瑞·智能陪伴） ---------- -->
+        <div class="mon-a">
+
+          <!-- --- 驾驶员实时画面 --- -->
+          <!-- `#stageHost` 是**没有真画面时的兜底**：一张由真实数据驱动的 SVG 头像
+               （头部姿态、眼开合、张嘴都在 app.js 那一套里画，这里用 XQ.headSVG）。
+               有摄像头就盖 `<img id="camStream">` 上去，它压在上面。 -->
+          <section class="card livecard">
+            <img class="cam-media" id="camStream" alt="驾驶员实时画面" hidden>
+            <!-- ⚠️ `data-face="none"` 是**页面自带的初值**，不是笔误：还没收到任何 state
+                 的时候"没有摄像头"才是诚实的（反过来先摆一张假脸正是被修掉的那个形态）。
+                 之后由 `XQ.headMode()` 一处按 `d.source`（`onHello` 里）把它改成
+                 `ok`/`none`，`XQ.headPose()` 每帧只是把它照抄一遍，不自己算。 -->
+            <div id="stageHost" data-face="none" style="position:absolute;inset:0"></div>
+            <!-- ★ 这一块**只在没接摄像头时**出现（`hidden` 由 `XQ.headMode()` 一处写）。
+                 它原来还兼着"摄像头开着但画面里没人"那一档，2026-09-25 用户把那一档
+                 去掉了：「只要接入摄像头后 就不要再出现 没人像的那个了」——
+                 接了摄像头，那一格里就是真实视频，空镜也是真实视频。
+                 ⚠️ 所以它**不是**两个源共用：只有 `#stageHost` 会露面时才可能看见它
+                 （有摄像头时 `#stageHost` 是 `hidden` 的，这一块也是）。
+                 默认**显示**（没有 `hidden`）：页面刚打开、还没收到 hello 时，
+                 "没摄像头"是诚实的默认。 -->
+
+            <div class="noface" id="noFace">
+              <span class="nf-ring">
+                <svg viewBox="0 0 48 48" aria-hidden="true">
+                  <circle cx="24" cy="17" r="8.5"/>
+                  <path d="M7.5 42c1.8-8.6 8.2-12.6 16.5-12.6S38.7 33.4 40.5 42"/>
+                  <path d="M3 22.5h5.5M39.5 22.5H45"/>
+                </svg>
+              </span>
+              <b>未检测到人脸</b>
+              <!-- ⚠️ 标题是「未检测到人脸」，但这一块**只在没接摄像头时**才露面
+                   （2026-09-25 用户第二句话把它那一档去掉了，见上面那段）。
+                   "没摄像头"和"检测不到人脸"在这台机器上其实是同一件事的两个说法，
+                   留着这个标题是因为它对**没插摄像头的机器**读起来最直白。 -->
+              <!-- ★ 2026-09-25 深夜：副标题改成**指向**右上角那颗按钮。
+                   原来这里写着「接入摄像头后此处显示实时视频」，而"接入"那颗按钮
+                   就长在它下面 —— 用户现在把按钮挪走了（见下面 `#camToggle`），
+                   再把这句话原样留着，就会指向一个不存在的东西。 -->
+              <span class="nf-sub">点右上角「接入摄像头」，这里就显示实时视频</span>
+              <!-- ❌ 已删 · 等待卡里那颗 `#camOn`（2026-09-25 深夜）。
+                   它原来就长在上面那行副标题的位置。用户原话：
+                   「是否接入摄像头按键 放到一个可选择的地方 然后无论有没有实时图像
+                     都可以按 可以自由切换是否接入」
+                   —— 这一颗只在**等待卡露面时**才看得见，而等待卡一接上摄像头就被
+                      `#noFace.hidden` 藏掉了；右上角那颗「断开」反过来只在接上时
+                     看得见。两颗各自只活一半，用户要"断"的时候正赶上它不在。
+                   现在合成 `#camToggle` 一颗，常驻在卡片右上角，两个方向都能按。
+                   ⚠️ 它俩原来共用 `camSwitch()`；那颗的 CSS（`.livecard .noface
+                     .nf-btn`）也一起删了。
+                   ⚠️ 这条注释留着，是为了让后来搜 `camOn` / `nf-btn` 的人能读到
+                     "为什么没了"，别照着旧结构把那颗按钮加回来。 -->
+            </div>
+            <!-- 静态初值也写「示意画面」而不是「驾驶员实时画面」：这句在**摄像头连上之前**
+                 一直是屏上那句话，而那时候屏上确实是画的、不是摄像头。连上 cam 源
+                 （或回放源）时 `onHello` 会把它改成真话。 -->
+            <div class="cam-chip live"><span class="dot"></span><span id="camLive">示意画面 · 未接摄像头</span></div>
+            <!-- 右上那颗「识别中」是**参考图上就有的**。它说的是"推理在跑"，
+                 和左上那颗"画面从哪来"是两件事，所以两颗都留。 -->
+            <div class="mon-recog"><i class="d"></i>识别中</div>
+            <!-- ★★ 全页**唯一**的换源入口（2026-09-25 深夜）。用户原话：
+                 「是否接入摄像头按键 放到一个可选择的地方 然后无论有没有实时图像
+                   都可以按 可以自由切换是否接入」
+                 所以它**常驻**在这里 —— 不进 `#noFace`（那整块会跟着摄像头状态
+                 hidden）、不进 `#stageHost`（同上），也没有 `hidden`。
+                 按下去往哪个方向换，由 `CAM_LIVE` 决定（不是由这颗按钮自己的
+                 文案决定 —— 文案是画出来的结果，不能拿它当判据）。
+                 ⚠️ 文案和配色**只在 `camPaint()` 一处写**：它同时管
+                    「接入摄像头」/「断开摄像头」/「正在接入…」三种样子，
+                    之前是在两颗按钮上各写一半，改一处忘一处。
+                 ⚠️ 位置（`top:3.1rem`）是让开上面那颗「识别中」的，见 pages.css
+                    的 `.cam-toggle`。 -->
+            <button class="cam-toggle" id="camToggle" type="button" data-on="0">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 7.5h11.5v9H3z"/>
+                <path d="M14.5 11 21 7.6v8.8L14.5 13z"/>
+              </svg>
+              <span id="camTgTxt">接入摄像头</span>
+            </button>
+            <!-- 底边那条：**参考图上是一条横贯卡片的半透明条**，不是一颗胶囊。
+                 左边是"在算什么"（`#camAlertTxt`，跟档位变），右边是"画面从哪来"
+                 （`#camNote`，onHello 里写）。两条信息都要，所以并成一条。 -->
+            <div class="cam-bar">
+              <span class="at">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6 21 19.4H3z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 9.6v4.4M12 16.8v.1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                <span id="camAlertTxt">AI 正在分析驾驶员状态</span>
+              </span>
+              <!-- ⚠️ 这句**只在没摄像头时看得见**（`onHello` 里源是 cam 会被整句换掉），
+                   所以它必须是"没有摄像头"也成立的一句。原来是
+                   「示意画面 · 姿态/眼开合由真实数据驱动」—— 这句**两种情况下都是假的**：
+                   demo 源喂的是演出数据（不是"真实数据"），而一帧 state 都没有时
+                   （没人脸、上面那块浮层正亮着）根本没有任何东西在驱动五官。
+                   改成中性且为真的说法。 -->
+              <span class="cam-from" id="camNote">示意画面 · 非摄像头视频</span>
+            </div>
+          </section>
+
+          <!-- 右列：实时监测数据 + 小瑞。参考图上右列就是这两张卡，上下排。 -->
+          <div class="mon-side">
+
+          <!-- --- 实时监测数据（★ 第七次改版：原来那张「驾驶状态评分」卡并进这里） --- -->
+          <!-- 参考图这一张卡的内容是「心率 | 眨眼频率(带条) / PERCLOS | 头部姿态 /
+               哈欠检测(带条)」，评分环参考图上没有 —— 用户拍板「并进实时监测数据卡」，
+               所以环缩到 5.2rem 挂在块首。
+               ★★ 第七次改版第二稿（用户 2026-09-25 原话：「实时数据监测部分
+               过于杂乱 可视化程度不高」「布局不好」「部分过大 里边字太小 太杂
+               数据直接跟在自己测的后边就可以了啊 为啥还要单起一行」）：
+               这一卡现在只有两层 ——
+                 ① 块首 = 状态（环 + 词 + 一句话），
+                 ② 底下 = **七行数**，一行一路：名字在左、条在中间（有量的那三路）、
+                    数在最右。
+               数值一个字没少（七路全在），也没有"格子里再摆一行大数"那种排法。
+               ⚠️ 别把它改回逐格带底带边的九宫格 —— 那正是"过大 / 太杂"的来源。 -->
+          <section class="card card-pad mon-data">
+            <div class="card-h">
+              <h3>实时监测数据</h3>
+              <!-- 参考图这张卡右上角写的是「推流中」。⚠️ 它和标题行那颗
+                   「实时监测中」是**同一个判据的两种说法**，所以两处由
+                   `paintLive()` **一处**写 —— 分开写迟早会出现"一颗亮一颗灭"。 -->
+              <span class="md-live off" id="mdLive">连接中…</span>
+            </div>
+
+            <div class="md-score">
+              <!-- ⚠️ 类名是 `.score-ring`，**不是 `.ring`** —— `.ring` 在
+                   `style.css` 里已经名花有主（小瑞外面那两圈光晕，
+                   `position:absolute; inset:6%`）。同一个类名用两次的后果不是
+                   "样式二选一"，是 `pages.css` 在 `style.css` 之后加载，
+                   那条 `position:relative` 会把光晕**也**改成相对定位，
+                   两圈光晕于是在流里上下排开、把小瑞顶到卡片外面去。
+                   实际发生过一次，改回来时别图省事又写回 `.ring`。
+                   ⚠️ SVG 的 viewBox 是 120×120、r=50（周长 314.159，`render()`
+                      里算弧长用的就是这个数）—— **改 CSS 上的宽高不影响它**，
+                      别去动 viewBox 里的 r。 -->
+              <div class="score-ring">
+                <svg viewBox="0 0 120 120" aria-hidden="true">
+                  <circle class="trk" cx="60" cy="60" r="50"/>
+                  <circle class="arc" id="scoreArc" cx="60" cy="60" r="50"/>
+                </svg>
+                <div class="num"><b id="scoreNum">—</b><u>/100</u></div>
+              </div>
+              <div class="score-txt">
+                <div class="k">驾驶状态</div>
+                <b class="word" id="scoreWord">—</b>
+                <div class="say" id="scoreSay">等待数据…</div>
+              </div>
+            </div>
+
+            <!-- 七路数：**一行一路，数就跟着自己的名字**（用户 2026-09-25 原话：
+                 「数据直接跟在自己测的后边就可以了啊 为啥还要单起一行」）——
+                 所以没有"格子里再摆一行大数"那种排法，也没有逐格的底和边框。
+                 摆法照 `行为特征` 那页的 `.p4-row`：名字在左、条在中间、数在最右。
+                 ⚠️ 三根条的满格都是**有出处的数**，不是画着好看：
+                    · 眨眼频率：满格 30 次/分（`render()` 里 `W()` 的除数）；
+                    · 哈欠检测：满格 = `XQ.alarms.yawnMin`（服务端给的哈欠阈值），
+                      条走满 = 到了告警线 —— 这个数**不能写死**，
+                      `hello` 里的 `alarm_cfg` 改了它要跟着走；
+                    · PERCLOS：满格 0.6 —— 和「疲劳分析」那张卡里 `#fPcBar`
+                      是**同一条刻度**（同一个除数，别在本地另立一条）。
+                 ⚠️ 心率、头部姿态、疲劳概率、安全通道这四路**没有条**：
+                    心率是"有就是有、没有就是没有"的数（画空轨等于说"量到了，是 0"），
+                    另外三路是**类别**不是 0~满格的量。它们的数照样右对齐，
+                    所以右边那条竖线是齐的。 -->
+            <div class="md-rows">
+              <div class="mr"><span class="k">心率</span><b class="v na" id="mHr">未接入</b></div>
+              <!-- ★ 2026-09-26：心率那一路的另外两个量。加在 `.md-rows` 里
+                   而不是另起一块 —— 这一页的 `.mr` 有现成的 `.v.na` 那一档
+                   （「没量到」的灰字），三行并排就是"同一条路上的三个数"。
+                   ★ 2026-09-26 深夜：这一格**原本是 `#mRr`（HRV-RMSSD）**，
+                   换掉了 —— 它要 NN 连续跨度 ≥ 30 s 才有值，屏幕上基本永远
+                   一根横杠（实测那场会话 0.0% 的帧有数）。 -->
+              <div class="mr"><span class="k">脉搏波幅度</span><b class="v na" id="mAc">--</b></div>
+              <div class="mr"><span class="k">PI 灌注指数</span><b class="v na" id="mPi">--</b></div>
+              <div class="mr"><span class="k">PERCLOS</span>
+                <div class="bar"><i id="mdPcBar"></i></div><b class="v" id="mPc">—</b></div>
+              <div class="mr"><span class="k">眨眼频率</span>
+                <div class="bar"><i id="mdBrBar"></i></div><b class="v" id="mBr">—</b></div>
+              <div class="mr"><span class="k">哈欠检测</span>
+                <div class="bar"><i id="mdYawnBar"></i></div><b class="v" id="mYawn">—</b></div>
+              <div class="mr"><span class="k">头部姿态</span><b class="v" id="mPose">—</b></div>
+              <div class="mr"><span class="k">疲劳概率 P(fat)</span><b class="v" id="mPFat">—</b></div>
+              <div class="mr"><span class="k">安全通道</span><b class="v" id="mLevel">—</b></div>
+            </div>
+
+            <!-- 支路二那两条独立告警（持续闭眼 / 打哈欠），与首页同一份实现
+                 （live.js 的 XQ.alarms）。放在这里：上面那个词说级别，
+                 这一块说**为什么** —— 级别是 L1「注意」时分不出是在打哈欠
+                 还是别的。
+                 ★ 第七次改版从评分卡搬进来 —— ⚠️ **不许挪去别的面板**：
+                   `_check_alarm.py` 是在这一页**默认那一屏**上找它的
+                   （它不点页签），挪进 `[data-tab]` 面板就会整块 hidden。 -->
+            <div class="alarms" id="alarms" hidden></div>
+
+            <!-- 参考图右下角有这一行小字。 -->
+            <p class="md-note">＊监测数据仅供参考，安全始终如一</p>
+            <!-- ★ 2026-09-26：「数据详情」在这一页的入口。
+                 🔴 **上面那行免责小字是用户自己的文案，原样保留** ——
+                    入口是**另起一行**，不是替代它（首页那一处是替代，
+                    因为那三格本来就是「未接入」占位、没有真数据）。
+                 ⚠️ `md-more` 是这一页新加的一类，样式在 pages.css 里、
+                    `.ntiles-note` 那一段下面。 -->
+            <a class="md-more" href="data.html">数据详情</a>
+
+            <!-- 2026-09-24：删掉 `.score-note` 那一整段（环里的数是档位刻度 /
+                 不是独立评分 / 安全通道是另一个轴）。用户要求去掉成段说明。
+                 备份见 web/_bak_20260924_prose/detail.html。 -->
+          </section>
+
+          <!-- --- 小瑞 · 智能陪伴 --- -->
+          <!-- ★ 第七次改版：卡名从「小瑞 · 驾驶陪伴」改成「小瑞 · 智能陪伴」。
+               参考图上这张卡叫「小瑞智能助手」，用户点名写的是「小瑞 智能陪伴」，
+               按用户的原话走。 -->
+          <section class="card card-pad mon-xq">
+            <div class="card-h"><h3>小瑞 · 智能陪伴</h3></div>
+            <div class="xq-head">
+              <!-- 这一格的小瑞是**会动 + 可点**的（呼吸待机、档位变化时换动作、
+                   手点循环切十个动作）。头部姿态/眼开合那套在这一页由画面里那张
+                   SVG 头像负责，这里是陪伴形象，不重复。 -->
+              <div class="mascot" id="mascot">
+                <div class="ring"></div>
+                <div class="ring r2"></div>
+                <img class="mascot-img" id="mascotImg" alt="小瑞" hidden>
+                <div id="mascotSvgHost"></div>
+              </div>
+              <div class="xq-bubble" id="xqBubble" hidden></div>
+            </div>
+            <!-- 参考图上这四颗是**圆形图标按钮 + 下面一行字**。
+                 前三颗是服务端真的认的动作（和首页「快捷操作」同一批 id），
+                 第四颗「更多」**是一个链接**（★ 第八次改版）。
+                 用户原话两遍，第二遍把第一遍没说完的说清了：
+                   「更多是小瑞智能陪伴下面的更多」
+                   「点更多直接到下一页 不是在我这里下边出现五个按钮」
+                   「我的意思是更多 然后直接跳转一页 不是在这一页了」
+                 —— 所以是 `<a href="monitor.html">`，**不是**按钮、更不是浮层菜单：
+                   那四项（疲劳分析/生理指标/行为特征/历史记录）现在长在
+                   `monitor.html` 上，从「驾驶监测」点过去是一张真的页面跳转。
+                 ⚠️ 「综合概览」不再是入口之一 —— 它**就是这一页**（detail.html），
+                    所以那边不再列它，回程走 monitor.html 左上那颗返回箭头。
+                 ⚠️ 用 `<a>` 而不是 `onclick=location` 那种按钮：中键、新标签页、
+                    浏览器自己那套"链接"语义都还在，右键菜单也点得出「在新标签打开」。
+               参考图那一颗写的是「空调」，本项目没有空调那一路，
+               不摆一个点了没反应的按钮。 -->
+            <div class="qk-round" id="quick">
+              <div id="quickBtns" style="display:contents"></div>
+              <a id="qkMore" href="monitor.html" title="疲劳分析 · 生理指标 · 行为特征 · 历史记录"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.4" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="18.6" cy="12" r="1.7" fill="currentColor"/></svg></span><span>更多</span></a>
+            </div>
+          </section>
+          </div>   <!-- /.mon-side -->
+        </div>     <!-- /.mon-a -->
+      </div>
+
+    </div>
+
+    <!-- ---------- 下：小瑞对话栏（★ 从首页搬过来的） ---------- -->
+    <!-- 用户拍板的「搬到驾驶监测页」就是这一块：摄像头画面、概率条、对话栏、
+         语音按钮都归这一页。首页变成纯总览。
+         ⚠️ 它挂在 `.main.sub` 上、`.sub-body` 的**外面** —— `.sub-body` 是
+            `overflow-y:auto` 的滚动容器，放进去的话对话栏会跟着内容滚走。 -->
+    <div class="talk" id="talk">
+      <div class="talk-ava">
+        <img id="talkAvaImg" alt="" hidden>
+        <div id="talkAvaSvgHost"></div>
+      </div>
+
+      <div class="bubbles" id="bubbles"></div>
+
+      <div class="talk-input">
+        <input id="sayInput" placeholder="对小瑞说点什么…（试试「我有点困」）" autocomplete="off">
+        <button class="send" id="send" title="发送">发送</button>
+        <button class="mic" id="mic" title="点一下开始说话，再点一下结束">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0v-6a3 3 0 0 1 3-3z" fill="currentColor"/><path d="M19 12a7 7 0 0 1-6 6.9V22h-2v-3.1A7 7 0 0 1 5 12h2a5 5 0 0 0 10 0z" fill="currentColor"/></svg>
+        </button>
+        <!-- ★ 2026-09-25 常听唤醒：点一下开始常听「你好，小瑞」，再点一下停。
+             和上面那颗麦克风是**两件事**：那颗是"我说一句，你转成文字发出去"
+             （点一下开、说完自动停），这颗是"你一直听着，我叫你你就答应"
+             （常听，直到我自己关）。两颗都做成一样的外观反而会让人分不清，
+             所以这颗不带录音动画、状态写在右边的两行字里。
+             ★ 2026-09-25 晚起**打开页面就自己开麦**（用户原话「能不能不需要我按就可以说
+               你好小瑞 然后唤醒了」，把原来那条「绝不自动开麦」翻了过来 —— 见 web/wake.js
+               文首第 1 条）。这颗键现在管的是**「停」**：点一下就别听了，而且**这一次
+               会话内翻页也不会再自己开**（sessionStorage）。 -->
+        <div class="wk">
+          <button class="wk-btn" id="wake" aria-pressed="false"
+                  title="点一下让小瑞开始听（说「你好，小瑞」）">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6a4.4 4.4 0 0 0-4.4 4.4v6.2a4.4 4.4 0 0 0 8.8 0V7A4.4 4.4 0 0 0 12 2.6z" fill="currentColor"/><path d="M5.4 11.6a1 1 0 0 1 2 0 4.6 4.6 0 0 0 9.2 0 1 1 0 0 1 2 0 6.6 6.6 0 0 1-5.6 6.5v2.7a1 1 0 0 1-2 0v-2.7a6.6 6.6 0 0 1-5.6-6.5z" fill="currentColor"/></svg>
+            <span class="wk-label">听</span>
+          </button>
+          <div class="wk-line">
+            <div class="wk-host off" id="wakeHost">没在听</div>
+            <div class="wk-detail" id="wakeDetail"></div>
+          </div>
+        </div>
+        <a class="talk-more" href="chat.html" title="打开完整对话页面">展开完整对话 ›</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<!-- ★ 2026-09-25 常听唤醒（说「你好，小瑞」叫醒小瑞）。**必须在 live.js 之后**
+     —— 它建在 `XQ` 这个命名空间上，还要借 `XQ.speak` / `XQ.flash`。
+     ⚠️ 它**不会**自己开麦克风：只有点了那颗「听」才会（文首第 1 条纪律）。 -->
+<script src="/static/wake.js"></script>
+<script>
+/* =========================================================================
+   04 驾驶监测
+   -------------------------------------------------------------------------
+   数据全部来自服务端推的 state（就是 src/fuse.py 的真实判决），
+   这里只做映射与呈现。**没有的模块不画假数**：心率量不出来时明确写「未接入」。
+
+   ★ 第六次改版（照参考图 驾驶监测.png）：**综合概览**那一个页签整块重排成
+   上行 = 画面/评分/小瑞陪伴、下行 = 数据趋势/最近事件/手写，底部加一条小瑞对话栏。
+   另外四个页签（疲劳分析/生理指标/行为特征/历史记录）**没动版式**，
+   只是「多维度数据」和「建议与提示」两块从概览搬了进去。
+
+   ★★ 第七次改版（照参考图 `ui/图片效果/驾驶监测页.jpg`）：
+     · 概览只剩**三块** —— 左「驾驶员实时画面」、右「实时监测数据」+「小瑞·智能陪伴」；
+     · 下行那排（数据趋势 / 最近事件 / 手写）**整排删掉**，评分环并进「实时监测数据」。
+     · 右上角那排五个页签也撤了（参考图右上角只有「时钟 + ● 实时监测中」两颗）。
+
+   ★★ 第八次改版（用户 2026-09-25 原话：「点更多直接到下一页 不是在我这里下边
+   出现五个按钮」「我的意思是更多 然后直接跳转一页 不是在这一页了」）：
+     · 那五项**不再长在这一页上**。四个深层面板（疲劳分析/生理指标/行为特征/
+       历史记录）**整块搬去 `monitor.html`**（连 id 和 render 一起）。
+     · 「小瑞 · 智能陪伴」卡底下第四颗圆钮「更多」现在是一颗 `<a href="monitor.html">`，
+       点了就换页 —— 没有浮层菜单、没有 `[data-tab]` 切换、没有 `showPanel()`。
+     · 所以这一页**只剩概览**：这一份 script 只管画面 / 评分 / 实时监测数据 /
+       告警 / 气泡 / 换源。要看曲线和历史记录，去 monitor.html。
+     ⚠️ `data-tab="overview"` 这个属性**留着**：它现在是 `pages.css` 里那条
+        「概览撑满一屏」的钩子（`.sub-body > [data-tab="overview"]:not([hidden])`），
+        不是"还有别的页签"的意思。改它要连着 CSS 一起改。
+
+   ⚠️ 四档的台词 / 表情 / 状态胶囊和首页**共用一份** —— `XQ.LOOK`（在 live.js 里）。
+      各写一份的下场很具体：改了档位定义之后某一页停在上一个版本的文案上，
+      `LOOK[lvKey]` 照样取得到一个值，**不报错、看着完全正常**。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+const ICON = XQ.ICON;
+
+/* 拿不到元素就静默跳过 —— 概览这一屏的元素在换版时增删过好几轮，
+   逐个 if 会让这个函数没法读。
+   ⚠️ 也正因为它们是**静默**的：写错了 id 不会报错，只是什么都不做。
+      所以改版删 markup 时，这几句写入必须一起删（第八次改版那四块就是这么搬走的）。 */
+const T = (id, txt) => { const e = $(id); if (e) e.textContent = txt; };
+const W = (id, pct) => { const e = $(id); if (e) e.style.width = Math.max(0, Math.min(100, pct)) + '%'; };
+/* 写一个**可能没有**的数：有值就把 `.na` 摘掉，没值就挂上。
+   ⚠️ 不能只写文字不改类：`.v.na`（pages.css:1523 那一档）是「未接入」专用的
+      小号灰字，只换文字的话，一个真数字会按"没量到"的样式显示。 */
+const TNA = (id, txt, na) => {
+  const e = $(id);
+  if (!e) return;
+  e.textContent = txt;
+  e.classList.toggle('na', !!na);
+};
+
+/* 头部姿态那一格（`#mPose`，「实时监测数据」里）。以前是 `POSE[s.l1]` —— ⚠️ `l1` 是**级别**，
+   不是类别下标（`CLASS_LEVEL` 把 phone 和 fatigue 都映到 3），所以三类之后
+   那张表只会给出「正常」和「头部晃动」两个值，**低头/点头永远不显示**。
+   改成从**服务端判好的行为**读，判据和首页 app.js 的 `POSE_OF` 逐字一样
+   （两边文案不一致会被当成 bug）。 */
+function poseOf(s) {
+  /* ★ 2026-09-25 二类：不再读概率（`phone` 已经不是一个类了），
+     直接用服务端判好的 `attention` 换个说法 —— 判据只在 `ui/state.py` 一处。 */
+  const POSE_OF = {'疲劳点头': '点头', '头部持续低垂': '低头',
+                   '略有低头': '略低头', '专注': '正常'};
+  return POSE_OF[s.attention] || '正常';
+}
+
+/* `s.severity`（'normal'/'mild'/'moderate'/'severe'）-> 档位键。
+   **表在 live.js 里**（`XQ.LV`），index/detail 两页共用一份 —— 各写一份的话
+   改了档位定义就会有页面停在旧档上，而且不报错。
+   现在键和值同名（`LV.severe === 'severe'`），保留这张表是为了"哪天档位名要跟
+   显示名分开"时只有一处要改，调用方一律写 `LV[x] || 'normal'`。 */
+const LV = XQ.LV;
+/* 四档的外观（台词/表情/胶囊/动作）—— 和首页同一份，见文件头。 */
+const LOOK = XQ.LOOK;
+const DEG_W = XQ.DEG_W;
+
+/* ★ 2026-09-24「只做疲劳」：下面两张表就是**疲劳四档**（normal/mild/moderate/
+   severe），键名 = `severity` = `data-sev` = `pages.css` 的 `.tl li.<档位>`
+   圆点四条 = style.css 的 `--sev-*` 四条，全站一把钥匙。
+   ⚠️ 大标题和右上那颗胶囊**不在这两张表里**：它们直接取服务端的
+      `s.severity_name` 和 `XQ.LOOK[*].pill`，比在这儿抄一份可靠。
+      `PILL` 里只剩"取不到 severity_name 时的兜底词"那一半。
+   ⚠️ 改名要四处一起改（改漏的表现是时间轴圆点悄悄退回主题色，不报错）。 */
+const SEV_TXT = {
+  normal: '当前状态：注意力良好，保持专注驾驶。',
+  mild: '当前状态：有点困了，别硬撑，找机会歇一歇。',
+  moderate: '当前状态：困倦明显，尽快找服务区休整。',
+  severe: '当前状态：疲劳迹象明显，请立即靠边停车休息。',
+};
+/* [右上角那枚 pill 的字, 大标题取不到 severity_name 时的兜底]。
+   ⚠️ 兜底那几个词必须和服务端那个「档位名」一致（清醒/轻度疲劳/中度疲劳/
+      重度疲劳），不然掉线时会显示成另一套说法。 */
+const PILL = {
+  normal: ['安全驾驶', '清醒'],
+  mild: ['注意', '轻度疲劳'],
+  moderate: ['警告', '中度疲劳'],
+  severe: ['紧急', '重度疲劳'],
+};
+/* ⚠️ 「画面底边那行字」（`#camAlertTxt`）以前在这里另有一张 `CAMTXT` 表，
+   注释还写着"与 app.js 的 LOOK[*].cam 逐字一致"——那就是**靠人肉维持的一致**。
+   第六次改版把 `LOOK` 搬进 `live.js` 之后，这里直接读 `LOOK[lvKey].cam`，
+   表没了，不一致也就不可能了。
+   ⚠️ 支路二那两个数（告警保持时长 / 哈欠阈值）同理**不在这里存**：
+      在 `XQ.alarms.holdSec` / `XQ.alarms.yawnMin`，由 hello 的 `alarm_cfg` 灌进去。 */
+
+/* ★★ 第八次改版：「建议与提示」那张卡（连同 `const ADVICE`）**搬到 monitor.html
+   去了** —— 它长在「历史记录」那一块里。⚠️ 别只把常量留在这一页：
+   留一份没人用的清单，下一个人改这里会以为改的就是页面上那张卡。 */
+
+let link = null;
+/* 这一页到底**有没有真摄像头**。`onHello` 里按 `d.source` 定，用来决定
+   「驾驶员画面」那一格画不画人 —— 用户 2026-09-25 拍板：
+   没有摄像头就**永远只留等待卡**，不许画那张示意头像。
+   ⚠️ 不能只看"这一帧有没有面部数据"：demo 源自己造 `ear`/`en_now`，
+      数据是有的，头像是会被画出来的（判据和理由见 live.js 的 `HEAD_MODE` 段）。 */
+let CAM_LIVE = false;
+
+/* ★ 2026-09-25 深夜：这一格**只有一颗**换源按钮了（`#camToggle`，画面卡右上角，
+   常驻）。用户原话：
+     「是否接入摄像头按键 放到一个可选择的地方 然后无论有没有实时图像 都可以按
+       可以自由切换是否接入」
+   它只做一件事 —— 发一条 `{type:'source', spec}` 给服务端，然后等回话。
+   设备能不能开、开在哪个源上，判据**只有服务端那一处**，这一页不碰设备。
+
+   两个 spec（语法见服务端 `make_source`）：
+     `cam`  = 开真摄像头（服务端 `ui/cam.py` 自己跑模型，画面是真画面）；
+     `demo` = 演示源（这一格回到"示意画面 + 等待卡"）。
+
+   ⚠️ 为什么"断开"落回 demo 而不是某种 null 源：没有第三个源能"什么都不放"。
+      demo 是唯一不需要设备、又永远建得起来的那个，而它在界面上本来就被如实
+      标成「示意画面 · 未接摄像头」—— 断开之后呈现的就是那句真话。
+   ⚠️ 用户要的"无论有没有实时图像都可以按"落到代码上就是：这颗按钮**不在**
+      `#noFace` / `#stageHost` 里（那两块会整块 hidden），也没有自己的 `hidden`，
+      也没有任何"源不是 cam 就置灰"的逻辑。别再给它加上这类条件。 */
+
+/* 换源在飞。从发出去到服务端回话（hello 或 info）之间，按钮上写着「正在接入…」。
+   ⚠️ 这个中间态**不能省**：服务端建 cam 源要 load 两个 torch 权重 + 两个
+   mediapipe landmarker，实测量级是**秒**（为此服务端还专门把建源丢进了线程，
+   见 `ui/server.py` 的 `switch_source`）；"断开"那条路上放旧源也要等
+   `CamSource.stop()` 的 join，实测 0.3~1.5 s。 */
+let CAM_BUSY = false;
+let CAM_BUSY_T = 0;
+
+/* 那颗按钮**唯一**的画法。三种样子，一处写：
+     busy  → 「正在接入…」/「正在断开…」，置灰不吃点击
+     连着  → 「断开摄像头」（`data-on="1"`，素色玻璃，次要动作）
+     没连  → 「接入摄像头」（`data-on="0"`，主操作配色）
+   ⚠️ 方向（busy 时那句话往哪边念）读的是 `CAM_LIVE` —— 它才是"服务端
+      现在到底在不在给画面"的唯一真相，按钮自己的文案只是它的投影。 */
+function camPaint() {
+  const b = $('camToggle');
+  if (!b) return;
+  b.dataset.on = CAM_LIVE ? '1' : '0';
+  b.disabled = CAM_BUSY;
+  let txt;
+  if (CAM_BUSY) txt = CAM_LIVE ? '正在断开…' : '正在接入…';
+  else txt = CAM_LIVE ? '断开摄像头' : '接入摄像头';
+  T('camTgTxt', txt);
+}
+
+function camBusy(on) {
+  CAM_BUSY = on;
+  clearTimeout(CAM_BUSY_T);
+  /* 断线时服务端不会回话，按钮不能永远停在「正在接入…」。25 秒够盖住最慢的
+     一次建源，又短到用户能自己重试一次。 */
+  if (on) {
+    CAM_BUSY_T = setTimeout(() => {
+      camBusy(false);
+      XQ.flash('服务端还没回话，数据源应该没变（状态栏看左上那颗芯片）');
+    }, 25000);
+  }
+  camPaint();
+}
+
+function camSwitch(spec) {
+  if (CAM_BUSY) return;
+  if (!link || !link.send) { XQ.flash('未连上服务端，切不了数据源'); return; }
+  camBusy(true);
+  link.send({ type: 'source', spec });
+}
+
+/* 「自由切换」＝ 按一下就往**另一个方向**走，方向由 `CAM_LIVE` 现算。
+   ⚠️ 不要改成"按 `data-on` 或按钮文案去判" —— 那两样都是 camPaint 画出来的
+      结果，页面刚打开、还没收到 hello 的时候它们和真实源是错位的。 */
+function camToggleClick() {
+  camSwitch(CAM_LIVE ? 'demo' : 'cam');
+}
+
+
+/* 「实时监测中」（标题行那颗）和「推流中」（实时监测数据卡右上那颗）**一处写**。
+   ⚠️ 两处各写各的迟早会出现"一颗亮一颗灭"：它们是同一个判据的两种说法，
+      本来就是一件事。
+   ★★ 2026-09-25 改：这颗说的**不是**"连上了"，而是"这一格现在真的在看驾驶员"。
+      用户原话：「我关闭摄像头了 右上角为啥还是实时监测中」—— 断掉摄像头之后
+      服务端**照样在推 state**（demo 源一直在演那条演示弧），旧写法是"收到一帧就
+      亮 '实时监测中'"，于是关掉摄像头这颗还亮着，**它就成了假话**。
+      三种话由 `CAM_LIVE` + `LINK_DOWN` 现算，一处写：
+        断线            -> 「已断开」    （灰）
+        连着、没摄像头   -> 「未接摄像头」/「示意数据」（灰）
+        连着、有摄像头   -> 「实时监测中」（绿）
+      ⚠️ 判据是 `CAM_LIVE`（服务端 hello 里 `source === 'cam'`），**不是**按钮文案、
+         也不是"最近一帧有没有人脸" —— 后者在 demo 源上恒为真。
+   ⚠️ `#monLive` 里那点文字是 `<i class="d">` **后面那个文本节点**，
+      所以只能 `lastChild.textContent`；`#mdLive` 是光杆 `<span>`，直接 `textContent`。 */
+let LINK_DOWN = false;          /* 服务端断了（onDown 写） */
+/* ★★ 2026-09-26：再加一道判据 —— **这一帧数字是从哪来的**。
+   用户原话：「撒谎的显示不能有」。`CAM_LIVE` 只说明"服务端现在挂的是摄像头源"，
+   它**不等于**"屏上这几个数就是摄像头算的"：摄像头刚接上那几秒要 load 两个权重
+   再填满 45 帧窗口（实测秒级），这期间一帧 state 都没有，页面手上还是上一路
+   （demo 源）那一帧 —— 于是「实时监测中」亮着、数字却是演示脚本的。
+   所以屏上说你"正在被实时监测"，判据必须是**这一帧自己报的来源**（`s.source`，
+   服务端 `ui/cam.py:409` 填的 "cam"）。两条都成立才配说"实时监测中"。
+   ⚠️ 它由 `render()` 每帧更新；`paintLive()` 只在这一个函数里画，别在别处再判一次。 */
+let NUM_CAM = false;            /* 最近一帧 state 的 `source === 'cam'` */
+function paintLive() {
+  const off = LINK_DOWN || !CAM_LIVE || !NUM_CAM;
+  /* 标题行那颗说得全一点（"未接摄像头"），卡片那颗说得短一点（"示意数据"）——
+     两处是**同一件事的两种说法**，所以仍然在这一个函数里一起写。
+     四种话：
+       断线                      -> 「已断开」（灰）
+       连着、源不是摄像头          -> 「未接摄像头」/「示意数据」（灰）
+       连着、是摄像头、但还没数     -> 「等待数据」（灰）
+       连着、是摄像头、数也是它的    -> 「实时监测中」（绿） */
+  const top = LINK_DOWN ? '已断开'
+    : (!CAM_LIVE ? '未接摄像头' : (NUM_CAM ? '实时监测中' : '等待数据'));
+  const card = LINK_DOWN ? '已断开'
+    : (!CAM_LIVE ? '示意数据' : (NUM_CAM ? '实时监测中' : '等待数据'));
+  const a = $('monLive');
+  if (a) { a.classList.toggle('off', off); a.lastChild.textContent = top; }
+  const b = $('mdLive');
+  if (b) { b.classList.toggle('off', off); b.textContent = card; }
+}
+
+function render(s) {
+  /* 这一帧的数字**是谁算的**（见 `paintLive` 上面那段）。
+     ⚠️ 变了才重画：`paintLive()` 会动 DOM，每帧无条件调是白花钱（8 Hz）。 */
+  const num = (s.source === 'cam');
+  if (num !== NUM_CAM) { NUM_CAM = num; paintLive(); }
+
+  /* 外观跟**疲劳档**（`severity`，四档）—— 和首页 app.js 同一条理由：
+     全站只有一条轴，档位是几，这一页的配色、大标题和那句话就是几。
+     ⚠️ 安全通道的 `level` / `L_fused` 没被丢掉，它还在下面「安全通道」那一格。 */
+  const lvKey = LV[s.severity] || 'normal';
+  document.body.dataset.sev = lvKey;
+  const look = LOOK[lvKey] || LOOK.normal;
+  const pill = PILL[lvKey] || PILL.normal;
+
+  /* ⚠️ 哈欠秒数**每帧只锁存一次**（实现在 live.js 的 `XQ.yawnShown`）——
+     下面那张脸的嘴、「打哈欠」那一行、疲劳分析页的「哈欠时长」全读这一份。
+     各处各调一次的话锁存会被推两次，"涨的那一刻"当场被消耗掉，于是**到处都读 0**
+     （不报错，只是哈欠永远不出现）。 */
+  const yawnS = XQ.yawnShown(s.yawn_sec);
+
+  /* 把 state 画到画面卡那张示意头像上（头姿 / 眼开合 / 嘴）。没有摄像头时
+     这就是"画面"本身；有摄像头时它被 MJPEG 盖住（`onHello` 里隐藏）。
+     画法在 live.js（`XQ.headPose`）—— 总览页那张脸用的是同一份。 */
+  XQ.headPose(s, yawnS);
+
+  /* 小瑞的动作：档位**变了**才换。写法照抄首页 app.js 那一段（连"记不记这一笔
+     取决于 react() 有没有真的送到"那条竞态判据一起）—— 页面刚打开时那张图
+     还没下载完、槽还没登记，这时第一帧 state 就到了，react() 会因为没槽返回
+     false，可 dataset 已经被记成 normal，**以后同样的档位再也不会触发**。
+     ⚠️ 顺序不能反：先发上升的「加油」（hold!=0），再发常驻表情（hold==0）。 */
+  const last = document.body.dataset.xqSev;
+  const rank = (v) => ({ mild: 1, moderate: 2, severe: 3 }[v] || 0);
+  if (lvKey !== last) {
+    if (rank(lvKey) > rank(last) && XQ.mascot) XQ.mascot.react('sev:up');
+    if (!XQ.mascot || XQ.mascot.react('sev:' + lvKey)) {
+      document.body.dataset.xqSev = lvKey;
+    }
+  }
+
+  /* 实时画面底边那行字：**行为归因**（为什么判这一档），直接取共享表的 `cam`。 */
+  T('camAlertTxt', look.cam);
+
+  /* 评分块（★ 第七次改版：整块并进「实时监测数据」那张卡） */
+  /* ⚠️ 环里那个数是**档位刻度**（`100 − DEG_W[该档]`），和首页那根「疲劳程度」条
+     同一个数，**不是**新测出来的评分。
+     这么做是为了让它和旁边那个词**永远自洽**：拿别的量（比如 P(fat)）去填，
+     就会出现"环 75 分 / 大标题写重度疲劳"那种同一张卡里两个结论打架的情况。 */
+  const score = Math.round((1 - (DEG_W[lvKey] || 0)) * 100);
+  const arc = $('scoreArc');
+  if (arc) arc.setAttribute('stroke-dashoffset',
+    (314.159 * (1 - score / 100)).toFixed(2));
+  T('scoreNum', String(score));
+  T('scoreWord', s.severity_name || pill[1]);
+  T('scoreSay', SEV_TXT[lvKey]);
+
+  /* 「实时监测数据」那几格。心率是真数（HPM5300 + MAX30102，见
+     ui/serial_hr.py），量不出来时走「未接入」那一档 —— 用 TNA，因为
+     `.na` 那个类是这一格的样式的一部分，不能只换文字。 */
+  T('mPFat', s.p_fat == null ? '—' : (s.p_fat * 100).toFixed(0) + '%');
+  T('mPc', s.perclos == null ? '—' : (s.perclos * 100).toFixed(1) + '%');
+  TNA('mHr', XQ.hrText(s), s.hr == null);
+  /* ★ 2026-09-26：心率那一路的另外两个量。口径同 `#mHr` —— 有数才写数字，
+     没数走 `.na` 那一档（`--`）。文案和首页共用 `XQ.hrText` 那条纪律：
+     三页的数字格式必须一模一样，不然看起来像 bug。
+     ★ 2026-09-26 深夜：`hr_ac` 是无量纲的 ADC 计数，**不给单位**（理由见
+       `app.js`）—— 四个页面的格式串逐字一致：`toFixed(0)`、没有后缀。 */
+  TNA('mAc', s.hr_ac == null ? '--' : s.hr_ac.toFixed(0), s.hr_ac == null);
+  TNA('mPi', s.hr_pi == null ? '--' : s.hr_pi.toFixed(2) + ' %', s.hr_pi == null);
+  T('mPose', poseOf(s));
+  T('mBr', s.brate == null ? '—' : s.brate.toFixed(1) + ' 次/分');
+  T('mLevel', `L${s.level} ${s.level_name || ''}`);
+  /* ★ 第七次改版第二稿：四格大数里带条的那三根。满格都是**有出处的数**：
+        · 眨眼频率 0~30 次/分（和上面那一格 `toFixed(1)` 的文字同一个数）；
+        · 哈欠拿 `XQ.alarms.yawnMin` 当满格 —— 条走满 = 到了服务端那条告警线；
+        · PERCLOS 拿 0.6 当满格 —— 和下面「疲劳分析」那张卡里 `fPcBar`
+          用的是同一个除数，改要一起改（两条刻度不一样会被当成 bug）。
+     没数的时候条宽写 0：**不能拿「—」去算**，那会变成 NaN → `style.width`
+     被赋成 "NaN%"，浏览器静默忽略，条停在上一帧的宽度上（看起来像有数）。 */
+  T('mYawn', yawnS == null ? '—'
+      : (yawnS >= XQ.alarms.yawnMin ? '检测到' : '无'));
+  W('mdPcBar', s.perclos == null ? 0 : s.perclos / 0.6 * 100);
+  W('mdBrBar', s.brate == null ? 0 : s.brate / 30 * 100);
+  W('mdYawnBar', yawnS == null ? 0
+      : (XQ.alarms.yawnMin > 0 ? yawnS / XQ.alarms.yawnMin * 100 : 0));
+
+  /* 支路二那两条独立告警（持续闭眼 / 打哈欠）。host 是这一页的 #alarms；
+     传 holdSec 是为了压住 yawn_sec 在阈值上下抖（见 live.js 的 XQ.alarms）。 */
+  XQ.alarms.render($('alarms'), s, XQ.alarms.holdSec);
+
+  /* 小瑞那句陪伴话 —— **和首页同一份台词**（`XQ.LOOK[*].bubble`）。
+     ⚠️ `normal` 档的 `bubble` 是**空串**（小瑞在清醒时不唠叨，这是 look 表定的口径），
+     所以这里必须**连 `hidden` 一起管**，不能只写 textContent ——
+     否则清醒时那个气泡框还在，白白挂一个空的圆角白框（首屏就是这一档，一眼就看见）。
+     这一句和 app.js 对 `#xqBubble` 的处理是同一条规矩。 */
+  const bub = $('xqBubble');
+  bub.hidden = !look.bubble;
+  if (look.bubble) bub.textContent = look.bubble;
+
+  /* ★★ 第八次改版：原来这里往下还有三大段（多维度 / 疲劳分析 / 行为特征），
+     它们写的是「疲劳分析」「生理指标」「行为特征」「历史记录」四块里的元素。
+     那四块**整块搬到 `monitor.html` 去了**（用户原话：「点更多直接到下一页」），
+     写入跟着搬走 —— ⚠️ **别在这儿把它们加回来**：这些 id 在这一页已经不存在，
+     `T()` / `W()` 有空守卫，加回来不会报错，只是**一声不响地什么都不做**
+     （比报错更难查的那种）。
+     这一页的 `render()` 只管它自己有的东西：画面、评分、实时监测数据、告警、气泡。
+     `poseOf()` 还留着 —— 「实时监测数据」里那格 `#mPose` 在用。 */
+}
+
+
+/* ---------------------------------------------------------------- 对话栏 */
+/* 这一块**是从首页搬过来的**（用户拍板「对话栏搬到驾驶监测页」）。实现和首页
+   app.js 里那份逐字一致，只是这边没有 app.js，所以在这儿有一份。 */
+const MAX_BUBBLES = 12;
+
+function addBubble(role, text, pending) {
+  const box = $('bubbles');
+  const el = document.createElement('div');
+  el.className = 'b' + (role === 'me' ? ' me' : '') + (pending ? ' pending' : '');
+  el.innerHTML = `<u>${role === 'me' ? '我' : '小瑞'}</u><p></p>`;
+  el.querySelector('p').textContent = text;      // textContent：模型的话不进 HTML
+  box.appendChild(el);
+  while (box.children.length > MAX_BUBBLES) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+  return el;
+}
+
+function bindTalk() {
+  const input = $('sayInput');
+  const submit = (text) => {
+    text = (text || '').trim();
+    if (!text) return;
+    if (!link || !link.online) {
+      XQ.flash('还没连上座舱服务，这句话没发出去（用 run_ui.bat 启动服务端）');
+      return;
+    }
+    link.send({ type: 'say', text });
+    input.value = '';
+  };
+  $('send').onclick = () => submit(input.value);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(input.value); });
+  /* 麦克风：真的语音输入（`XQ.asr`，双路：浏览器优先 + 本地 whisper 兜底）。
+     ⚠️ 回调传的是**本页自己的 `submit`** —— `XQ.asr` 只负责把识别出的文字交出来。 */
+  XQ.asr.bind($('mic'), { submit });
+
+  /* ★ 2026-09-25 常听唤醒：说「你好，小瑞」就能叫醒它（`web/wake.js`）。
+     和上面那颗麦克风是**两件事**（见上面那段注释）。这里只绑按钮，
+     `hello` 里那份引擎状态在 `onHello` 里 `attach` 进去 —— 那才是知道
+     "唤醒模型下没下、识别走哪条路"的地方。 */
+  if ($('wake')) XQ.wake.bind($('wake'), $('wakeHost'));
+}
+
+/* 小瑞那四颗圆形按钮。前三颗是服务端认的动作（`XQ.QUICK`，和首页同一批 id），
+   第四颗「更多」在 markup 里写死（切页签），不参与这里。
+   参考图上那几颗是**圆形图标 + 两三个字的短标签**，所以另给一份短名。
+   ⚠️ 短名**不改 `XQ.QUICK` 的源头** —— 那里面是动作的**真名**（和首页按钮、
+      服务端 `action` 的 id 一起用的），为了一页的排版去改它，首页跟着变短。
+   ⚠️ 图标要用 `XQ.icon(id)`，**不能写 `XQ.ICON[id]`**：那张表里存的是
+      `<path …/>` 这种**内层标记**，没有外层 `<svg>`；直接塞进 innerHTML 的话
+      HTML 解析器会把 `path` 当成未知标签**整个丢掉** —— 不报错、不警告，
+      表现就是圆钮里空空的（第 4 颗「更多」的原生标记是手写的 `<svg>`，
+      所以它不但没事，还正好对比出另外三颗是空的）。 */
+const QUICK_SHORT = { music: '舒缓音乐', rest_stop: '导航', status: '驾驶状态' };
+function renderQuick() {
+  const host = $('quickBtns');
+  host.innerHTML = XQ.QUICK.map(([id, label]) =>
+    `<button type="button" data-id="${id}"><span class="ic">${XQ.icon(id)}</span>`
+    + `<span>${QUICK_SHORT[id] || label}</span></button>`
+  ).join('');
+  host.querySelectorAll('button').forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset.id;
+      if (link) link.send({ type: 'action', id: id });
+      /* ★ 2026-09-25 晚：「舒缓音乐」那颗圆钮**真的放**（和驾驶监测页那颗 chip
+         是同一件事、同一个入口）。用户原话见 player.js 文件头。
+         ⚠️ 不弹"已执行"—— 放没放成由 `playCalm()` 自己说（见 monitor.html 那段）。 */
+      if (id === 'music' && window.XQP && XQP.playCalm) XQP.playCalm();
+      /* ★ 2026-09-25 晚：「导航」那颗**真的跳**到导航页（左导航第五项那一页）。
+         原来这儿只弹一句「已执行：导航」—— 一句没有下文的话，和当初「舒缓音乐」
+         那颗"只有话术没有声音"是同一类毛病。
+         ★★ 2026-09-26：跳过去的时候**把"要干嘛"一起带过去**（`?do=nearby`）——
+         这一颗本来就叫「导航服务区」，那就得真的到那一页去问最近的服务区、真的
+         把路线画出来、真的进导航。用户原话：「其他页面有导航到最近服务区 或者
+         导航啥的按钮 要真的有这个功能 不是摆设」。
+         ⚠️ 别改成 `nav.html`（不带参数）：那样到那一页是**空白等起点**，
+            人会以为这颗键还是没干成事。参数怎么用见 nav.html 的 `WANT`。 */
+      else if (id === 'rest_stop') location.href = 'nav.html?do=nearby';
+      else XQ.flash('已执行：' + b.querySelector('span:last-child').textContent);
+    };
+  });
+}
+
+/* ---------------------------------------------------------------- 起步 */
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${ICON.chevL}</svg>`;
+$('stageHost').innerHTML = XQ.headSVG();
+/* 脸上的定位点。**在 `XQ.headSVG()` 之后** —— 它找的是那张 svg 里的 `#mesh`，
+   骨架还没进 DOM 的话它是空跑（有守卫，不报错，就是脸上没有点）。 */
+XQ.buildMesh();
+$('mascotSvgHost').innerHTML = XQ.mascotSVG();
+XQ.mountChrome({ active: 'mon' });
+XQ.mascot.bind('mascotImg', 'mascotSvgHost', { cycle: true });
+/* `deck:'h'` = 接 43 张形象库的方形头像那套（点一下换个形象，见 live.js）。 */
+XQ.mascotSlot('talkAvaImg', 'talkAvaSvgHost', { simple: true, deck: 'h' });
+
+/* ★★ 第八次改版的搬走清单（都在 monitor.html 上，别在这儿重新挂一遍）：
+   「建议与提示」的 `#adv`、历史记录 `#tl2`、六张图 `#plot*`、四块数
+   `#fPFat` / `#dEye` / `#bNormal` / `#bNod` …… 它们的接线跟着 markup 一起搬走了。 */
+
+/* 时钟：**自己走**，不搭 render 的车 —— render 是 8 Hz 的、而且没数据时不来，
+   靠它走时钟的话断线那一刻钟就停了（那正好是最该看到时间的时候）。 */
+function tickClock() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  T('monClock', `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
+               + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`);
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+renderQuick();
+bindTalk();
+
+/* 换源那一颗按钮。**只发协议**，别的什么都不做 —— 复位交给 onHello / onInfo
+   （服务端一定会回一条，那是"到底成没成"的唯一判据）。 */
+$('camToggle').onclick = camToggleClick;
+camPaint();                    /* 初值：没收到 hello 之前按"没接摄像头"画 */
+paintLive();                   /* 同理：还没收到 hello 时那句必须是「未接摄像头」 */
+
+link = XQ.connect({
+  onHello: (d) => {
+    /* 换源的结果**就是 hello**：服务端换成了才发它（更早的版本是先放旧源再建
+       新源，失败时能把数据源弄死 —— 顺序已经改过来了，见 server.py 的
+       `switch_source`）。所以这一句既在"刚打开页面"时跑，也在"换源成功"时跑。 */
+    camBusy(false);
+    /* ★ 2026-09-25 常听唤醒：把这条链接和 hello 里那段引擎状态交给 `XQ.wake`。
+       放在最前面，是因为它和摄像头/数据源**没有关系** —— 唤醒是本地的一条独立
+       通道（麦克风在浏览器这边，服务端只做推理），源是 cam 还是 demo 都不影响它。
+       `d.voice` 报的是"唤醒模型在不在、识别走哪条路"，点「听」时页面靠它决定
+       "能不能真听"还是"如实说一句缺什么"（见 web/wake.js 的 start()）。 */
+    XQ.wake.attach(link, d.voice);
+    /* ★ 2026-09-25 晚：**不用点任何一下就开始听**（见 web/wake.js 文首第 1 条）。
+       挂在这里而不是 DOMContentLoaded，是因为这一刻 `link.online` 才是真的、
+       `d.voice` 里的引擎状态也才到手 —— `start()` 头两句就要这两样。
+       ⚠️ 这句在**换源成功**时也会跟着 hello 再跑一次，`autostart()` 自己会挡住
+          （`state !== 'off'` 直接返回），别在这外面再包一层判断。 */
+    XQ.wake.autostart();
+    /* ⚠️ `CAM_LIVE` 这一处判据管着**三件事**：要不要出等待卡（`XQ.headMode`）、
+       这颗按钮往哪个方向画、按下去往哪个方向发协议。都由 `d.source === 'cam'`
+       定 —— 仍是**一处**判据，没有第二份真相。
+       ⚠️ 下面那个 `camPaint()` 必须等 `CAM_LIVE` 写完再调（上面这句
+          `camBusy(false)` 只管把"正在…"收掉，那时 `CAM_LIVE` 还是上一轮的
+          值）—— 所以 if/else 之后再画一次，别把它挪到上面去。 */
+    if (d.source === 'cam') {
+      const im = $('camStream');
+      im.src = '/video.mjpg';
+      im.hidden = false;
+      $('stageHost').hidden = true;
+      CAM_LIVE = true;
+      /* 有真画面了：不出等待卡，画的也不画（`#stageHost` 本来就被藏了）。
+         ⚠️ 这一句和下面那个 `headMode('none')` 是全站**唯一**的写入点。 */
+      XQ.headMode('auto');
+      $('camLive').textContent = d.cam && d.cam.replay ? '推理回放画面' : '驾驶员实时画面';
+      $('camNote').textContent = '真实摄像头画面 · FaceMesh 叠加 · 本机实时推理';
+    } else {
+      /* ★ 2026-09-25 补的一支。**没有摄像头**的时候（用户 2026-09-25 明确说了
+         「没有实时接人脸摄像头」），以前这一格什么都不做 —— 于是左上那颗芯片
+         一直写着「驾驶员实时画面」，压在**一张画出来的假人**上面。
+         那是这一页最不该有的一句话：整页都在讲"不摆假数据"，这里却把示意图
+         说成实时画面。现在非 cam 源一律如实标成示意画面。 */
+      CAM_LIVE = false;
+      /* ⚠️ 「断开摄像头」那一支**必须**把这两行也跑一遍：从上一次 hello 起
+         页面可能正停在一个 cam 源上（`#stageHost` 被藏了、`<img>` 上挂着一条
+         MJPEG 长连接），这时候把 demo 源接过来的话，上面那句"永远只留等待卡"
+         会落空 —— 等待卡出来了，但底下压着一张冻住的旧画面。
+         另外 `src` 要**真的清掉**：那是 `multipart/x-mixed-replace` 的长连接，
+         只 `hidden` 的话浏览器不会关它，服务端那个生成器会一直挂着。 */
+      const im = $('camStream');
+      if (im) { im.hidden = true; im.removeAttribute('src'); }
+      $('stageHost').hidden = false;
+      $('camLive').textContent = '示意画面 · 未接摄像头';
+      $('camNote').textContent = '示意画面 · 非摄像头视频';
+      /* ★ 没有摄像头 -> 这一格**永远**是等待卡（用户 2026-09-25 拍板
+         「永远不画人，只留等待卡」）。连 demo 源一起按掉：demo 是有数据的，
+         不显式关的话那张示意头像照样会画出来。
+         反过来，接了摄像头就**再也不出**等待卡 —— 同一天用户又补了一句
+         「只要接入摄像头后 就不要再出现 没人像的那个了」，两句合起来正好是
+         `XQ.headMode()` 那一个开关的两种取值。 */
+      XQ.headMode('none');
+    }
+    /* `CAM_LIVE` 到此为止是新的了，按钮和右上角那颗状态跟着它重画。
+       ⚠️ `paintLive()` **必须**在这里再调一次：断掉摄像头走的就是这条路
+         （服务端换源成功 -> 回一条 hello），少了这一句，右上角那颗会一直
+          停在「实时监测中」—— 用户 2026-09-25 报的就是这个。 */
+    camPaint();
+    paintLive();
+    /* ⚠️ 这里原来还有一句 `SEV_CFG = d.severity_cfg`（存阈值表）。
+       唯一读它的那一格 `#dEye`（「多维度数据 · 眼睑状态」）已经搬到 monitor.html，
+       所以这一页**不再存**这份表 —— 存着没人读，等于给下一个人一个"这里有阈值"的错觉。
+       要判 PERCLOS 那条线的那一页自己去 `hello` 里拿。 */
+    /* 支路二那两条告警的两个数（保持时长 / 哈欠阈值）。**存在 live.js 里**
+       （XQ.alarms.holdSec / .yawnMin），这一页不另存一份。 */
+    XQ.alarms.setCfg(d.alarm_cfg);
+    /* 对话栏的问候语。★ 第七次改版换成参考图底栏那一句
+       （「检测到困倦时，我会主动提醒并为您推荐舒缓音乐。」）——
+       它说的是这套系统**真的会做**的事（疲劳档真的会开口 + 真的会挑一首舒缓的放，
+       见 media.html 的疲劳联动和 live.js 的 LOOK 表），不是一句客套话。
+       ⚠️ 只在**一条气泡都没有**时补（`!box.children.length`）：换源回来的 hello
+          会再走一遍这里，不判这一下就会把同一句问候刷成第二条。 */
+    const box = $('bubbles');
+    if (box && !box.children.length) {
+      addBubble('xq', '检测到困倦时，我会主动提醒并为您推荐舒缓音乐。');
+    }
+  },
+  onState: (s) => {
+    render(s);
+    /* 这一句现在只做"重画"：亮不亮由 `paintLive()` 里那个判据算（见它上面那段）
+       —— ⚠️ **不要**再退回"收到一帧就写 '实时监测中'"，那正是被报的那个假话。 */
+    paintLive();
+  },
+  onSay: (d) => {
+    if (d.user) addBubble('me', d.user);
+    addBubble('xq', d.text);
+    // 念出来。`emotion` 是服务端早就给好、以前一处都没用过的字段
+    // （ui/xiaorui.py 的 emotion_for），用它调语速和音高，见 XQ.tts.prosody。
+    //
+    // ★ 2026-09-25 常听唤醒：`silent` 那条**只画气泡、不出声** —— 语音进来的答复
+    //   由**开麦的那张页面**自己念（`web/wake.js`），它要 `XQ.speak` 的"念完了"
+    //   回调去把服务端状态机放回 IDLE。这里也跟着念的话，同一个窗口里会念两遍。
+    if (!d.silent) XQ.speak(d.text, { emotion: d.emotion });
+    if (d.backend && d.backend !== 'deepseek') XQ.flash('本地固定话术（' + d.backend + '）');
+  },
+  /* ⚠️ 第二个参数 `d` 是整条 payload，**只有换源那条 info 才带 `source_switch`**
+     （`ui/server.py` 的 source 那支给的成功/失败都带）。靠它复位按钮，不去匹配
+     中文文案 —— 文案改一个字，匹配就会静默失效。
+     失败时这里**不碰 `CAM_LIVE` / `headMode`**：源根本没换，页面停在原样才是对的，
+     服务端也只回一句 info（没有 hello）。 */
+  onInfo: (t, d) => {
+    /* ★ 2026-09-25 晚：服务端现在会**自己**去开摄像头（页面一打开就接，
+       页面全关掉就松手，见 server.py 的 `maybe_autocam` / `watch_pages`）。
+       那条「正在打开摄像头…」带 `busy:true` —— 那不是失败，是**已经在做了**，
+       所以这里要进「正在接入…」而不是复位。不带这个字段的（成功/失败两条）
+       照旧复位。`ok:null` + `busy:true` 这一对是给前端认的**结构化**标记，
+       别改成匹配中文文案。 */
+    if (d && d.source_switch) camBusy(!!(d.busy));
+    XQ.flash(t);
+  },
+  onDown: (down) => {
+    LINK_DOWN = down;
+    paintLive();
+    XQ.flash(down ? '未连上服务端，数字显示为「—」（用 run_ui.bat 启动即可）'
+                  : '已连上服务端');
+  },
+  /* ★ 2026-09-25 常听唤醒：`{"type":"voice"}` 那条通道**只有这一页关心**，
+     所以它不在 `XQ.connect` 主干的那几个分支里（见 live.js 那个 catch-all，
+     试音台的 `tts_voices` 也是走的它）。
+     ⚠️ 这一句**必须真的接上**，而且**只能转给这一页自己那颗按钮开的耳朵**：
+       漏了它，界面上什么都不动 —— 而服务端那边其实**已经叫醒了、也已经识别了**，
+       表现是"对着麦克风说了半天，屏幕上一点反应都没有"（自测第一版就是这么
+       判红的，服务端全绿、页面全哑）。`XQ.wake.onMsg` 里自己认是不是它在听。 */
+  onMsg: (type, d) => {
+    if (type === 'voice' && XQ.wake && XQ.wake.onMsg) XQ.wake.onMsg(d);
+  },
+});
+
+render({ severity: 'normal', probs: {}, severity_name: '清醒', level: 0, level_name: '清醒',
+         attention: '专注', b2_ready: false, pc_ready: false, l1: 0, alarms: [] });
+</script>
+</body>
+</html>

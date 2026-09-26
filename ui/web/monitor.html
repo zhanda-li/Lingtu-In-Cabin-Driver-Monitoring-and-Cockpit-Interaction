@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>监测详情 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+</head>
+<!-- =========================================================================
+     05 监测详情 —— 「驾驶监测」那张卡里「更多」的去处。
+     -------------------------------------------------------------------------
+     ★ 第八次改版（用户 2026-09-25 原话：「点更多直接到下一页 不是在我这里下边
+     出现五个按钮」「我的意思是更多 然后直接跳转一页 不是在这一页了」）：
+       · 原来那五项（综合概览/疲劳分析/生理指标/行为特征/历史记录）是 detail.html
+         **同一页里的五个页签**，后来收进一颗「更多」的浮层菜单 —— 还是同一页。
+       · 现在它是一张**真的页面**：点「更多」= 跳到这一页，四项各自一节，
+         从上往下排（`疲劳分析 / 生理指标 / 行为特征 / 历史记录`）。
+       · 「综合概览」不再是一项 —— 它**就是 detail.html 本身**，所以在这一页
+         它是左上那颗返回箭头（`.ptitle .back`）。
+
+     ★ 第十五次改版（用户 2026-09-25 原话：「监测详情部分 各个方框占的位置布局
+     不好 重新布局 不要中间留空白 对齐」+「监测详情页面把建议与提示部分去掉」）：
+       · 布局：三列**均分** + `align-items:stretch`，图表卡加 `.grow` 让图跟着
+         长高，统计卡内容垂直居中；「行为特征」从 4 张重排成 5 张（原
+         「点头 / 哈欠」把趋势图分出去单列）按 3 + 2 铺满两行。
+         规则全在 `pages.css` 的 05 段，那里有改前实测的卡高和完整理由。
+       · 「建议与提示」整块删掉（`<ul class="adv">` + `const ADVICE` + 那段
+         `$('adv')` 绑定），历史记录改成和上面同款的三列格 + `.span-all` 满行。
+         ⚠️ 那是全站唯一一处，删掉后这一页再没有那三颗动作按钮；功能本身还在
+            `chat.html` 和 `detail.html`，见正文那段注释。
+
+     ⚠️ 这一页的每一块都是从 detail.html **搬过来的**，markup 和 render 的写法
+        一个字没改（id 也照旧）—— 所以 `_check_grade.py` 里读 `#fPFat` / `#bNormal`
+        那几段**必须跟着改到这一页**，不然它会在 detail.html 上读到 null。
+     ⚠️ 数据流和 detail.html 是**各连各的**（`XQ.connect` 各开一条 WebSocket）：
+        两页同时开着时，服务端给两边的 state 是同一份，不存在"哪一页先"。
+     ========================================================================= -->
+<body class="pg-dms" data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <div class="ptitle">
+        <a class="back" href="detail.html" title="返回驾驶监测" id="backBtn"></a>
+        <h1>监测详情</h1>
+        <span class="spacer"></span>
+        <!-- 时钟和「实时监测中」这两颗和 detail.html 同款 —— 这一页也在收数，
+             不写的话它会看起来像一张静态报表。 -->
+        <span class="mon-clock">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.4V12l3.2 1.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span id="monClock">—</span>
+        </span>
+        <span class="mon-live off" id="monLive"><i class="d"></i>连接中…</span>
+      </div>
+
+      <!-- ⚠️ 四节的 `data-tab="fatigue|vital|behav|history"` **留着**，两个用处：
+             ① 深链（`monitor.html#fatigue` 这种）；
+             ② `_scratch/_check_grade.py` / `_check_alarm.py` 里那些
+                `[data-tab="behav"] .p4 .p4-row` 选择器**照旧能按**（它们原来是
+                点在「驾驶监测」那一页上的，第八次改版只把目标页换成了这一页）。
+           别为了"这里没有页签了"把它们删掉 —— 删了那两个检查脚本会安静地
+           扫不到任何东西（空数组 = 报红，但报的是"页面不对"）。 -->
+      <!-- ============ 疲劳分析 ============ -->
+      <section class="mon-sec" id="fatigue" data-tab="fatigue">
+        <div class="mon-sec-h"><h2>疲劳分析</h2></div>
+        <div class="three">
+          <section class="card card-pad">
+            <div class="card-h"><h3>支路二 · 面部路</h3><span class="note" id="b2Note">—</span></div>
+            <div class="mtiles">
+              <div class="mt"><div class="k">疲劳概率 P(fat)</div><div class="v" id="fPFat">—</div><div class="bar"><i id="fPFatBar"></i></div></div>
+              <div class="mt"><div class="k">PERCLOS</div><div class="v" id="fPc">—</div><div class="bar"><i id="fPcBar"></i></div></div>
+              <div class="mt"><div class="k">眨眼频率</div><div class="v" id="fBr">—</div></div>
+              <div class="mt"><div class="k">哈欠时长</div><div class="v" id="fYawn">—</div></div>
+              <div class="mt wide"><div class="k">闸门（支路一判"正视前方"才投票）</div><div class="v" id="fGate">—</div></div>
+            </div>
+          </section>
+          <section class="card card-pad grow">
+            <div class="chart">
+              <div class="chart-h"><b>疲劳概率趋势</b></div>
+              <div class="plot" id="plotPFat"></div>
+            </div>
+          </section>
+          <section class="card card-pad grow">
+            <div class="chart">
+              <div class="chart-h"><b>哈欠时长（秒）</b></div>
+              <div class="plot" id="plotYawn"></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ 生理指标 ============ -->
+      <section class="mon-sec" id="vital" data-tab="vital">
+        <div class="mon-sec-h"><h2>生理指标</h2></div>
+        <div class="three">
+          <section class="card card-pad grow">
+            <div class="card-h"><h3>心率（实时）</h3><span class="note">HPM5300 + MAX30102</span></div>
+            <!-- ★ 2026-09-26：心率这一格**接上了** —— 板端 MAX30102 采原始 PPG，
+                 串口进 PC（`ui/serial_hr.py`）算成 BPM，服务端贴进 state 的 `hr`。
+                 ⚠️ 血氧那一格**仍然是「未接入」，这是真话**：硬件上两个通道都有
+                     （RED + IR，正好是 SpO2 要的两路），但**没有做过任何标定**，
+                     没标定的比值法算出来是个看着合理的假数 —— 别为了让版面对称
+                     去填一个（这一页最不该有的就是"看起来量到了"）。
+                 ⚠️ 第十五次改版：这一张是全行最矮的（122 vs 两张图的 212），
+                 靠 `.card.grow` 把两格撑满 —— 不然它下面空着 90px。
+                 ★ 2026-09-26：加了两格（脉搏波幅度 / PI），2×2 —— 那一张不再
+                 是"最矮的"了，但 `.card.grow` 照旧（邻居的高度是它撑的）。 -->
+            <div class="mtiles" style="margin-top:.7rem">
+              <div class="mt"><div class="k">心率</div><div class="v na" id="mvHr">未接入</div></div>
+              <!-- ★ 2026-09-26：心率那一路的另外两个量。`.mtiles` 是 `1fr 1fr`
+                   （两列），2+2 正好补成 2×2 —— 形状不变，只是多了一行。
+                   ⚠️ `.mt` 被 design.html / link.html 共用，样式一行都没动。
+                   ★ 2026-09-26 深夜：格子**原本是 `#mvRr`（HRV-RMSSD）**，换掉了
+                   —— 它要 NN 连续跨度 ≥ 30 s 才有值，屏幕上基本永远一根横杠。 -->
+              <div class="mt"><div class="k">脉搏波幅度</div><div class="v na" id="mvAc">--</div></div>
+              <div class="mt"><div class="k">PI 灌注指数</div><div class="v na" id="mvPi">--</div></div>
+              <div class="mt"><div class="k">血氧 SpO₂</div><div class="v na">未接入</div></div>
+            </div>
+          </section>
+          <section class="card card-pad grow">
+            <div class="chart">
+              <div class="chart-h"><b>眨眼频率（次/分）</b></div>
+              <div class="plot" id="plotBr"></div>
+            </div>
+          </section>
+          <section class="card card-pad grow">
+            <div class="chart">
+              <div class="chart-h"><b>眼开度（归一化）</b></div>
+              <div class="plot" id="plotEn"></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ 行为特征 ============ -->
+      <section class="mon-sec" id="behav" data-tab="behav">
+        <div class="mon-sec-h"><h2>行为特征</h2></div>
+        <div class="three">
+          <section class="card card-pad grow">
+            <div class="card-h"><h3>二类行为概率</h3><span class="note" id="b1Note">支路一</span></div>
+            <!-- ⚠️ 这里**只有两类**（normal / fatigue）：三类改二类之后 phone
+                 并进了 fatigue（见 `ui/state.py` 的 CLASSES）。以前写死三类时
+                 这一页会主动印出「低头看手机 0%」—— 那不是死元素，是在断言一个数。 -->
+            <div class="p4" style="border-top:none;padding-top:0">
+              <div class="p4-row"><span>正常</span><div class="bar"><i id="bNormal"></i></div><b id="bvNormal">—</b></div>
+              <div class="p4-row fatigue"><span>疲劳（低头·点头）</span><div class="bar"><i id="bFatigue"></i></div><b id="bvFatigue">—</b></div>
+            </div>
+          </section>
+          <section class="card card-pad grow">
+            <div class="chart">
+              <div class="chart-h"><b>头部晃动 d_pitch（度）</b></div>
+              <div class="plot" id="plotPitch"></div>
+            </div>
+          </section>
+          <section class="card card-pad grow">
+            <div class="card-h"><h3>多维度数据</h3><span class="note">支路一 × 支路二</span></div>
+            <div class="dims">
+              <div class="dim"><div class="k">眼睑状态</div><div class="v" id="dEye">—</div></div>
+              <div class="dim"><div class="k">头部姿态</div><div class="v" id="dPose">—</div></div>
+              <div class="dim"><div class="k">面部表情</div><div class="v" id="dFace">—</div></div>
+              <div class="dim"><div class="k">低头倾向</div><div class="v" id="dAtt">—</div></div>
+            </div>
+          </section>
+          <!-- ★ 第十五次改版：原来「点头 / 哈欠」是一张卡（两个数 + 一条趋势图），
+               高 309，比同节其它卡（112 / 184 / 212）高出一大截 —— 按 3 列排时
+               它把整行顶到 309，另外三张被撑得很难看。现在把趋势图分出来单列一张，
+               五张卡按 3 + 2 铺满两行，两行都刚好 212。
+               ⚠️ 只是**拆卡**，id（`bNod` / `bYawn` / `plotNod`）和读数一个字没改。 -->
+          <section class="card card-pad grow">
+            <div class="card-h"><h3>点头 / 哈欠</h3></div>
+            <div class="mtiles">
+              <div class="mt"><div class="k">点头（次）</div><div class="v" id="bNod">—</div></div>
+              <div class="mt"><div class="k">哈欠（秒）</div><div class="v" id="bYawn">—</div></div>
+            </div>
+          </section>
+          <section class="card card-pad grow span2">
+            <div class="chart">
+              <div class="chart-h"><b>点头次数趋势</b></div>
+              <div class="plot" id="plotNod"></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ 历史记录 ============ -->
+      <section class="mon-sec" id="history" data-tab="history">
+        <div class="mon-sec-h"><h2>历史记录</h2></div>
+        <!-- ★ 2026-09-25 第十五次改版：用户原话「监测详情页面把建议与提示部分去掉」。
+             原来这里是 `bottom3` + 内联 1.2fr/.8fr 两列（846 / 564），右边那张
+             「建议与提示」（`.adv` / `#adv` / `const ADVICE`）**整块删掉**。
+             ⚠️ 那一块**全站只有这一处**（`detail.html:446` 的注释写着它是第八次
+                改版从 detail.html 搬过来的），删掉之后这一页就没有
+                「播放舒缓音乐 / 导航至最近服务区 / 查看实时驾驶状态」这三颗按钮了。
+                功能本身没丢 —— `chat.html:361` 有一模一样的一份（连同
+                `XQP.playCalm()` 那段），`detail.html:706` 的 `QUICK_SHORT` 也还在。
+             ⚠️ 剩下的「状态变化记录」原来只占左边那一列，右边空着 —— 现在改成
+                和上面几节同一个三列格 + `.span-all` 铺满整行。 -->
+        <div class="three">
+          <section class="card card-pad span-all">
+            <div class="card-h"><h3>状态变化记录</h3><span class="note" id="tlNote">—</span></div>
+            <ul class="tl" id="tl2"></ul>
+          </section>
+        </div>
+      </section>
+
+      <!-- ★ 2026-09-26 删掉这里一段 `<p class="fine-print">`（「这一页的数全部
+           来自服务端推的 state。**没有的模块不画假数** —— 心率那一路明确写
+           「未接入」。」）。两条理由：
+             1. 它现在是**假话**：心率这一路接上了（串口进来的真数）。
+             2. 它是解释"这一页怎么用 / 这个数哪来的"的整句 —— 用户说过四次
+                界面只留标签和数字。而且那两个 `**` 是 markdown 星号，
+                在 HTML 里**会原样显示出来**（这段八成是从注释里抄过来的）。
+           ⚠️ 删了之后这一页底部少 3 行，`#vital` 那两节的间距靠 `.mon-sec`
+              自己撑，不需要补占位。 -->
+
+    </div>
+
+    <!-- ---------- 下：小瑞对话栏（和驾驶监测页同一套） ---------- -->
+    <div class="talk" id="talk">
+      <div class="talk-ava">
+        <img id="talkAvaImg" alt="" hidden>
+        <div id="talkAvaSvgHost"></div>
+      </div>
+
+      <div class="bubbles" id="bubbles"></div>
+
+      <div class="talk-input">
+        <input id="sayInput" placeholder="对小瑞说点什么…（试试「我有点困」）" autocomplete="off">
+        <button class="send" id="send" title="发送">发送</button>
+        <button class="mic" id="mic" title="点一下开始说话，再点一下结束">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0v-6a3 3 0 0 1 3-3z" fill="currentColor"/><path d="M19 12a7 7 0 0 1-6 6.9V22h-2v-3.1A7 7 0 0 1 5 12h2a5 5 0 0 0 10 0z" fill="currentColor"/></svg>
+        </button>
+        <!-- 常听唤醒（说「你好，小瑞」）。和上面那颗麦克风是**两件事**，
+             说明见 detail.html 里那段注释；它从 2026-09-25 晚起**打开页面就自己开麦**，
+             这颗键管的是「停」（见 web/wake.js 文首第 1 条）。 -->
+        <div class="wk">
+          <button class="wk-btn" id="wake" aria-pressed="false"
+                  title="点一下让小瑞开始听（说「你好，小瑞」）">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6a4.4 4.4 0 0 0-4.4 4.4v6.2a4.4 4.4 0 0 0 8.8 0V7A4.4 4.4 0 0 0 12 2.6z" fill="currentColor"/><path d="M5.4 11.6a1 1 0 0 1 2 0 4.6 4.6 0 0 0 9.2 0 1 1 0 0 1 2 0 6.6 6.6 0 0 1-5.6 6.5v2.7a1 1 0 0 1-2 0v-2.7a6.6 6.6 0 0 1-5.6-6.5z" fill="currentColor"/></svg>
+            <span class="wk-label">听</span>
+          </button>
+          <div class="wk-line">
+            <div class="wk-host off" id="wakeHost">没在听</div>
+            <div class="wk-detail" id="wakeDetail"></div>
+          </div>
+        </div>
+        <a class="talk-more" href="chat.html" title="打开完整对话页面">展开完整对话 ›</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script src="/static/wake.js"></script>
+<script>
+/* =========================================================================
+   05 监测详情 —— 「更多」跳过来的那一页（文件头的注释说了为什么）。
+   这一支的每一块都是**从 detail.html 搬过来的**（连 id 一起），
+   所以那边的 `render()` 现在就只剩概览那几行。
+
+   ⚠️ 四档的台词 / 表情和首页**共用一份**（`XQ.LOOK`，在 live.js 里）。
+      各写一份的下场：改了档位定义之后某一页停在上一个版本的文案上，
+      `LOOK[lvKey]` 照样取得到一个值，**不报错、看着完全正常**。
+   ⚠️ 阈值也只有一处（`XQ.alarms.yawnMin` / `hello` 里的 `alarm_cfg`），
+      这一页不另存一份 —— 抄一份的下场是图上那条线和卡里那个档位不是一个数。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+const ICON = XQ.ICON;
+
+/* 拿不到元素就静默跳过 —— 这一页的元素比 detail.html 少，逐个 if 会让函数没法读。 */
+const T = (id, txt) => { const e = $(id); if (e) e.textContent = txt; };
+const W = (id, pct) => { const e = $(id); if (e) e.style.width = Math.max(0, Math.min(100, pct)) + '%'; };
+/* 同 detail.html 的 TNA：`.v.na` 是「未接入」那一档的灰字样式（pages.css:1539），
+   有真数时要把类摘掉，否则数字会按"没量到"的样式显示。 */
+const TNA = (id, txt, na) => {
+  const e = $(id);
+  if (!e) return;
+  e.textContent = txt;
+  e.classList.toggle('na', !!na);
+};
+
+/* 头部姿态那一格。判据和首页 app.js 的 `POSE_OF` 逐字一样 ——
+   ⚠️ 别改读 `s.l1`（那是**级别**不是类别下标，三类之后只会给出两个值）。 */
+function poseOf(s) {
+  const POSE_OF = {'疲劳点头': '点头', '头部持续低垂': '低头',
+                   '略有低头': '略低头', '专注': '正常'};
+  return POSE_OF[s.attention] || '正常';
+}
+
+const LV = XQ.LV;
+const LOOK = XQ.LOOK;
+/* [右上角那枚 pill 的字, 大标题取不到 severity_name 时的兜底]。
+   ⚠️ 兜底那几个词必须和服务端那个「档位名」一致（清醒/轻度疲劳/中度疲劳/重度疲劳）。 */
+const PILL = {
+  normal: ['安全驾驶', '清醒'],
+  mild: ['注意', '轻度疲劳'],
+  moderate: ['警告', '中度疲劳'],
+  severe: ['紧急', '重度疲劳'],
+};
+
+/* ⚠️ 这里原来有一张 `const ADVICE`（建议与提示那三颗按钮的动作表）——
+   第十五次改版按用户要求把那块整个删了，见上面 `<div class="three">` 那段注释。
+   ⚠️ 删的时候**必须连下面 `$('adv')` 那段绑定一起删**：元素没了之后
+      `$('adv').innerHTML = …` 会在 `null` 上当场抛，而它在启动链上 ——
+      抛一次，后面 `bindTalk()` / `link = XQ.connect(...)` 全都不会执行，
+      表现是"页面画得出来但一个数都不动"，且控制台只报一次。 */
+
+let link = null;
+/* 服务端 hello 给的阈值表（`ui/config.json` 的 severity 段）。默认空对象 ——
+   拿不到就退回各自的等价默认值，不会因为少一个字段变成 NaN。 */
+let SEV_CFG = {};
+
+/* ---------------------------------------------------------------- 图表 */
+let tick = 0;
+function drawCharts(force) {
+  if (!force && (tick++ % 8)) return;        // 状态 8 Hz，图 1 Hz 就够
+
+  const H = XQ.Hist;
+
+  const pf = H.series('p_fat', 60);
+  XQ.plot($('plotPFat'), {
+    t: pf.t, v: pf.v, yMin: 0, yMax: 1, ticks: [0, 0.35, 0.55, 1],
+    fmt: (x) => x.toFixed(2), callout: '当前', empty: '还没有判决（缓冲未满 27 秒）',
+  });
+
+  const yw = H.series('yawn_sec', 60);
+  XQ.plot($('plotYawn'), {
+    t: yw.t, v: yw.v, yMin: 0, yMax: 6, ticks: [0, 2, 4, 6],
+    fmt: (x) => x.toFixed(0), callout: '当前', empty: '还没有数据',
+  });
+
+  const br = H.series('brate', 60);
+  XQ.plot($('plotBr'), {
+    t: br.t, v: br.v, yMin: 0, yMax: 30, ticks: [0, 10, 20, 30],
+    fmt: (x) => x.toFixed(0), callout: '当前', empty: '还没有数据',
+  });
+
+  const en = H.series('en_now', 60);
+  XQ.plot($('plotEn'), {
+    t: en.t, v: en.v, yMin: 0.4, yMax: 1.2, ticks: [0.4, 0.8, 1.2],
+    fmt: (x) => x.toFixed(2), callout: '当前', empty: '还没有数据',
+  });
+
+  const dp = H.series('d_pitch', 60);
+  XQ.plot($('plotPitch'), {
+    t: dp.t, v: dp.v, yMin: 0, yMax: 40, ticks: [0, 12, 25, 40],
+    fmt: (x) => x.toFixed(0), callout: '当前', empty: '还没有数据',
+  });
+
+  const nd = H.series('nod', 60);
+  XQ.plot($('plotNod'), {
+    t: nd.t, v: nd.v, yMin: 0, yMax: 12, ticks: [0, 4, 8, 12],
+    fmt: (x) => x.toFixed(0), callout: '当前', empty: '还没有数据',
+  });
+  /* ⚠️ `XQ.plot` 的第一句是 `el.innerHTML = ''`，拿到 null 会**当场抛**，
+     抛在 8 Hz 这条路上等于整页从那一拍开始不再更新（控制台只报一次）。
+     所以：**删图必须连着这一句一起删**，别只删 markup。 */
+}
+
+/* ---------------------------------------------------------------- 历史 */
+/* 这里存的 `lv` 是**档位键**（`severity`），时间轴圆点画的也是这一档的颜色
+   （pages.css 的 `.tl li.normal/mild/moderate/severe`）。 */
+let lastLv = null;
+let sessionStart = Date.now();
+const EVENTS = [];
+
+function noteEvent(lv) {
+  if (lv === lastLv) return;
+  lastLv = lv;
+  EVENTS.unshift({ t: new Date(), lv });
+  if (EVENTS.length > 40) EVENTS.pop();
+  renderTimeline();
+}
+
+function renderTimeline() {
+  T('tlNote', `本次会话 · ${XQ.Hist.fmtSpan()}`);
+  const rows = EVENTS.length ? EVENTS : [{ t: new Date(sessionStart), lv: 'normal' }];
+  const html = rows.map((e, i) => {
+    /* class 直接用**档位键**（四档各对应 pages.css 里一条 `::after`）。
+       认不出来的键退回 normal，不要留空 class —— 空 class 不是"没颜色"，
+       是圆点掉回主题色（静默错，不报错）。 */
+    const cls = PILL[e.lv] ? e.lv : 'normal';
+    const hh = String(e.t.getHours()).padStart(2, '0');
+    const mm = String(e.t.getMinutes()).padStart(2, '0');
+    const desc = i === 0 ? '当前状态' : '状态发生变化';
+    return `<li class="${cls}"><time>${hh}:${mm}</time>`
+         + `<b>${PILL[cls][1]}</b><p>${desc}</p></li>`;
+  }).join('');
+  if ($('tl2')) $('tl2').innerHTML = html;
+}
+
+/* 「实时监测中」。⚠️ 它跟着**数据到没到**亮，不跟着连接状态猜 ——
+   连上了但服务端不出数（推理崩了）时，这一颗必须是灭的。
+   detail.html 那一份还多写右列那颗「推流中」，这一页没有那颗。 */
+function paintLive(text, off) {
+  const a = $('monLive');
+  if (a) { a.classList.toggle('off', off); a.lastChild.textContent = text; }
+}
+
+/* ---------------------------------------------------------------- 渲染 */
+function render(s) {
+  const lvKey = LV[s.severity] || 'normal';
+  document.body.dataset.sev = lvKey;
+  const pill = PILL[lvKey] || PILL.normal;
+
+  /* ⚠️ 哈欠秒数**每帧只锁存一次**（实现在 live.js 的 `XQ.yawnShown`）——
+     下面「哈欠时长」「面部表情」「哈欠（秒）」三处全读这一份。
+     各处各调一次的话锁存会被推两次，"涨的那一刻"当场被消耗掉，
+     于是**到处都读 0**（不报错，只是哈欠永远不出现）。 */
+  const yawnS = XQ.yawnShown(s.yawn_sec);
+
+  /* 疲劳分析 */
+  /* 支路二是**两级**就绪（见 `ui/state.py` 的 ROLL_WIN / WARMUP_SEC）：
+     基线攒够 10 秒先出统计量（PERCLOS 这些），连续 27 秒才出模型判决。
+     只说"热身中"会把中间那 17 秒说错 —— 那 17 秒里 PERCLOS 已经有数了。 */
+  T('b2Note', s.b2_ready ? '已出判决'
+                        : (s.pc_ready ? '统计量已出 · 待判决' : '热身中'));
+  T('fPFat', s.p_fat == null ? '—' : s.p_fat.toFixed(2));
+  W('fPFatBar', s.p_fat == null ? 0 : s.p_fat * 100);
+  T('fPc', s.perclos == null ? '—' : (s.perclos * 100).toFixed(1) + '%');
+  W('fPcBar', s.perclos == null ? 0 : s.perclos / 0.6 * 100);
+  T('fBr', s.brate == null ? '—' : s.brate.toFixed(1));
+  T('fYawn', yawnS == null ? '—' : yawnS.toFixed(1) + ' s');
+  T('fGate', s.b2_ready ? (s.gate ? '开 · 支路二正在投票' : '关 · 支路二暂停投票') : '—');
+
+  /* 生理指标：心率 —— HPM5300 + MAX30102 的真数（`ui/serial_hr.py`）。
+     没有读数时（手指没按上去 / 串口没数据 / 心跳还没攒够）走「未接入」那一档：
+     `serial_hr.py` 那一路**只会给 None 或者一个真的数**，中间没有"估一个"。
+     ⚠️ 血氧那一格**不在这里写** —— 它是死的（`class="v na"` 写死在 HTML 里），
+        因为 SpO2 没做过标定，硬算出来会是个看着合理的假数。 */
+  TNA('mvHr', XQ.hrText(s), s.hr == null);
+  /* ★ 2026-09-26：心率那一路的另外两个量。格式与首页/detail 逐字一致
+     （`hr_ac` 取整、无量纲；`hr_pi` 百分数两位）。 */
+  TNA('mvAc', s.hr_ac == null ? '--' : s.hr_ac.toFixed(0), s.hr_ac == null);
+  TNA('mvPi', s.hr_pi == null ? '--' : s.hr_pi.toFixed(2) + ' %', s.hr_pi == null);
+
+  /* 行为特征 */
+  const P = s.probs || {};
+  T('b1Note', s.source === 'demo' ? '演示数据' : '支路一 · 实测');
+  /* 清单跟着 `ui/state.py` 的 CLASSES 走（现在是两类）。 */
+  const ROWS = [['Normal', 'normal'], ['Fatigue', 'fatigue']];
+  ROWS.forEach(([K, k]) => {
+    const v = P[k] || 0;
+    W('b' + K, v * 100);
+    T('bv' + K, (v * 100).toFixed(0) + '%');
+  });
+  T('bNod', s.nod == null ? '—' : s.nod.toFixed(0));
+  T('bYawn', yawnS == null ? '—' : yawnS.toFixed(1) + ' s');
+
+  /* 多维度 */
+  /* ⚠️ 判据用**配置里**的 `moderate_perclos`（= 需求文档的 42.6%），不写死 0.35 ——
+     全项目只有 0.187 / 0.426 两条数值阈值，写死 0.35 会让人以为还有第三条，
+     而且改 config 时它不会跟着动。`SEV_CFG` 要到 hello 之后才有值。 */
+  T('dEye', s.perclos == null ? '—'
+      : (s.perclos > (SEV_CFG.moderate_perclos > 0 ? SEV_CFG.moderate_perclos : 0.426)
+         ? '闭合偏多' : '正常'));
+  T('dPose', poseOf(s));
+  T('dFace', (yawnS || 0) >= XQ.alarms.yawnMin ? '哈欠' : (s.mar > 0.5 ? '张口' : '平静'));
+  /* 「低头倾向」：**由行为量映射**，不读概率。
+     ⚠️ 这一格踩过两次坑（读 `probs.glance` / `probs.phone`）—— 那两个项在类别
+        合并之后就没了，式子变 NaN、比较恒 false，于是**永远显示「正常」**。 */
+  T('dAtt', {'疲劳点头': '偏高', '头部持续低垂': '偏高',
+             '略有低头': '略高'} [s.attention] || '正常');
+
+  noteEvent(lvKey);
+}
+
+/* ---------------------------------------------------------------- 对话栏 */
+/* 和 detail.html / 首页同一套实现（那边有完整注释）。 */
+const MAX_BUBBLES = 12;
+
+function addBubble(role, text, pending) {
+  const box = $('bubbles');
+  const el = document.createElement('div');
+  el.className = 'b' + (role === 'me' ? ' me' : '') + (pending ? ' pending' : '');
+  el.innerHTML = `<u>${role === 'me' ? '我' : '小瑞'}</u><p></p>`;
+  el.querySelector('p').textContent = text;      // textContent：模型的话不进 HTML
+  box.appendChild(el);
+  while (box.children.length > MAX_BUBBLES) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+  return el;
+}
+
+function bindTalk() {
+  const input = $('sayInput');
+  const submit = (text) => {
+    text = (text || '').trim();
+    if (!text) return;
+    if (!link || !link.online) {
+      XQ.flash('还没连上座舱服务，这句话没发出去（用 run_ui.bat 启动服务端）');
+      return;
+    }
+    link.send({ type: 'say', text });
+    input.value = '';
+  };
+  $('send').onclick = () => submit(input.value);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(input.value); });
+  XQ.asr.bind($('mic'), { submit });
+  if ($('wake')) XQ.wake.bind($('wake'), $('wakeHost'));
+}
+
+function tickClock() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  T('monClock', `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
+               + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`);
+}
+
+/* ---------------------------------------------------------------- 起步 */
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${ICON.chevL}</svg>`;
+XQ.mountChrome({ active: 'mon' });
+/* `deck:'h'` = 接 43 张形象库的方形头像那套（点一下换个形象，见 live.js）。 */
+XQ.mascotSlot('talkAvaImg', 'talkAvaSvgHost', { simple: true, deck: 'h' });
+
+/* ⚠️ 这里原来是「建议与提示」那段绑定（`$('adv').innerHTML = ADVICE.map(…)`
+   加上它的 `li.onclick`，里面还挂着 ★★ 2026-09-25 晚那一段「真的放音乐」的
+   `XQP.playCalm()`）。第十五次改版按用户要求把那张卡整个删了，这段跟着删。
+   ⚠️ **不能只删 markup 留着这段**：`$('adv')` 会是 null，第一句 `.innerHTML` 就抛，
+      而它在启动链上 —— `tickClock` / `renderTimeline` / `bindTalk` / `XQ.connect`
+      全在它下面，一个都跑不到，页面看着"能画出来但一个数都不动"。
+   丢掉的入口在哪还有：`chat.html:361`（同样三颗，同样连着 `XQP.playCalm`）、
+   `detail.html:706` 的 `QUICK_SHORT`。 */
+
+tickClock();
+setInterval(tickClock, 1000);
+renderTimeline();
+bindTalk();
+
+link = XQ.connect({
+  onHello: (d) => {
+    XQ.wake.attach(link, d.voice);
+    XQ.wake.autostart();     // ★ 不用点任何一下就开始听（见 web/wake.js 文首第 1 条）
+    if (d.severity_cfg) SEV_CFG = d.severity_cfg;
+    /* 支路二那两条告警的两个数（保持时长 / 哈欠阈值）存在 live.js 里，
+       这一页不另存一份 —— 下面「哈欠时长」「面部表情」都读它。 */
+    XQ.alarms.setCfg(d.alarm_cfg);
+    const box = $('bubbles');
+    if (box && !box.children.length) {
+      addBubble('xq', '检测到困倦时，我会主动提醒并为您推荐舒缓音乐。');
+    }
+  },
+  onState: (s) => {
+    render(s);
+    drawCharts(false);
+    paintLive('实时监测中', false);
+  },
+  onSay: (d) => {
+    if (d.user) addBubble('me', d.user);
+    addBubble('xq', d.text);
+    /* `silent` 那条**只画气泡、不出声** —— 语音进来的答复由**开麦的那张页面**
+       自己念（`web/wake.js`），这里也跟着念的话同一个窗口里会念两遍。 */
+    if (!d.silent) XQ.speak(d.text, { emotion: d.emotion });
+    /* ★ 2026-09-25 晚：`action_done` **终于有人用了**（服务端一直在广播，原来零个
+       消费者）。点了「播放舒缓音乐」之后，这一句固定话术**不再是"这件事的全部"**
+       —— 歌真的在放、左下角那条也出来了。这时候再弹一句「本地固定话术（scripted）」
+       就是拿"没放音乐"的那句提示盖在"已经在放了"的现场上，用户看到的是自己刚报的
+       那个症状。所以这一条动作**不弹**（其余动作照旧弹：那句提示对它们是实话 ——
+       它们确实只有一句话术）。
+       ⚠️ 判据用 `d.action_done`，**不是** `d.text` 里有没有"放"字：前者是服务端
+          明说的"这一条对应哪个动作"，后者一改文案就失效。 */
+    if (d.backend && d.backend !== 'deepseek' && d.action_done !== 'music') {
+      XQ.flash('本地固定话术（' + d.backend + '）');
+    }
+  },
+  onInfo: (t) => { XQ.flash(t); },
+  onDown: (down) => {
+    paintLive(down ? '已断开' : '实时监测中', down);
+    XQ.flash(down ? '未连上服务端，数字显示为「—」（用 run_ui.bat 启动即可）'
+                  : '已连上服务端');
+  },
+  /* 常听唤醒那条通道只有**开着耳朵的那张页面**关心，这里照 detail.html 转一次。 */
+  onMsg: (type, d) => {
+    if (type === 'voice' && XQ.wake && XQ.wake.onMsg) XQ.wake.onMsg(d);
+  },
+});
+
+/* 先按"还没连上"画一版，页面不会是空的（数字全是「—」而不是 0）。 */
+render({ severity: 'normal', probs: {}, severity_name: '清醒', level: 0, level_name: '清醒',
+         attention: '专注', b2_ready: false, pc_ready: false, l1: 0, alarms: [] });
+drawCharts(true);
+</script>
+</body>
+</html>

@@ -1,0 +1,1696 @@
+/* =========================================================================
+   小瑞 · 灵途智行驾驶员监测界面
+   -------------------------------------------------------------------------
+   布局照抄 `ui/图片效果/1.jpg`（正常）`2.png`（轻度）`3.png`（重度）三张参考图：
+   顶栏 / 左导航 / 中间驾驶员画面 / 右驾驶员状态 / 最右小瑞 / 底部对话栏 / 最底气候栏。
+
+   **整个配色只有一个变量：--accent。** 三档状态只改它的值，其余全部继承。
+   这样"换档变色"是一处改动，不会出现"红色模式漏改了某个角"。
+   ========================================================================= */
+
+:root{
+  --ink:#F4F8FA;
+  --muted:#91A5B5;
+  --line:rgba(255,255,255,.10);
+  --glass:rgba(9,24,36,.52);
+  --glass-2:rgba(10,28,42,.68);
+  --r-lg:26px;
+  --r-md:18px;
+  --r-sm:12px;
+  /* ── 字号层级 ─────────────────────────────────────────────────────────
+     依据是 **ISO 15008 的字符墨迹视角**，不是「看着好看」。
+     该标准 4.5.2/4.5.4/4.5.5 管的是字符高度、笔画粗细比、间距，
+     **没有规定过字体名** —— 所以「车规级字体」这个说法本身不成立；
+     能说出口的是这三条线（700 mm 视距下的字符墨迹视角）：
+         非关键信息 ≥ 12′   ·   关键信息 ≥ 16′   ·   最优 20′
+
+     本机换算基准（全部实测，不是文献值）：
+         面板 14.2" / 2880x1920 / 系统 200%  ->  CSS 视口 1440x960
+         1 CSS px = 0.2083 mm（300mm ÷ 1440，EDID 实测）
+         视距按 700 mm  ->  1 CSS px ≈ 1.023 角分
+         汉字墨迹 0.91 em、数字墨迹 0.79 em（微软雅黑，canvas actualBoundingBox 实测）
+
+     ⚠️ 根字号是**流式**的（看下面 html 那条：同一个界面要同时喂 1024x768 的投影仪
+     和 1920x1080 的现场屏），所以只写 rem 不够 —— 1024 宽下 `.6rem` 只有 6.6px
+     = 6.1′，只有底线的 51%。**每一档都写成 `max(<像素地板>, <rem>)`**：
+     小窗时地板兜住，大屏时照常跟着放大。
+
+     档位                  1440 下    汉字角分   数字角分
+       --fs-note  次要小字   13.0px     12.1′      10.5′    ← 底线，不能再低
+       --fs-sm    次级信息   15.0px     14.0′      12.2′
+       --fs-body  正文/名称  16.2px     15.1′      13.1′
+       --fs-lead  强调正文   18.0px     16.8′ ✅   14.5′
+       --fs-num   指标数字   20.1px     18.7′ ✅   16.2′ ✅  ← 关键档
+       --fs-title 状态大标题 27.0px     25.1′ ✅   21.3′ ✅  ← 最优档
+
+     改之前实测：全库 156 处 font-size / 37 个 rem 取值，**133 处（85%）落在
+     7.7~12.2px，即 7.2′~11.7′，全部在底线以下**。这 6 档就是把那 37 个取值收敛的结果。
+     实测脚本：_scratch/_probe_type.py（改前/改后各跑一次对比） */
+  --fs-note:  max(13px, 1rem);
+  --fs-sm:    max(15px, 1.17rem);
+  --fs-body:  max(16px, 1.26rem);
+  --fs-lead:  max(18px, 1.4rem);
+  --fs-num:   max(20px, 1.56rem);
+  --fs-title: max(26px, 2.1rem);
+
+  /* 行高：中文是方块字，没有西文的升部降部留白，1.4 对中文长句偏紧。
+     标题/数字 1.25、正文 1.5。（ISO 15008 4.5.5 管字距，行高它不管。） */
+  --lh-tight: 1.25;
+  --lh-body:  1.5;
+
+  /* ── 主题色板（2026-09-23 加）────────────────────────────────────────────
+     这一层是**为浅色主题加的**：原来界面里的颜色是散在各条规则里的字面量，
+     换主题等于把每条规则抄一遍。收敛成变量之后，切换只换这一个块。
+     ⚠️ 深色值就是原来的字面量本身，所以**深色渲染逐像素不变**。
+     ⚠️ 命名按**角色**不按颜色（fill/line/track/panel/ink），
+        否则浅色主题里 `--white-05` 会变成一个"值是深的但名字叫白"的东西。
+     ⚠️ 只有**单色**才走变量；渐变和阴影那种多停靠点的，在浅色块里整条覆盖
+        （拆成变量反而更难看懂）。见下面 html[data-theme="light"] 那一段。
+     ⚠️ `--ink` / `--muted` / `--line` / `--glass` / `--glass-2` 这五条
+        **上面已经声明过了**，这里不重复 —— 浅色块靠选择器权重取胜
+        （`html[data-theme]` = 0,1,1 高于 `:root` = 0,1,0），跟声明顺序无关。 */
+  --ink-2:    #EAF4FB;      /* 正文亮字（原 #eaf4fb / #e2eef7 / #dbe7f0 / #EAF3F8）*/
+  --ink-3:    #C8D8E4;      /* 次级文字 */
+  --ink-4:    #B9CBD8;      /* 导航项文字 */
+  --ink-icon: #9FB4C4;      /* 图标 */
+  --on-accent:#04141B;      /* 压在强调色上的字（原 #04141b / #06121C）*/
+  --line-3:   rgba(255,255,255,.13);   /* 原 .12 / .14 */
+  --fill-1:   rgba(255,255,255,.035);  /* 原 .03 / .035 / .04 */
+  --fill-2:   rgba(255,255,255,.05);   /* 原 .045 / .05 / .06 */
+  --fill-3:   rgba(255,255,255,.075);  /* 原 .07 / .08 */
+  --fill-4:   rgba(255,255,255,.095);  /* 原 .09（文字块用途，不是进度槽）*/
+  --track:    rgba(255,255,255,.09);   /* 进度条槽底 */
+  --hair:     rgba(255,255,255,.07);   /* 装饰细线（地图底图那几条路）*/
+  --hair-2:   rgba(255,255,255,.14);   /* 稍重的装饰线 / 未走完的虚线 */
+  --hair-3:   rgba(255,255,255,.35);   /* 最重的装饰记号 */
+  --blk:      rgba(255,255,255,.035);  /* 地图上那几块地 */
+  --legend-bg:rgba(4,12,20,.72);       /* 地图角的图例底 */
+  --panel:    rgba(6,14,24,.86);
+  --panel-2:  rgba(6,16,26,.62);
+  --panel-4:  rgba(8,18,28,.90);
+  --panel-5:  rgba(8,18,28,.95);
+  --scrim:    rgba(0,0,0,.42);
+  --glow:     rgba(150,228,255,.28);
+  --glow-2:   rgba(150,228,255,.72);
+  --cta-a:    #EAF4FB;                 /* 「进入座舱」渐变亮的那一头 */
+  --page-bg:  #050B14;
+  --bg-img:   url("assets/bg.jpg");
+  --bezel-1:  #1B2634;
+  --bezel-2:  #0A121C;
+
+  /* ── 四档疲劳色（★ 2026-09-24「只做疲劳」：键名从**类别**换成**档位**）────
+     这四条和下面 `body[data-sev]` 那组是**同一个颜色的两种用法**，但不是一回事：
+     `--accent` 是"当前这一档"（整页只有一个），而 `--sev-*` 是"指定某一档"——
+     一屏里要同时并排看到四档时只能用它（疲劳概率条的渐变、时间线那四色圆点、
+     指标小格的严重度文字）。
+
+     ★ 这次改的是**键名，色值一个字节没动**，所以观感零回归。旧 → 新：
+     `glance` → `mild`（黄）、`phone` → `moderate`（橙黄）、`fatigue` → `severe`（红），
+     `normal` 两代同名。换名的理由：后端现在只做疲劳，`data-sev` 驱动的是
+     **疲劳档位**（`ui/state.py` 的 severity = 清醒/轻度/中度/重度），而这四档的
+     色序就是需求文档那张分级表的 绿 / 黄 / 橙黄 / 红。旧键名说的是支路一的
+     **类别**，三类之后它只剩 L0/L3 两档 —— 按它上色的话轻度/中度**永远变不出
+     黄和橙黄**，大标题还会和旁边「疲劳程度」那一行自相矛盾。
+
+     ⚠️ 值必须和 `body[data-sev]` 那四条、以及浅色块里那四条**保持一致** ——
+        四档色一共只该有"深色一套、浅色一套"两个出处。
+     ⚠️ `phone` / `fatigue` 这两个词**没有从界面消失**，它们降级成**模型类别名**，
+        只出现在「疲劳概率」那三条和 `attention`（低头看手机 / 疲劳点头）上
+        —— 那是支路一真的输出，名字不该改。**两套名字别混**：
+        配色 / 大标题 / 小瑞 = 档位（这套变量），概率条 = 类别（见 app.js 的 p4）。 */
+  --sev-normal: #18D7C5;   /* 清醒     —— 品牌青，不变 */
+  --sev-mild: #FFD400;     /* 轻度疲劳 —— = 原 --sev-glance（值不动）*/
+  --sev-moderate:  #FF9830;/* 中度疲劳 —— = 原 --sev-phone（值不动）*/
+  --sev-severe:#FF4055;    /* 重度疲劳 —— = 原 --sev-fatigue（值不动）*/
+}
+
+body[data-sev="normal"] { --accent:#18D7C5; --rgb:24,215,197; }
+body[data-sev="mild"]   { --accent:#FFD400; --rgb:255,212,0; }
+body[data-sev="moderate"]{ --accent:#FF9830; --rgb:255,152,48; }
+body[data-sev="severe"] { --accent:#FF4055; --rgb:255,64,85; }
+
+/* =========================================================================
+   浅色主题 —— 照 `ui/图片效果/12.png` 的色板（2026-09-23 加，用户点名）
+   -------------------------------------------------------------------------
+   换主题**只换这一层变量**，选择器一条都不重写 —— 这就是上面那套
+   `--fill-*` / `--line*` / `--panel*` 存在的理由。两个主题共用同一套规则，
+   所以不可能出现"改了深色忘了浅色"。只有**多停靠点的渐变**（背景、顶栏底、
+   光带）和几处需要整条替换的，才在下面单独列出来。
+
+   色值不是估的，是从 12.png 上取样出来的（脚本 `_scratch/_palette12.py`）：
+       玻璃底  #9ED0F6 ~ #D5E7F8   （占了全图 60% 的那几档淡蓝）
+       亮强调  #3397F5             青色高光  #7EDDFC      深墨蓝  #172D69
+
+   ⚠️ 两条最容易抄错的地方：
+     1. **`--fill-*` 要反过来变成"加暗"**。深色主题里那些值是"在白底上叠白"
+        （rgba(255,255,255,.05) 这种），浅色主题下白底叠白等于什么都没叠 ——
+        必须换成带蓝的暗色低透明度，否则整页的玻璃卡、悬停底、分隔全部消失。
+     2. **四档状态色必须重新给**，不能照搬深色那套。青/橙/红压在浅底上对比度
+        不够，「清醒」那档尤其读不出来（青在浅蓝底上几乎是同色）。浅色下改成
+        蓝=清醒 / 金=轻度 / 琥珀=中度 / 红=重度：**语义优先，不为了好看牺牲
+        可辨性**。实测对浅底 `#E4F0FB` 的对比度：蓝 3.57 / 金 3.30 / 琥珀 2.54 /
+        红 4.23 —— 读起来最费劲的其实是**琥珀**，而它的值这次一个字节都没动
+        （原来就是它），所以这一档**没有回归**，只是老问题留在原地。
+        ⚠️ 四档名的口径 2026-09-24 改过一次（原来是"正常/分心/看手机/疲劳"那条
+        **类别**轴），色值没动；这句"蓝/金/琥珀/红"说的是深浅，不是名字。
+   ========================================================================= */
+html[data-theme="light"]{
+  --ink:      #0E2A4A;      /* 正文主色，取自 12.png 的深墨蓝一档，压到能读 */
+  --ink-2:    #14406F;
+  --ink-3:    #2A5C8F;
+  --ink-4:    #33689E;
+  --ink-icon: #3E76AB;
+  --muted:    #5A87B4;
+  --on-accent:#FFFFFF;      /* 压在强调色上的字：浅色下改成白 */
+
+  --line:     rgba(255,255,255,.62);   /* 玻璃卡上的白描边，浅底靠它起边 */
+  --line-3:   rgba(255,255,255,.78);
+  --fill-1:   rgba(255,255,255,.42);
+  --fill-2:   rgba(255,255,255,.56);
+  --fill-3:   rgba(255,255,255,.68);
+  --fill-4:   rgba(255,255,255,.80);
+  --track:    rgba(23,45,105,.14);     /* 进度槽：浅底上要**暗**才看得见 */
+  --hair:     rgba(23,45,105,.12);
+  --hair-2:   rgba(23,45,105,.22);
+  --hair-3:   rgba(23,45,105,.38);
+  --blk:      rgba(255,255,255,.55);
+  --legend-bg:rgba(255,255,255,.86);
+
+  --panel:    rgba(255,255,255,.74);
+  --panel-2:  rgba(255,255,255,.62);
+  --panel-4:  rgba(255,255,255,.90);
+  --panel-5:  rgba(255,255,255,.95);
+  --glass:    rgba(255,255,255,.60);
+  --glass-2:  rgba(255,255,255,.78);
+  --scrim:    rgba(23,60,110,.16);     /* 阴影：白底上用蓝灰，不能用纯黑 */
+  --glow:     rgba(51,151,245,.26);
+  --glow-2:   #2E86D8;                 /* 这条例外：它是**文字色**不是辉光 */
+  --cta-a:    #3E9BF0;                 /* 「进入座舱」渐变亮的那一头 */
+
+  --page-bg:  #E4F0FB;
+  /* ★★ 2026-09-24（第四次改版）：底图换成 `ui/图片效果/背景.png`（用户点名
+     「把刚打开浏览器 没进入座舱前的背景变成背景.png图」）。
+     和原来那条 `none` 的区别不只是"有图了"：
+       · **座舱内那几页和封面用的是两张不同的压法**，同一张源图：
+           `bg_wash.jpg`  —— 缩小到 1280 宽 + 高斯模糊，再靠 `.bg::after`
+                              一层 0.78 的白把它洗成"纹理"（见下面那段）；
+           `bg_scene.jpg` —— 1920 宽原色，**只有封面**用（`body.cover` 那条）。
+       · 为什么不干脆都用原图：白卡片压在 1280 高的城市照片上，卡片边缘那一圈
+         会很花；而封面没有卡片，要的就是照片本身。所以是**两张压法**，
+         不是两个设计。
+     ⚠️ 生成脚本 `_scratch/_mk_bg.py`（那里还有一张 0.72/0.78/0.84 三档
+        洗白程度的对照图，改了白蒙版先去看那张）。
+     ⚠️ 深色主题那条 `url("assets/bg.jpg")` **一个字没动** —— 那是夜景，
+        和这次换的浅色底图是两回事。 */
+  --bg-img:   url("assets/bg_wash.jpg");
+  --bezel-1:  #C9DDF2;                 /* 手机模型的边框，浅色下是浅蓝 */
+  --bezel-2:  #93BBE0;
+
+  /* 四档状态色，和下面这组 `--accent` **逐字相同** —— 深色下青/橙/红在浅底上
+     读不出来（青尤其，在浅蓝底上几乎同色），浅色下换成蓝/金/琥珀/红。
+     改这里就得改下面那四条，反之亦然。
+     ⚠️ 浅色下 **金(轻度) 和 琥珀(中度) 是四档里最接近的一对**（都在黄橙之间），
+        实测 CIE Lab 色差 ΔE = **20.3**（深色那对是 40.1）；20 大约是 9 个
+        刚刚可辨的台阶，够用但不算宽裕。**别拿"把琥珀再往红挪"来拉开它** ——
+        试过 `#E2661A`，ΔE 反而降到 **19.3**，更近。真要拉开得动的是**金**
+        （往更亮的黄走），但那会和深色那套的 `#FFD400` 分家、两套色板的
+        对应关系就断了，所以维持现状。 */
+  --sev-normal: #1E7FD8;
+  --sev-mild: #A87B00;
+  --sev-moderate:  #D98212;
+  --sev-severe:#D62B44;
+}
+html[data-theme="light"] body[data-sev="normal"] { --accent:#1E7FD8; --rgb:30,127,216; }
+html[data-theme="light"] body[data-sev="mild"] { --accent:#A87B00; --rgb:168,123,0; }
+html[data-theme="light"] body[data-sev="moderate"]  { --accent:#D98212; --rgb:217,130,18; }
+html[data-theme="light"] body[data-sev="severe"]{ --accent:#D62B44; --rgb:214,43,68; }
+
+/* 背景三层：从"夜景照片 + 压暗罩 + 霓虹光带"换成"城市底图 + 一层洗白"。
+   这一块是整页观感的底子，只换变量表达不出来，所以整条覆盖。
+
+   ★★ 2026-09-24（第四次改版）：底图由**手搭的渐变天空**换成
+   `ui/图片效果/背景.png`（用户点名）。原来那一大套（三个 radial + 一条四色
+   linear，外加 `pages.css` 里给封面单独搭的 `::before` 玻璃地面 + `::after`
+   天际线两层）**整块作废** —— 现在底下是一张真照片，再叠那些手画的楼
+   就是两座城市打架。封面那两层已经从 pages.css 里删掉了。
+
+   分层：
+     `.bg`        照片本体（`--bg-img`，cover 定位）
+     `.bg::after` **座舱内**那几页的洗白（一台 0.36→0.26 的白渐变，见下）——
+                  封面**不要**这一层，封面要的就是照片本身（13.png 的观感）。
+     `.tint`      档位色的两团辉光（`.`=四档色，切档变色就靠它）+ 一层很薄的
+                  上下渐白，把顶栏和底栏那两条边压住。 */
+html[data-theme="light"] .bg{
+  background:var(--page-bg) var(--bg-img) center/cover no-repeat;
+  transform:none;
+}
+/* ★★ 2026-09-25（第九次改版）：**每页一张底图**，用户点名了四页。
+   「把首页整体大背景换成背景图1.png／多媒体…背景图3.png／驾驶监测…背景图2.png／
+     设置页面…背景图3.png」（多媒体和设置**共用**背景图3，那是用户点名的）。
+   做法是**在 body 上覆盖 `--bg-img` 这个变量**，不是给 `.bg` 抄四条 background ——
+   `.bg` 是 `<body>` 的直接子节点（见下面那段），变量自己就继承下去了；
+   抄四条的话 `var(--page-bg)` / `center/cover no-repeat` 那一串要重复四遍，
+   改一处漏三处。类名加在 `<body>` 上，因为 `.bg` 不在 `.app` 里。
+   ⚠️ 三张图是 `_scratch/_mk_bg2.py` 从 `ui/图片效果/背景图1|2|3.png` 出来的
+      （1600 宽、模糊 4.0、水印已裁）。**别再拿 `_mk_bg.py` 的 `bg_wash.jpg` 顶替** ——
+      那张是 1280 宽 + 7px 模糊，跟这三张不是一个观感。
+   ⚠️ 用户只点名了四页。**对话页和试音台是我顺手给的**（对话跟首页同族 →
+      背景图1；试音台跟设置同族 → 背景图3），用户还没表过态，**要改就改这两行**。
+      其余没点名的（flow / link / phone / design：三张旧作品页 + 深色的 design）
+      继续走**默认**那条 `--bg-img:url("assets/bg_wash.jpg")`（背景.png）。 */
+html[data-theme="light"] body.pg-home    { --bg-img: url("assets/bg1_wash.jpg"); }
+html[data-theme="light"] body.pg-chat    { --bg-img: url("assets/bg1_wash.jpg"); }
+html[data-theme="light"] body.pg-dms     { --bg-img: url("assets/bg2_wash.jpg"); }
+html[data-theme="light"] body.pg-media   { --bg-img: url("assets/bg3_wash.jpg"); }
+html[data-theme="light"] body.pg-voice   { --bg-img: url("assets/bg3_wash.jpg"); }
+/* 座舱内那几页：把照片洗一层白，让卡片压上去能读。
+   ★★ 2026-09-25（第九次改版）：**0.84/0.78/0.74 → 0.36/0.30/0.26**。
+      用户原话：「但是整体显示 出来还是太白 就是你背景没啥用」——
+      0.78 那一档底下那张照片已经只剩一点影子，**换哪张图都等于没换**
+      （这也是为什么"换底图"和"压蒙版"这两件事必须同一轮做完）。
+      新的三档是对着 `runs/_bg_wash_levels2.png` 定的（0.22/0.30/0.38/0.78 四格
+      并排）：0.22 城市/车已经很清楚，但源图本来就偏亮，再淡下去卡片之间
+      会开始"花"；0.38 又回到"只有一层雾"。取中间，顶栏那一格给到 0.36
+      （顶栏和左上角标志压在上面，那里最需要底子白一点）。
+   ⚠️ 改这个数先去看那张对照图（`_mk_bg2.py` 每次跑都会重出）。
+   ⚠️ 用 `body:not(.cover)` 而不是给座舱页加类：**只有封面有 `body.cover`**
+      （见 cover.html），加一个新类要改 10 个文件，而这里的分界本来就正好是它。
+      `.bg` 是 `<body>` 的**直接子节点**（`<div class="bg"></div>` 在
+      `<div class="app">` 前面，11 个页面都一样），所以这个后代选择器选得到。
+      `position:fixed` 不影响这件事 —— 它只改包含块，不改 DOM 层级。 */
+html[data-theme="light"] body:not(.cover) .bg::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg,
+    rgba(255,255,255,.36) 0%,
+    rgba(255,255,255,.30) 46%,
+    rgba(255,255,255,.26) 100%);
+}
+/* 压暗罩反过来变成**提亮罩**：浅色主题的层次靠"哪块更白"来做。
+   ★ 第四次改版：整体**减弱**。原来那条底部 .42 的白带是为了给手搭的地面
+     收边（地面上没东西了）；现在照片自己有地面，再压一条白带会把路压断。
+     两团档位辉光留着 —— 那是"换档变色"在背景上的落点，不是装饰。 */
+html[data-theme="light"] .tint{
+  background:
+    radial-gradient(70% 55% at 14% 8%,  rgba(var(--rgb),.11), transparent 62%),
+    radial-gradient(60% 50% at 88% 92%, rgba(126,221,252,.14), transparent 66%),
+    linear-gradient(180deg, rgba(255,255,255,.30) 0%, rgba(255,255,255,0) 42%, rgba(255,255,255,.26) 100%);
+}
+/* 封面：**原色照片**，不洗白。
+   ⚠️ 这里必须用 `body.cover`（0,1,1 + 元素）压过上面那条 `html[data-theme]`
+      级的选择器 —— 两条都在浅色块里，只比 `html[data-theme="light"] .bg`
+      （0,1,1）和 `html[data-theme="light"] body.cover .bg`（0,1,2）的权重，
+      后者胜。别写成 `.cover .bg`（0,2,0 vs 0,1,1 也够，但和文件里其它封面
+      规则不一致）。 */
+html[data-theme="light"] body.cover .bg{
+  background:var(--page-bg) url("assets/bg_scene.jpg") center/cover no-repeat;
+}
+/* 那几条霓虹光带是**深色主题的产物**（夜里车机上的氛围灯），浅色天空上留着
+   像三条划痕。直接不显示 —— 不是透明度调小，是不该出现在这套配色里。 */
+html[data-theme="light"] .streaks{ display:none; }
+html[data-theme="light"] .topbar{
+  background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(255,255,255,.34));
+  border-bottom-color:rgba(255,255,255,.72);
+  backdrop-filter:blur(10px) saturate(1.2);
+}
+
+/* ── 三处"灰蓝文字"，浅色下单独覆写（2026-09-24 全量推广时补）─────────────
+   这三条**原本是各自写死的十六进制**，而且是照着**深色底**挑的灰蓝：
+   深色下是"暗底上的暗字、有意压低一档"，同一组值挪到浅蓝底上就是
+   "浅底上更浅的字" —— 一个都读不出来。抽成变量并不合适：
+   它们不是某一种角色色（一个是不带底色的行内字、一个是 placeholder），
+   抽出来只会多三个一辈子只被用一次的名字。所以照"只覆写、深色那条一个字节
+   都不动"的先例办 —— 这条先例原来举的例子是 `.lingtu-txt em`，
+   那组规则 2026-09-24 晚随品牌组并成整张 lockup 一起删了，所以不再引用它。
+
+   ⚠️ 判断依据不是"看着浅就换"：这三条的对比度在浅底上是**真的不够**。
+      `.bubbles .b.me p` 尤其隐蔽 —— 它底下那层 `.talk` 是半透明的
+      `--glass-2`，浅色下算下来接近纯白，`#c2d4e0` 压上去肉眼几乎看不见，
+      而**气泡本身没有底色**，所以不是"底色配错了"，就是字色本身太浅。 */
+html[data-theme="light"] .p4-row span{ color:var(--muted); }
+html[data-theme="light"] .bubbles .b.me p{ color:var(--muted); }
+html[data-theme="light"] .talk-input input::placeholder{ color:var(--muted); }
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+
+/* 这条是必须的：`[hidden]` 在 UA 样式表里只是 `display:none`，权重极低，
+   任何一条 `display:grid/flex` 的类规则都能盖掉它 —— `.stats` 就中过招，
+   支路二还在热身、本该整块藏起来的格子照样显示出一排「—」。 */
+[hidden]{ display:none !important; }
+
+html{
+  /* 整套尺寸跟着视口走：投影仪 1024x768 和现场 1920x1080 都不会挤爆 */
+  font-size:clamp(11px, min(100vh / 58, 100vw / 112), 22px);
+}
+
+body{
+  height:100vh; overflow:hidden;
+  background:var(--page-bg); color:var(--ink);
+  font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;
+  display:flex; flex-direction:column;
+  -webkit-font-smoothing:antialiased;
+  transition:--accent .6s;
+}
+
+/* ---------------------------------------------------------- 背景三层 */
+.bg{
+  position:fixed; inset:0; z-index:0;
+  background:var(--page-bg) var(--bg-img) center/cover no-repeat;
+  transform:scale(1.04);
+}
+.tint{
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  background:
+    radial-gradient(70% 55% at 14% 8%,  rgba(var(--rgb),.22), transparent 62%),
+    radial-gradient(60% 50% at 88% 92%, rgba(var(--rgb),.16), transparent 66%),
+    linear-gradient(180deg, rgba(5,11,20,.72) 0%, rgba(5,11,20,.34) 42%, rgba(5,11,20,.82) 100%);
+  transition:background .7s ease;
+}
+
+/* 参考图里那几道横贯的长光带 */
+.streaks{ position:fixed; inset:0; z-index:1; pointer-events:none; overflow:hidden; }
+.streaks i{ position:absolute; display:block; border-radius:50%; filter:blur(.9rem); }
+.streaks .s1{
+  left:-6%; right:34%; top:9.4%; height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  opacity:.9; border-radius:2px; filter:blur(1px);
+  box-shadow:0 0 2.2rem rgba(var(--rgb),.75);
+  transition:box-shadow .7s;
+}
+.streaks .s2{
+  left:26%; right:-8%; top:60%; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(var(--rgb),.85),transparent);
+  opacity:.55; border-radius:2px; filter:blur(1px);
+}
+.streaks .s3{
+  left:40%; right:-4%; bottom:8.5%; height:2px;
+  background:linear-gradient(90deg,transparent,rgba(var(--rgb),.9),transparent);
+  opacity:.6; border-radius:2px; filter:blur(1.4px);
+  box-shadow:0 0 2rem rgba(var(--rgb),.6);
+}
+/* 光带全亮只有**重度**那一档。⚠️ 四档改名**没有给轻度/中度补中间台阶** ——
+   上一版（分心/看手机那两档）也没有：凭空补一级等于给轻度/中度加一层原来
+   没有的观感，不在这轮改动里。它们靠 `--accent`/`--rgb` 变色已经整页区分得开
+   （`.s1` 的背景色、`.tint`、`.glow` 全走这两个变量），不差这一条。 */
+body[data-sev="severe"] .streaks i{ opacity:1; }
+
+/* ---------------------------------------------------------- 骨架 */
+.app{
+  position:relative; z-index:2;
+  height:100%; display:flex; flex-direction:column;
+}
+
+/* 🔴 2026-09-25 晚：这里补了 `position:relative; z-index:40` —— **不是装饰**，
+   是修一个"顶栏里弹出来的东西被页面内容盖住"的 bug。用户原话：
+       「展开后为啥小瑞头像挡住了 展开后应该在顶层不在底层啊」
+   -------------------------------------------------------------------------
+   成因（量出来的，不是猜的）：浅色主题那条规则
+       html[data-theme="light"] .topbar{ backdrop-filter: blur(10px) ... }
+   里 **`backdrop-filter` 会创建层叠上下文**。`.topbar` 本身是 static、没写
+   z-index，于是它成了一个 `z-index:auto` 的层叠上下文 —— 这种上下文
+   **按 DOM 顺序参与绘制**，而 `.main` 排在它后面，于是**整条顶栏（连同里面
+   弹出来的个人档）都被 `.main` 盖在下面**。
+
+   ⚠️ 为什么给下拉自己写 z-index 没用：`.tb-menu` 那个 `z-index:60` 只在
+      **顶栏这个上下文内部**排序，而它和 `.main` 根本不在同一个上下文里比 ——
+      所以 60 再大也压不过后面绘制的 `.main`。**必须先让顶栏本身站上去**。
+   ⚠️ 为什么之前一直没暴露：座舱页顶栏里从来没有"会伸出顶栏之外的"东西
+      （院徽、品牌、副标题都在 6rem 里），被盖住也看不出来。个人档是第一个
+      往下伸出去的元素。
+   ⚠️ 为什么只有浅色主题坏：`backdrop-filter` 那条只在
+      `html[data-theme="light"]` 下生效；深色主题的顶栏不是层叠上下文，
+      子元素按常规 z-index 比，本来就是对的。**全站 10 页浅色**，所以用户
+      一眼就看到。哪天把浅色那条 backdrop-filter 去掉，这个 bug 会"自己好"
+      —— 但别去掉，那层毛玻璃是设计的一部分；`z-index:40` 留着才是正解。
+   ⚠️ 取 40 的依据：页面内容里最高的显式 z-index 是 `.toast` 的 50，
+      其余（`.cam-toggle` 4 / `.mon-recog` 3 / `.dash-say` 2 / `.mascot-svg` 1
+      / `.dash-mascot` 1）都不到 10。40 稳压所有页面内容，又把最顶层留给
+      toast 那类**真正的临时浮层**。 */
+.topbar{
+  position:relative; z-index:40;
+  flex:0 0 auto; height:6rem;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+  padding:0 1.6rem;
+  border-bottom:1px solid rgba(var(--rgb),.14);
+  background:linear-gradient(180deg, rgba(6,14,24,.86), rgba(6,14,24,.16));
+  transition:border-color .7s;
+}
+
+/* ⚠️ 2026-09-23：**顶栏品牌组只剩灵途智行自己了** —— 原来这里是
+   「Chery 官方 lockup + 一道竖线 + 灵途智行」，用户要求把左上角的 CHERY 换成
+   灵途智行（「左上角那个标换掉 但是左下角不去除」，所以左下角 `.rail-foot`
+   里那个 CHERY 一个字没动）。
+   这一改的连带后果：**没有"旁边那个车标"可以对齐了**，所以下面每一个尺寸
+   都要按"自己就是主角"重新定，不能再拿 2.05rem 当基准。 */
+/* ⚠️ `grid-column:1` 是**必须的**，不是装饰 —— 理由见 `.tbtitle` 那一段
+   （`display:none` 的中间格会让后面的项整体前移）。三列显式钉死，缺一不可。 */
+.brand{ grid-column:1; display:flex; align-items:center; gap:.75rem; color:var(--ink); }
+/* 车标（Chery 官方 lockup，从 ui/图片效果/8.png 抠出来的白墨透明底）。
+   ⚠️ 顶栏里**已经没有它了**，现在唯一的用处是**封面页脚**左下角那个 CHERY
+   （cover.html），那里由 `.cover-foot .brand-logo` 覆写成 1.7rem。
+   留在这条是当基准值，不是死规则 —— 别删，删了封面那处就没高度了。
+   出处与生成脚本见 _scratch/_mk_logo.py。 */
+.brand-logo{ height:2.05rem; width:auto; display:block; }
+
+/* 品牌组 = **整张 lockup 一张图**（2026-09-24 晚第七次改版；缘由见 chrome.js 与
+   下面 `.lingtu-lockup` 那段）。它现在还是顶栏左侧**唯一**的东西，又是 6rem 高
+   顶栏里 1fr 那格的头，所以整组做到 ~2.9rem 的视觉高度。
+   ⚠️ 这句原来是「和右边 `.clock b` 的 2.05rem 是一个量级」—— 2026-09-23
+      时钟整块拿掉了，顶栏现在是「左品牌 / 中标题(封面才有) / 右状态」，
+      左右两块就是全场最重的两处，不需要再和谁对齐了。基准失效，故改。
+   ⚠️ 不再有「字身占整幅高度的 58%」这种反算 —— 那是**艺术字图**才有的问题
+      （图上带星芒和飘带，字身只占一部分）。现在文字又回到图里了，
+      **但那条反算也不该回来**：素材本身就是设计稿给的一整张，按它的宽高比给高度
+      就行（4.788），不必去猜"字身占多少"。
+   ⚠️ 原来那条 `.brand .brand-wordmark{ height:2.82rem }` 已删除：全库只有
+      chrome.js 生成过那个 class，留着就是死规则。 */
+/* =========================================================================
+   ★★ 全局机制：同一张图准备「深色版 / 浅色版」两份，CSS 按主题二选一。
+   -------------------------------------------------------------------------
+   现在有三处在用，**都是同一个原因**：白墨（或重上过色的）素材压在
+   12.png 那套近白底上会消失，而换色规则两套主题不一样，滤镜救不回来。
+     · `.lingtu-lockup` 顶栏品牌   （_mk_lingtu2.py，★ 2026-09-24 晚换整张 lockup）
+       ⚠️ 这一处**两张文件内容已经完全相同**（都是原图）—— 2026-09-25 用户拍板
+          「整张原图直接贴，不管看不看得见」，因为素材是给深色底做的（文字区
+          93% 纯白），浅色顶栏上那四个字会淡掉。**这是已知代价，别再"修"它**：
+          中间被用户打回来过两版填色，两版都把白字填成实心蓝、把 G 的白弧填掉，
+          标志的形状就不成立了。机制留着是因为切主题还是靠显示哪一张。
+     · `.brand-mark`   左下 CHERY （_mk_chery_ink.py，白墨→墨蓝）
+     · `.brand-logo`   封面 CHERY （同上）
+   ⚠️ 主视觉卡片里那个 `.dash-brand` **不在这一套里**：它底下是白渐变，
+      两种主题都只用浅色版，所以是一个不带 .on-* 的单 <img>，别顺手给它配两张。
+   用法：两个 <img> 并排，一个挂 `.on-dark`、一个挂 `.on-light`。
+
+   ⚠️ **必须用 display 切，不能用 opacity/visibility** ——
+      淡出的那张仍然占位（三个都是 `flex:0 0 auto`），会并排撑开父容器，
+      标志右边多出一整个标志宽度的空白。
+   ⚠️ **默认（深色）那条写成 `html .on-light`，不能写成 `.on-light`。**
+      写成单类的话它和 `.brand-mark{display:block}`（也在本文件里）**同为 0,1,0**，
+      胜负由**出现顺序**决定 —— 而 `.brand-mark` 排在后面，会把它压掉，
+      于是深色页上两张图**同时显示、叠在一起**。
+      加一个 `html` 就是 0,1,1，稳压任何单类规则，**和顺序无关**。
+      （这是本文件里第二次踩"同优先级靠顺序"这个坑，浅色主题那组变量
+        一开始也是这么写的，解法一样：靠选择器权重，不靠顺序。）
+   ⚠️ 本文件里**不要再出现任何单类的 `.on-dark` / `.on-light` 规则**，
+      要加就加 `html[...]` 前缀。 */
+html .on-light{ display:none; }
+html[data-theme="light"] .on-dark{ display:none; }
+html[data-theme="light"] .on-light{ display:block; }
+
+.lingtu-lockup{
+  height:2.9rem; width:auto; display:block; flex:0 0 auto;
+  filter:drop-shadow(0 0 .45rem var(--glow));
+}
+/* ⚠️ 2026-09-24 晚（第七次改版）：`.lingtu` / `.lingtu-mark` / `.lingtu-txt`
+   （含它那两条 b / em 和浅色下 em 的覆写）**五条规则一起删了**。
+   原因：顶栏那个品牌组从「标志图 + 两行 HTML 文字」并成了**整张 lockup**
+   （用户：「我给了灵途智行的标志 直接整张图替换所有左上角出现灵途智行标的
+   部分」），文字在图里了 —— `.lingtu` 那层 flex 容器只剩一个孩子、
+   gap 和那两条字规则就全成了永不命中的死规则。
+   ⚠️ 高度 2.9rem 是**从旧的组合推出来的**，不是随手定的：
+      旧组 = 标志 2.45rem 高 + 两行字，整组屏上约 230px 宽；
+      素材宽高比 4.788，2.9rem × 4.788 ≈ 13.9rem ≈ 208px —— 同一个量级，
+      而顶栏是 6rem 高，2.9rem 的组在里面上下都还有余量。
+      改这张图（换素材/换高度）**要重新截图看**，别只改数。
+   ⚠️ 图片本身有 alpha，别给它加背景色；浅色主题那张是重上过色的
+      （源素材 68% 的实心像素是白的，近白顶栏上会消失），
+      机制见上面那套 `.on-dark` / `.on-light`，生成脚本 _scratch/_mk_lingtu2.py。 */
+/* ⚠️ `.brand .vline{...}` 已删除：那道竖线是**用来隔开 CHERY 和灵途智行的**，
+   CHERY 走了它就没有隔的对象了。 */
+
+/* ★ 2026-09-23：`.clock b` / `.clock span` 三条规则整块删掉了 ——
+   顶栏那个时钟（#hhmm / #date）已经拿掉（用户「不要在页面顶部放置时间日期」，
+   全站）。留着就是三条永不命中的死规则。
+   ⚠️ 本文件里另有一句注释拿 `.clock b` 的 2.05rem 当**排版基准**（在 `.lingtu`
+   那段上面），时钟没了那句基准也就不成立了，已经一并改掉 —— 那种"注释里引用了
+   一个已经不存在的东西"的腐坏，比死规则更难发现。 */
+
+/* 顶栏三格：`.brand`(1fr) / `.tbtitle`(auto) / `.collab`(1fr)。
+   -------------------------------------------------------------------------
+   🔴 2026-09-25 晚修：三格的定位原来是**靠自动排布**的 —— 谁都没写
+   `grid-column`，全指望"三个子节点按顺序落进三列"。**这个假设是错的**：
+   下面那条 `.tbtitle:empty{ display:none }` 会把中间那一格整个移出文档流，
+   `display:none` 的网格项**不参与自动排布**，于是 `.collab` 从第 3 个变成
+   第 2 个，落进 `auto` 那一列 —— **也就是正中间**。
+
+   为什么一直没暴露：座舱页的 `.collab` 一直是**空的**（院徽只有封面有），
+   空的落中间也看不出。2026-09-25 晚给座舱页右上角加了用户入口，它当场
+   出现在**屏幕正中**，用户原话：「最右边啊 你放到中间干嘛」。
+
+   ⚠️ 上面这段注释原来写着「空格子也占住中线」—— **那句话是错的**，
+      而且和它下面三行的 `:empty` 直接冲突，是这对矛盾的根源。真正占住中线
+      的不是"空格子"，是**被 `display:none` 挪走的那个格子**。
+   ★ 修法是**把三列显式钉死**（下面每条规则都加了 `grid-column`），
+     这样无论 `.tbtitle` 在不在流里，`.collab` 都只会落在第 3 列。
+     判据不是"看代码觉得对"，是量：`.collab` 的右边缘应该贴着顶栏右内边
+     （`_check_theme2.py` 的 B3 段量它）。
+   ⚠️ 别把这三行 `grid-column` 删了退回自动排布 —— 那正是这个 bug 的成因，
+      而且它**只在"中间那格为空"时才发作**，封面永远是对的，最难发现。 */
+
+/* 顶栏中间那一格。默认空着（座舱页不传 title 就是这样），
+   封面往里面放一行项目主题文字（13.png 的版式）。
+   ⚠️ 院徽只有封面有（clockHTML 传 logo:true）。这一格**不能删** ——
+      删了 `1fr auto 1fr` 就只剩两列，左右两块当场塌成中间并对齐。
+   ⚠️ 字号只到 1.06rem：这是**顶栏**，不是页面标题。13.png 上那行字是海报级的，
+   但那是张图；真做成 20 个字的 2rem 顶栏文字，在 1672px 宽、6.6rem 高的条里
+   会把左右两块压得没地方站。 */
+.tbtitle{
+  grid-column:2;
+  text-align:center; line-height:1.2;
+  font-size:1.06rem; font-weight:600; letter-spacing:.16em;
+  color:var(--ink); white-space:nowrap;
+}
+/* 空格子不给它撑高度：`auto` 列里一个空 div 仍然会走 line-height，
+   等于给顶栏留了一段空白基线。`:empty` 压掉它。
+   ⚠️ 这条会让中间那格**退出网格排布**（见上面那段）—— 也就是说它现在
+      只能和上面那三行 `grid-column` **搭配**使用，不能单独存在。 */
+.tbtitle:empty{ display:none; }
+
+/* ★ 2026-09-24：这里原来是两组规则 —— 一组管顶栏右上角那一条（天气图标 +
+   气温 / 信号格 / 联网状态），另一组管小瑞语音状态标识。用户要求
+   「天气那些去掉」，两组规则连 DOM 一起删干净。
+
+   现在顶栏右上角那一格叫 .collab，装的是同济大学汽车与能源学院的院徽，
+   而且**只有封面有**（见 chrome.js 的 clockHTML 和 cover.html 的 mountChrome）。
+   高度取 2.45rem，和左边 `.lingtu-lockup` 的 2.9rem 差不多是一个量级
+   （院徽是方形构图、lockup 是 4.788 的横条，两个数**不该相等**，
+   要的是"站在一起谁也不压谁"这个观感）—— 顶栏现在是
+   「左品牌 / 中标题(仅封面) / 右院徽」，左右两块各钉一端。 */
+/* ⚠️ `grid-column:3` 是 2026-09-25 晚补的（**不是装饰**）：少了它，座舱页
+   （中间那格被 `.tbtitle:empty` 移出流）会把这一格自动排进第 2 列，
+   右上角的用户入口当场跑到屏幕正中。详见 `.tbtitle` 那一段的完整说明。
+   `justify-content:flex-end` 让它内部的元素靠右贴边。 */
+.collab{ grid-column:3; display:flex; align-items:center; justify-content:flex-end; }
+.collab-logo{ height:2.45rem; width:auto; display:block; }
+/* 院徽**没给 drop-shadow**：左边 lingtu 标志有一层品牌辉光，是因为它本来就是
+   自发光的设计；院徽是院校标识，加辉光既不像它、也会把「同济大学」那几笔
+   细画糊掉。这不是漏写。 */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ★★ 2026-09-24（第五次改版）：顶栏右侧那一格，**座舱页和封面装的是两拨
+      不同的东西**，照 首页.png 的版式加的：
+        封面   → 院徽（原样，一个字没动）
+        座舱页 → 「智驾相伴 安全出行」 + 铃铛(带未读红点) + 管理员
+      生成方在 chrome.js 的 `userBlock`（`logo` 为真时整块是空串）。
+   ⚠️ 头像用的是**内联 SVG 的人形**，不是小瑞的头像图 —— 这一格在封面上要能
+      塞下院徽，用图会让「院徽只有封面有」那条判据没法写（见 chrome.js）。
+   ⚠️ 这一组是 `.collab` 的子节点，而 `.collab` 是 `justify-content:flex-end`
+      的 flex 行 —— 所以这里只需要给元素之间留间距，**不要给整组加
+      `margin-left:auto`**（那是 `.collab` 的活）。
+   ======================================================================= */
+/* ★★ 2026-09-25 晚：顶栏右上角那颗**用户入口**（座舱页）——
+   用户原话：「页面右上角搞个用户 然后用我的用户头像 有我个人基本信息 能连微信吗」。
+   -------------------------------------------------------------------------
+   🔴 这一格的历史要一起读，不然会以为本文件自相矛盾：
+   2026-09-25 早些时候，用户**分两次点名把这一格里座舱页那一拨删光了** ——
+     · 「把智驾相伴 安全出行、管理员去掉，就是顶部那些，感觉多余了」
+       → `.tb-slogan`（口号）+ `.tb-user` / `.tb-ava` / `.tb-name` / `.tb-caret`
+         （"管理员"：内联 SVG 人形头像 + 名字 + 箭头）整组删掉，规则一起删；
+     · 「把**驾驶监测与报警那个小铃铛**去掉 在顶部」
+       → `.tb-bell` 那一组（含 `.tb-bell .dot` 未读红点）也删掉了。
+   当时否掉"管理员"的理由是它**点不动、没有下拉、没有内容**（这套系统没有
+   账号体系，settings 那张卡上也明写着没有登录），是个纯装饰的假控件。
+   ★ 现在用户点名要它回来，而这次**真有内容**（他本人的照片 + 一张个人档）。
+     所以这**不是"把删掉的东西加回来"**，是把假控件换成了真控件；
+     "没内容可显示"那条理由不再成立。将来谁要再删它，别拿上面那两句当依据。
+   ⚠️ 但当时那半句理由**今天仍然成立，代码里照做了**：
+     「同一个动作放两处，一个显眼一个不显眼，只会让人在答辩现场去找那个
+      不显眼的」—— 所以这张个人档里**没有「返回展示页」也没有「退出座舱」**。
+      回程口依然只有一处：首页那颗 `.dash-cta`（见下面 `.tb-back` 那段已否记录）。
+      要往菜单里加，先问用户。
+   ⚠️ 那次删的只是**座舱页那一拨**，`.collab` 这一格本身一直在，也**不能删**。
+   ❓ 顺带更正一处旧注释（本文件里出现过两次，这一版一并说明）：`.collab` 是
+      `.topbar`（`1fr auto 1fr`）的**第三列、是 `1fr`**，**不是 `auto`** ——
+      `auto` 是中间那格 `.tbtitle`。这个笔误没造成过后果（判据一直按 `.collab`
+      数），但它是错的，chrome.js 那边已经改过一次，本文件当时漏了。
+   ======================================================================== */
+.tb-user{ position:relative; display:flex; align-items:center; }
+/* 胶囊按钮：头像 + 名字 + 箭头。**必须是个真 button** —— 上一版那个"管理员"
+   是个纯 div，点不动。"看着像控件、其实点不动"正是它被否掉的原因之一。 */
+.tb-ubtn{
+  display:flex; align-items:center; gap:.5rem;
+  padding:.26rem .6rem .26rem .3rem;
+  border:1px solid var(--hair-2); border-radius:999px;
+  background:transparent; color:var(--ink);
+  font:inherit; cursor:pointer;
+  transition:background .16s ease, border-color .16s ease;
+}
+.tb-ubtn:hover{ background:var(--hair); }
+/* 焦点环用 currentColor：这颗按钮的颜色就是 var(--ink)，深色主题下近白、
+   浅色主题下深墨蓝，两边都是高对比 —— 比挑一个固定色稳。
+   它是真 button，不给焦点样式等于键盘用户看不见光标在哪。 */
+.tb-ubtn:focus-visible{ outline:2px solid currentColor; outline-offset:2px; }
+/* ⚠️ 头像是**真照片**（用户本人，见 chrome.js 里 XQ_USER 那段）。
+   object-fit:cover 不能省：原片是正方形，万一哪天换成横幅的，
+   少了它会把脸压扁而不是裁切。 */
+.tb-ava{
+  width:1.86rem; height:1.86rem; border-radius:50%;
+  object-fit:cover; display:block; flex:0 0 auto;
+}
+.tb-name{ font-size:var(--fs-sm); letter-spacing:.04em; white-space:nowrap; }
+/* 箭头那个 svg 用 currentColor 描边，**不参与** .on-dark / .on-light 那套 ——
+   那套是给图片用的（两份位图按主题切显示），线条图标不需要。 */
+.tb-caret{ width:.82rem; height:.82rem; flex:0 0 auto; color:var(--ink-3); }
+
+/* 下拉那一张个人档。**默认是 hidden 的**（见 chrome.js 的 XQ.userHTML），
+   开关在 XQ.userMenu 的 JS 里，不在 CSS —— 下面那条 [hidden] 只是安全带。 */
+.tb-menu{
+  position:absolute; right:0; top:calc(100% + .62rem);
+  /* ⚠️ 宽度是**量出来**的，不是随手给的：15.2rem 时副标题
+     「灵途智行 · 智能座舱体验」会在「座舱」和「体验」之间折行，
+     小字那句也会在「真实账/号」中间断开（截图里很难看）。
+     17rem 下两行都能整句排下 —— 改宽度要**重新截图看那两行**，
+     别只改数字就走。 */
+  width:17rem; z-index:60;
+  padding:.95rem 1rem 1rem;
+  border:1px solid var(--hair-2); border-radius:.95rem;
+  background:var(--panel-5);
+  box-shadow:0 1.1rem 2.4rem var(--scrim);
+  backdrop-filter:blur(14px) saturate(1.15);
+}
+/* ⚠️ 这一条**不能省**：只要本文件给 .tb-menu 写了 display，UA 那条
+   [hidden]{display:none} 就被作者样式覆盖掉，菜单会一上来就常开。
+   眼下这条 .tb-menu 没写 display（默认 block）所以还没事，但留着它是拦住
+   下一个人"为了排版顺手加一句 display:flex"——那样 hidden 当场失灵，
+   而且**不报错**，表现只是"菜单一直挂着、关不掉"。 */
+.tb-menu[hidden]{ display:none; }
+.tb-menu-head{
+  display:grid; grid-template-columns:auto 1fr;
+  gap:.1rem .7rem; align-items:center;
+}
+.tb-menu-ava{
+  width:2.9rem; height:2.9rem; border-radius:50%;
+  object-fit:cover; display:block; grid-row:1/3;
+}
+.tb-menu-name{ font-size:var(--fs-body); color:var(--ink); letter-spacing:.04em; }
+.tb-menu-sub{ font-size:var(--fs-note); color:var(--ink-3); }
+.tb-menu-sep{ height:1px; margin:.85rem 0 .55rem; background:var(--hair-2); }
+.tb-menu-item{
+  display:flex; align-items:center; gap:.6rem;
+  padding:.5rem .55rem; border-radius:.6rem;
+  color:var(--ink-2); text-decoration:none; font-size:var(--fs-sm);
+}
+.tb-menu-item svg{ width:1.05rem; height:1.05rem; flex:0 0 auto; color:var(--ink-icon); }
+.tb-menu-item:hover{ background:var(--hair); }
+/* ⚠️ 这句话**不是装饰**，是这一格诚不诚实的判据：这套系统真的没有账号体系，
+   头像和这行字只存在这台机器上。删了它，这张卡看起来就像一个真能登录/
+   退出的账号 —— 那正是上一版"管理员"被否掉的那个形状。 */
+.tb-menu-note{
+  margin:.55rem .55rem 0; padding-top:.6rem;
+  border-top:1px dashed var(--hair-2);
+  font-size:var(--fs-note); line-height:1.5; color:var(--muted);
+}
+/* ⚠️ `.tb-bell`（顶栏那枚「驾驶监测与报警」小铃铛）和它那个未读小红点
+   （`.tb-bell .dot` + `body[data-sev="mild"|"moderate"|"severe"]` 那三条）
+   **仍然不存在**，这是故意的：用户 2026-09-25「把驾驶监测与报警那个小铃铛
+   去掉 在顶部」。这次加回来的只有"用户入口"这一件，铃铛不在其中。
+   原来那段注释里值得留的事实：那个红点**纯 CSS 驱动**（读 `body[data-sev]`，
+   不是 normal 就亮），没有 JS、没有定时器 —— 要写这种"跟着状态变色"的
+   指示器，这套写法值得抄，坑也值得抄：
+     ⚠️ 逐档列出来、不要写 `body:not([data-sev="normal"])`（改档名时前者
+        一眼能对上，后者照样亮且"normal 不亮"变得不可见）；
+     ⚠️ `i.dot` 默认行内，`position:absolute` 会把它块级化并展开成 0 宽高，
+        width/height 必须显式给。
+   ⚠️ 删掉铃铛的代价还在：**全站再没有"当前有报警"的顶栏常驻提示**，
+     只剩页面内部那几处（驾驶监测页档位卡 / 底部提示条、首页整页 `data-sev`
+     染色、底部小瑞那一句）。想加回来先问用户，别把这段注释当授权。 */
+/* 品牌组右边那句系统副标题。**只有座舱页有**（logo 为假）—— 封面顶栏中间
+   那一格（#tbTitle）写的就是这同一句话，两处一起出现就是同一行字念两遍。
+   照 首页.png：左边一道细竖线把它和品牌那一格隔开（现在那一格是**一张整
+   lockup**，不再是一图加两行字；这道线是它和 lockup 之间的分隔）。
+   ⚠️ 用 border-left 画那道线而不是塞一个 `<i>`：竖线是**纯装饰**，
+      塞元素进去会让读屏软件多念一个空节点，也会让 `.brand` 的 gap 多算一格。 */
+.tb-sub{
+  display:block; margin-left:.2rem; padding-left:1.05rem;
+  border-left:1px solid var(--hair-2);
+  font-size:var(--fs-sm); font-weight:400;
+  color:var(--ink-3); letter-spacing:.1em; white-space:nowrap;
+}
+/* ❌ 已删 · `.tb-bell`（顶栏右上那枚「驾驶监测与报警」小铃铛）以及它那个
+   未读小红点（`.tb-bell .dot` + `body[data-sev="mild"|"moderate"|"severe"]`
+   那三条）。用户 2026-09-25：「把驾驶监测与报警那个小铃铛去掉 在顶部」。
+   原来这一段上的注释留着几句事实，将来想再加一个常驻指示的人先读它们：
+     · 那枚铃铛是个**链接**（跳 `detail.html`），2.2rem 的圆形可点区域、
+       图标 1.05rem，内外比 ~1:2，在 6rem 高的顶栏里站得住；
+     · 那个红点**纯 CSS 驱动**（读 `body[data-sev]`，不是 normal 就亮），
+       没有 JS、没有定时器 —— 档位本来就在 body 上，多引一处变量就多一处
+       能不同步的地方。**这套写法的三条 caveat 值得抄**：
+         ⚠️ 逐档列出来、不要写 `body:not([data-sev="normal"])`（改档名时前者
+            一眼能对上，后者照样亮且"normal 不亮"变得不可见）；
+         ⚠️ `i.dot` 默认行内，`position:absolute` 会把它块级化并展开成 0 宽高，
+            width/height 必须显式给。
+     ⚠️ 删掉它之后，**全站再没有"当前有报警"的顶栏常驻提示**了 ——
+        这只剩页面内部那几处（驾驶监测页档位卡 / 底部提示条、首页整页
+        `data-sev` 染色、底部小瑞那一句）。这是这次删除的代价，
+        想加回来先问用户，别把这段注释当成授权。 */
+
+/* ❌ 已否 · 顶栏右侧那颗「返回展示页」（`.tb-back`，2026-09-25 当天加、当天撤）
+   ---------------------------------------------------------------------------
+   用户先说「搞一个返回展示页的按钮吧 我有时候要返回展示页啊」，我把它加在了
+   座舱页顶栏右侧那一格（`.collab`）；用户随即给了位置：
+   「**返回展示页在首页进入座舱那个位置 把进入座舱改成这个**」——
+   也就是**首页 `.dash-strip` 里原来那颗「进入座舱」**（`.dash-cta`，整条上最重
+   的胶囊，指向 detail.html），做法是**把那颗直接改成「返回展示页」**
+   （指向 cover.html）。于是这里那颗连同它的样式一起撤掉了。
+
+   ⚠️ **别因为"页页都能点更方便"再把它加回顶栏**：同一个动作放两处，
+      一个显眼一个不显眼，只会让人在答辩现场去找那个不显眼的 ——
+      这条理由 cover.html 那边删掉「‹ 返回座舱主界面」文字链时就写过一次。
+      回程口**只有一处**：首页那颗 `.dash-cta`。
+   ⚠️ 顶栏那一格（`.collab`）现在在座舱页**又是空的**了 ——
+      它是 `1fr auto 1fr` 的第三列，空着也占位，**不能删**（见那一段的注释）。
+   ======================================================================== */
+
+/* ---------------------------------------------------------- 主网格 */
+.main{
+  flex:1 1 auto; min-height:0;
+  display:grid;
+  grid-template-columns:11.5rem minmax(0,1fr) 27rem 20.5rem;
+  grid-template-rows:minmax(0,1fr) auto;
+  gap:.95rem 1rem;
+  padding:1rem 1.2rem .5rem .6rem;
+}
+
+.card{
+  background:var(--glass);
+  backdrop-filter:blur(16px) saturate(1.25);
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  box-shadow:0 1.2rem 3rem var(--scrim), inset 0 1px 0 var(--fill-2);
+}
+/* ★ 第五次改版：浅色下**卡片要真的白**。
+   原来那层 `--glass` 是白 .60，压在洗白过的城市底图上，卡片和背景
+   **几乎同色** —— 边界全靠 `--line` 那条白描边硬撑，双白相抵，整页看起来
+   是"一张纸上有几块稍亮的区域"，而不是参考图里那种"浮起来的白卡"。
+   这里三件事一起做：白度提到 .80、描边改成**近白**（不再靠它起边，
+   靠明度差起边）、投影从 `0 1.2rem 3rem` 收到 `0 .9rem 2.2rem` 且更淡
+   （参考图的投影很浅，重投影会把它压回"玻璃风"）。
+   ⚠️ 只覆写浅色。深色那条一个字节没动 —— 深色下的 `--glass` 本来就是
+      半透明深色，白度这套说法在那边不成立。
+
+   ★★ 2026-09-25（第十四次改版）：**白度 .80 → .46，卡片改成真的玻璃**。
+      用户原话：「你看多媒体页是这种琉璃立体感 就是因为有背景…我那个每个页面
+      不是也有背景吗 能不能都搞成这种立体感 **不要每个边框的分别背景了
+      我做不了那么多**」（随后补：「以前的背景肯定要保留」）。
+      ⚠️ **上面"浅色下卡片要真的白"那一段是被这次翻过来的**（第五次改版是有意
+         把卡片压平 —— 连 626 行那句"重投影会把它压回玻璃风"都写着）。留在这儿，
+         免得下一次看见 `.46` 以为是谁手滑。
+
+      🔴 **先把机制说清楚，这一步容易搞反**：
+         多媒体页那个琉璃感**不是**页面背景透过来的。`.mp-hero` / `.mp-lib` /
+         `.mp-xq`（media.html:158-184）和 `.card.mon-xq`（pages.css:1775）是
+         **每张卡自带一张照片 + 一层 .30 白纱**，media.html:143 那条注释写得
+         很直白：它们「**不再透出页面底图**」。所以那种深度 = "每张卡一张图"，
+         正是用户说"我做不了那么多"的那件事。
+         还有一个现成的旁证：pages.css:110-120 记着监测画面图没解码出来时，
+         卡片位置露出来的是「`.card` 的 `--glass` 叠在洗白过的城市底图上 ——
+         **那是一片灰白**」。白卡盖下去，页面背景就是看不见的。
+
+      ✅ 所以这里**不是**去给 93 处 `.card` 各配一张图，而是走同一条机制的
+         **免费版**：`.card` 基类里那条 `backdrop-filter:blur(16px) saturate(1.25)`
+         （style.css:615）—— **浅色这条从来没关过它**，只是被 .80 的白盖住、
+         一直不起作用（`.rail-card` 那段 686 行是同一个说法）。白度降到 .46，
+         那层 16px 模糊立刻把它背后 `--bg-img`（每页自己的 bg1/2/3_wash）
+         采样成**每张卡自己的纹理**：零新图、10 张浅色页一次性全有、
+         **`--bg-img` 一个字不改**（"以前的背景要保留"）。
+         ⇒ **别再往这里加 `backdrop-filter`** —— 基类那条就是它的来源，
+           两处各写一份，将来改模糊半径就会漏一处。
+
+      ⚠️ 用户拍板的是**"只做卡片"**：`.bg::after` 那层白纱（0.36/0.30/0.26）
+         **一个字不动**。两个旋钮管同一根针（纱越淡琉璃越显），而纱一动，
+         正文对比度就得整页重标；只动卡片这头最稳。要走更强的那一档，
+         代价和做法见那次对话（会连顶栏一起看）。
+      ⚠️ 受影响的是 **93 处 `.card` / 10 张浅色页**（monitor 19 / settings 15 /
+         index 10 / link 8 / chat 6 / voice 6 / media 6 / detail 5 / flow 2 /
+         phone 1）。深色全站只有 design.html 一张，**深色那条一个字节没动**。
+      ⚠️ 自带底图那几处（`.mp-*` 三张、`.card.mon-xq`、`.rail-card`、
+         `.livecard #stageHost`）**特指度都赢过这一条**，天然不受影响 ——
+         它们本来就是"每张卡一张图"那一档。
+      ⚠️ 投影从 `.10` 提到 `.14`：玻璃要有厚度才立得住（原来是"纸片"，
+         投影越浅越像印刷品）。这一条和第五次改版的方向相反，是**有意**的。 */
+html[data-theme="light"] .card{
+  background:rgba(255,255,255,.46);
+  border-color:rgba(255,255,255,.88);
+  box-shadow:0 .9rem 2.2rem rgba(23,60,110,.14), inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+/* ---------------------------------------------------------- 左导航 */
+.rail{
+  grid-column:1; grid-row:1 / 3;
+  display:flex; flex-direction:column; min-height:0;
+}
+.rail-card{
+  /* `flex:1 1 auto` 不是 `0 0 auto`：装不下时让**导航卡自己缩、自己滚**，
+     而不是把底下的 rail-foot 顶出容器 —— 顶出去它会压在气候栏上。 */
+  flex:1 1 auto; min-height:0; overflow-y:auto;
+  display:flex; flex-direction:column; gap:.4rem;
+  padding:1.1rem .7rem 1rem;
+  background:var(--glass);
+  backdrop-filter:blur(16px);
+  border:1px solid var(--line);
+  /* ★ 第五次改版：原来是「靠左边缘、左边框去掉、只圆右边两个角」
+     （`border-left:none; border-radius:0 var(--r-lg) var(--r-lg) 0`）——
+     那是"从屏幕左边滑出来的一块面板"。参考图 首页.png 的左侧导航是
+     **一张四周都有边、四个角都圆的浮卡**，和右边的卡片是同一个东西。
+     所以左边框补回来、四个角一起圆。
+     ⚠️ 这一段是**深色主题也会跟着变**的（不是只覆写浅色）—— 深色页现在
+        全站只有 design.html 一张，而它没有 #rail，所以实际影响为零；
+        真要说的话，"浮卡"在深色下同样比"贴边面板"更贴这套卡片语言，
+        所以这里不留一个只服务深色的特例。 */
+  border-radius:var(--r-lg);
+  scrollbar-width:thin; scrollbar-color:rgba(var(--rgb),.35) transparent;
+}
+/* ========== 2026-09-25 第十三次改版：左栏这张卡也有底图了 ==========
+   用户给了 `整体左栏背景图.png`，原话「…还有整体左栏背景图.png 都换上」。
+   由 `_scratch/_mk_bg.py` 的 `SRC_4` 出成 `assets/rail_bg.jpg`。
+
+   ★★ 两个数都是量出来的，别凭眼睛调：
+
+   1) **先裁成竖条**（340x1547，比例 0.22）。源图是 1.84:1 的横图，而这一格实测
+      **167.14x683.14 CSS px（0.2447，1:4.09）**。不裁就 `cover`，浏览器按高度放大，
+      2x 屏要看不出虚就得出到 2500 宽 ≈ 150 KB —— 而**每一页的左栏都在下载它**
+      （11 张页共用一个左栏、`/static/` 又没有缓存头），而屏上只用得到中间 334 像素。
+      裁成竖条之后 340 宽够用，25.5 KB。
+      ⚠️ 裁哪一条**不是随手挑的**：`emit_fit(band="std")` 扫一遍所有候选位置，
+        取"灰度方差最大、且上方 32%（四个入口那一段）的 p05 ≥ 215"的那条。
+        正中间那条方差只有 13.8、而且偏白，按 center 裁出来的左栏几乎看不出换过图
+        —— 用户上一轮就报过一模一样的症状（「你换了吗 但是整体显示出来还是太白
+        就是你背景没啥用」）。扫出来的候选表和选中结果都在 `_mk_bg.py` 的输出里。
+
+   2) **白纱 `.30`**：分段量出来（`veil_report` 的 bands）——
+      导航四项那一段 p05 244 → 压纱后 **5.44:1**（`--ink-4 #33689E`），过 4.5:1；
+      中段空白 4.53:1（那一段没字，只是顺带打下限）；
+      下段立绘 2.94:1 —— **那一段本来就没有字**，立绘是图，不需要文字对比度。
+      `.30` 和多媒体那三张卡是同一个数（全站"底图 + 白纱 .30"就这一档），
+      这一条又正好是"卡片"而不是"画面"（`#stageHost` 那种画面才不压纱）。
+      ⚠️ **改白纱就必须回头改 `_mk_bg.py` 的 `BAND_TOP_P05_MIN`** —— 那两个数是
+         绑在一起的（215 就是从 4.5:1 + 白纱 .30 反推出来的），只改一头会漂。
+   ⚠️ `backdrop-filter:blur(16px)` 那条**留在基类里**没动：底色被这张不透明的图
+      整块盖住之后它不起作用，但删它要连带确认没有别的规则在指望那层混合，
+      收益为零 —— 留着，别顺手动。
+   ⚠️ 深色那条（`.rail` 的深色主题）**一个字没改**：深色页现在只剩 design.html
+      一张，而它没有 #rail，所以这一轮只覆写浅色就够了。 */
+html[data-theme="light"] .rail-card{
+  background:
+    linear-gradient(rgba(255,255,255,.30), rgba(255,255,255,.30)),
+    url("assets/rail_bg.jpg") center/cover no-repeat;
+  border-color:rgba(255,255,255,.88);
+  box-shadow:0 .9rem 2.2rem rgba(23,60,110,.10);
+}
+.rail-card::-webkit-scrollbar{ width:.3rem; }
+.rail-card::-webkit-scrollbar-thumb{ background:rgba(var(--rgb),.3); border-radius:2rem; }
+
+/* ★★ 2026-09-25（第九次改版）：左栏里的小瑞立绘（HTML 在 chrome.js 的 XQ.railHTML），
+   **点一下换动作**（行为在 chrome.js 的 XQ.railMascot）。
+   用户：「然后做左侧空白处放上小瑞形象是每一页哦 类似多媒体.png左边小瑞那种」，
+   随后补：「而且左下小瑞应该可以像展示页一样可以点击变换 并且上下浮动」。
+   位置靠 `margin-top:auto` **顶到导航卡的底**：四个入口在卡顶，中段到卡底之间
+   本来是一大片空的，立绘就落在那块空白里（不遮任何入口）。
+   ⚠️ 别改成给它 `margin-top:0` 想让它紧贴上面那一样东西 —— 那样它会浮在卡片正中，
+      把"空白处"这件事做没了；`.rail-foot`（CHERY 那一行）在卡**外面**，
+      所以立绘不会和它抢位置。
+   ★ 2026-09-25：原来这一段里**有两个** `margin-top:auto`（喇叭按钮那个 `.src` 一个、
+      这里一个）。flex 里自动外边距是**平分**剩余空隙的，所以当时那半段空白是
+      "喇叭按钮浮在中间、立绘贴底"。
+      喇叭按钮那块和 `.src` 一起删掉之后空隙全归这一个，立绘的位置**没动** ——
+      它是靠 `margin-top:auto` 往下推、再被固定的 `margin-bottom:3.1rem` 抵住卡底
+      定住的，上下都到头，中间多出来的空隙本来就吃不到它。这才是"删了没变"的
+      原因，别记成"两个 auto 只算第一个"（不是那样的）。
+      `.src*` 那几条规则已按规矩连根删掉，墓碑在上面。
+
+   ★ `margin-bottom:3.1rem` 是**避让左下角那条跨页播放条**（`.xq-mini`，
+      见 player.js）。用户原话：「而且还有就是它挡到我坐下的小瑞了」——
+      那条是 `position:fixed; bottom:4rem` 的一条胶囊，量下来它压在
+      `.rail-card` **最底下那 2.9rem** 上，而小瑞正是被 `margin-top:auto`
+      顶到那个位置的，两张皮正好叠在一起。
+      ⚠️ **挪的是小瑞，不是那条**：播放条的位置是 `_probe_mini_spot.py`
+         量了九张页、避开所有可点矩形之后定的（"唯一一条横着没人用的带子"），
+         为了摆小瑞去动它，等于把已经验过的那件事重新打开一遍。
+      ⚠️ 这个数**不是挑的**，是 `_scratch/_check_railxr.py` 里
+         「小瑞的脚必须在播放条上沿之上」那条判据量出来的；改布局先跑那个脚本。
+         常驻 3.1rem（不管那一页有没有播放条）是有意的：条是"有存档才出现"的，
+         让它出现时小瑞跳一下比常驻一点空白更难解释。
+
+   ⚠️ `flex:0 1 auto` + `min-height:0` + 定高 + 图上的 `max-height:100%` 四件一起写，
+      是为了**窗口矮的时候让立绘自己缩**（按比例、按底对齐），而不是把导航卡
+      撑出滚动条 —— 左栏一出现滚动条，四个入口就会被推走。
+   ⚠️ 图上的 `width:auto;height:auto` 是**故意压掉 `.mascot-img` 的
+      `width/height:100%`** 的：那两个 100% 会让图被拉成容器大小（比例交给
+      object-fit 兜底），而这里要的是"按原始比例、被 max-* 夹住"，
+      换姿势时才不会因为比例微差而抖。`.rail-xr img`（0,1,1）权重高过
+      `.mascot-img`（0,1,0），所以这两行压得住 —— 顺序换了也一样。 */
+.rail-xr{
+  margin-top:auto; margin-bottom:3.1rem;
+  flex:0 1 auto; min-height:0; overflow:hidden;
+  height:13.4rem;
+  display:flex; justify-content:center; align-items:flex-end;
+}
+.rail-xr img{
+  display:block; width:auto; height:auto;
+  max-width:100%; max-height:100%;
+  object-fit:contain; object-position:bottom center;
+}
+.ri{
+  display:flex; align-items:center; gap:.7rem;
+  padding:.85rem .8rem; border-radius:.85rem;
+  color:var(--ink-4); text-decoration:none; font-size:var(--fs-sm);
+  border:1px solid transparent; transition:.3s;
+}
+/* ★★ 2026-09-25（第十四次改版）：**全站 hover「选中感」的通用语汇 —— 这里是它
+   唯一一份说明，别处只引这一段。**
+
+   用户原话：「就是在多媒体页面我鼠标到我的音乐上的一个歌曲 **它边框好像就有点
+   选中它的感觉** 感觉这感觉很好」—— 他点的就是 `.tracks li:hover` 那一行
+   （media.html:545：底色 `rgba(--rgb,.09)` + **描边 `rgba(--rgb,.38)`**）。
+   所以这个"手感"的**关键是描边，不是底色**：全站不少可点元素 hover 时只把底色
+   染一染、描边一动不动（`.ri` 原来就是这样），看起来只是"变亮了"，不像"被选中"。
+
+   通用语汇 = **hover 时底色和描边一起染档位色**，`.2s` 过渡：
+     · 静止就**有**描边的（`.tracks li` / `.adv li` / `.rec li` / `.chip` / `.tab` /
+       `.set-btn` / `.xq-btn` / `.qk` / `.qk-round` / `.xq-chips button`）→ 改 `border-color`
+     · 静止**没有**描边的（`.dash-entry`）→ 用 `box-shadow:inset 0 0 0 1px …`，
+       **不要**回头去 base 补一条 `border:1px solid transparent` —— 那会挤掉 2px
+       内容宽，一行字可能就此换行。内阴影这个写法本来就有先例（`.tracks li.on` 的
+       `inset 2px 0 0`、`.cover-go:hover` 的 `inset 0 0 0 1px`）。
+
+   🔴 **铁律：hover 的染度必须低于同一元素的选中态** —— 否则鼠标扫过时高亮会
+      "跳一下"。`media.html:541` 把 hover 从 .13 降到 .09 就是栽在这儿
+      （那一行的 `.on` 是 .13）。所以**全站不是同一个数**：
+        · **有**选中态的：hover 压在选中态下面 ——
+          `.tracks li` `.09/.38`（`.on` 是 `.13/.34`）、`.ri` `.10/.22`（`.active` 是 `.16/.26`）
+        · **没有**选中态的：可以足一点 —— `.adv li` `.14/.45`、`.rec li` `.15/.45`、
+          `.qk` `.12/.42`（这三条**现状没动**，本来就有这个手感）
+      新加一处先问自己一句："这一格有没有选中态？" 有，就把 hover 压在它下面。
+
+   ⚠️ **图标按钮不在此列**（`.talk-input .mic` / `.wk-btn` / `.mp-ctl button` /
+      圆形播放键 `.pp`）：它们靠 `color` 或 `filter:brightness()` 表态，给一个圆形
+      图标加一圈描边反而毛。`.ptitle .back` 本来就有描边，保留原样。
+   ⚠️ **实心按钮也不在此列**（`.wide-btn.solid` / `.dash-cta` / `.cover-go`）：它们
+      静止就是实心强调色，hover 走"抬升 + 提亮"那一套，再加描边会脏。
+   ⚠️ 这一轮**只补缺口、不统一数值**：已带这个手感的十来条规则原地不动（改了就是
+      在动用户没提过的观感），缺的补齐 + 把规矩写在这儿。 */
+.ri svg{ width:1.3rem; height:1.3rem; flex:0 0 auto; }
+/* ⚠️ 原来是 `background:var(--fill-2)`（浅色下是 `.56` 的白）—— 那一档**比选中态
+   还亮**，而且描边是透明的，于是鼠标扫过四个入口时是"白一下"而不是"被选中"。
+   改成档位色 .10 + 描边 .22：两条都压在 `.active`（.16/.26）下面（铁律见上）。
+   这是本轮**唯一一处"手感变了"的改动**，而且左栏每页都在 —— 想退回去就是这一行。 */
+.ri:hover{ color:var(--ink); background:rgba(var(--rgb),.10); border-color:rgba(var(--rgb),.22); }
+.ri.active{
+  color:var(--ink); font-weight:600;
+  background:linear-gradient(90deg, rgba(var(--rgb),.34), rgba(var(--rgb),.06));
+  border-color:rgba(var(--rgb),.45);
+  box-shadow:0 0 1.6rem rgba(var(--rgb),.28), inset 0 0 1.4rem rgba(var(--rgb),.12);
+  transition:.5s;
+}
+/* ★ 第五次改版：浅色下选中的那一项是**一整块淡蓝实心胶囊**，不是"发光"。
+   原来那条（`linear-gradient` 从 .34 淡到 .06 + 两层辉光）在深色底上是
+   "霓虹灯"，浅底上读起来是"左边深右边没了、还糊着一圈光"。
+   参考图 首页.png 的上那一格是干净的：整块 `rgba(accent,.16)`、
+   圆角、字和图标一起变成强调色、**没有投影**。
+   ⚠️ 只覆写浅色，深色那条原地不动（理由同 `.rail-card`：深色页现在只剩
+      design.html 一张，不留只服务它的特例）。 */
+html[data-theme="light"] .ri.active{
+  color:var(--accent);
+  background:rgba(var(--rgb),.16);
+  border-color:rgba(var(--rgb),.26);
+  box-shadow:none;
+}
+
+/* ⚠️⚠️ 这里原来有一整块 `.src` / `.src-title` / `.src-btn` / `.src-note`
+   （外加给喇叭按钮加了 `.src-btn.vb` 和 `.src-btn.vb .vb-ico` 两条 —— 后者是给内联
+   SVG 定尺寸的，不写的话那个喇叭会按 300×150 的默认尺寸渲染成一个巨大的图标；
+   HTML 里还有个 `.vb-txt` 包「出声」两个字，但**它从来没有过 CSS 规则**）。
+   **2026-09-25 连根删掉了，一个使用者都没有了 —— 别照抄《别的文件里有 `.src-*`》当理由
+   再把它写回来。** 这块东西的历史是这样的，留着给下次要加左栏块的人看：
+
+     · 最早它服务的是左栏那个「数据源」块（`.src-title` + 四个 `.src-btn[data-spec]`
+       + `.src-note#srcNote` 写源路径）。源路径很长，所以 `.src-note` 当时写的是
+       `word-break:break-all`。
+     · 2026-09-24 数据源块删除（用户「直接不要那个栏 我只要实时的画面」）。块没了，
+       但**这四条类名当时故意留着** —— 因为左栏那个喇叭按钮（「出声」，live.js 的
+       `XQ.tts.btnHTML()`）借的就是 `.src-btn` 的样式。那是**一个类名被两个完全
+       不同的按钮借样式**：`app.js` 里一段选 `.src-btn` 的循环差点把它的 `onclick`
+       一起覆盖掉（详情见 app.js 那段注释）。同时 `.src-note` 换成了"一句中文 +
+       `-webkit-line-clamp:2`"，因为 `break-all` 会把中文拦腰断开。
+     · 2026-09-25 喇叭按钮也删了（用户「小瑞语音 / 出声 / Microsoft Xiaoxiao Online
+       (Natural) —— 左边栏不要出现这些」）。到这里**最后两个使用者都没了**，
+       按本仓库的规矩（没人用的规则留着，下次改样式的人会以为它管着什么）删干净。
+
+   ⚠️ 连带作废的一条老规矩：早先记着「`.src-*` 四个类名不能删」，那是**当时**的事实，
+      不是永久约束 —— 现在删了才对。真要再做一个左栏按钮，**重新取个类名**，
+      别再叫 `.src-btn`：这个名字的语义是"数据源"，跟新块没关系，而且会重演
+      上面那次"两个按钮抢一个 onclick"。 */
+
+
+/* ⚠️ 这里原来有一块 `.sheets` / `.sheet` / `.sheet.on` —— 左导航那十个作品编号的样式。
+   用户要求把那个索引彻底去掉（入口删掉、文件保留），规则跟着一起删了：
+   留着没人用，下次改样式的人还会以为它管着什么。 */
+
+.rail-foot{ margin-top:auto; display:flex; align-items:center; gap:.6rem; padding:1rem .4rem; color:var(--ink); opacity:.9; }
+/* 左下角只要那个**标**（不带 CHERY 字），因为下面已经有一行文字了 */
+.brand-mark{ height:1.5rem; width:auto; display:block; flex:0 0 auto; }
+.rf-txt{ line-height:1.25; }
+.rf-txt b{ display:block; font-size:var(--fs-note); letter-spacing:.2em; }
+.rf-txt em{ font-style:normal; font-size:var(--fs-note); color:var(--muted); }
+
+/* ---------------------------------------------------------- 驾驶员画面 */
+.cam{
+  grid-column:2; grid-row:1; position:relative; min-height:0; overflow:hidden;
+  border-radius:var(--r-lg);
+  border:1px solid rgba(var(--rgb),.30);
+  box-shadow:0 1.2rem 3rem var(--scrim), inset 0 0 3rem rgba(var(--rgb),.06);
+  transition:border-color .7s, box-shadow .7s;
+}
+.cam-media{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; }
+.stage-svg{ position:absolute; inset:0; width:100%; height:100%; }
+
+/* SVG 里被数据驱动的零件。
+   ⚠️ 除 `#driver` 那一层（头姿）以外，**五官 + 定位点 + `#facebox` + `#scanline`
+      整组都在 `.st-face` 里**，由 `#stageHost[data-face]` 控制淡出 —— 见下面那条。
+      `#eyeL/#eyeR` 的 rx 和 `#mouth` 的 rx 在 2026-09-25 收小了一号
+      （15→13 / 17→14）：原来那双眼睛配上一对粗眉毛，远看就是一张画歪的卡通脸。 */
+#eyeL,#eyeR{ fill:#0f1c24; stroke:#3c5b6d; stroke-width:1.1; }
+#irisL,#irisR{ fill:#9dc2d4; }
+#mouth{ fill:#101d25; stroke:#33505f; stroke-width:1; }
+#facebox{ filter:drop-shadow(0 0 .45rem rgba(var(--rgb),.85)); transition:stroke .7s; }
+#scanline{
+  stroke:var(--accent); stroke-width:2; opacity:.5;
+  filter:drop-shadow(0 0 .5rem var(--accent));
+  animation:scan 2.8s ease-in-out infinite;
+}
+@keyframes scan{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(190px) } }
+#mesh circle{ fill:var(--accent); opacity:.42; }
+#mesh path{ stroke:var(--accent); fill:none; stroke-width:.9; opacity:.24; }
+#driver{ transition:transform .35s ease-out, opacity .45s ease; }
+
+/* 「不该画人的时候」这一格整层淡掉。`#stageHost` 上的 `data-face` 由
+   `XQ.headPose()` / `XQ.headMode()` 写，判据只有 live.js 里那一处。
+      · 有人脸数据                -> data-face="ok"   画布在（那张示意头像）
+      · 没有摄像头 / 没有面部数据 -> data-face="none" **整张 SVG 淡掉**，
+        只剩挂在 `#stageHost` 上的那张照片 + 「未检测到人脸」那块浮层
+   ★ 2026-09-25 用户拍板：「永远不画人，只留等待卡」。所以连 `#driver` 那个剪影
+     也一起去掉 —— 留着它虽然更"满"，但那仍然是一个画出来的人，
+     而这一格要说的恰恰是"这里没有人"。
+   ★ 2026-09-25 第十二次改版：淡出的范围从"五官 + 剪影"扩到**整张 `.stage-svg`**。
+     用户给了「驾驶检测 未接入摄像头时背景图.png」、点名换到这一格；
+     照片挂 `#stageHost`（见 `pages.css` 的 `.livecard #stageHost`），而
+     `.stage-svg` 是 `inset:0` 的一块**不透明画布**（第一笔就是铺满的
+     `url(#gCabin)`），不整层淡掉的话照片一个像素都看不见。
+     ⚠️ 所以"只剩座舱（车窗、远山、空座椅）"这句**现在不成立了** ——
+        连座舱也一起没了，那一格整个交给照片。
+   ⚠️ 淡出而不是删：`#mesh` / 五官每帧都在被写（`XQ.buildMesh` / `XQ.headPose`），
+      删掉节点会让它们静默失效（`getElementById` 返回 null，不报错）。
+   ⚠️ 下面 `.st-face` / `#driver` 那两条**留着**，不是忘了删：它们是这一层
+      "只淡人、留座舱"的原判据，将来谁要把整层淡出改回半淡出，这两条立刻
+      又是对的。现在被上面那条盖住，没有副作用。
+   🔴 `.stage-svg` **故意没有 `transition`** —— 这是用户点名要的，别顺手加回来。
+      第一版我给这条加了 `transition:opacity .45s ease`，用户当场报：
+      「从其他界面换到驾驶监测界面……现在不是直接显示我的背景图 而是从灰变成
+        我的背景图 我感觉这一刻会给人留下不好印象 **这个渐变效果我不要**
+        我就要这个背景图」。
+      那 0.45 秒的渐变**把底下的闪烁放大了**：真正的原因是 JS 侧
+      `HEAD_MODE` 初值写成了 `'auto'`（见 live.js 那一段），页面会先按
+      `data-face="ok"` 亮一次画出来的暗色座舱、再被 `onHello` 按回去。
+      两处都已经改掉，**只改一处另一个还会闪** —— 所以这里保持"没有过渡"，
+      `.st-face` 那份过渡留着不影响（它在 `.stage-svg` 里面，整层已经是 0）。 */
+.stage-svg{ transition:none; }
+.st-face{ transition:opacity .45s ease; }
+#stageHost[data-face="none"] .stage-svg{ opacity:0; }
+#stageHost[data-face="none"] .st-face,
+#stageHost[data-face="none"] #driver{ opacity:0; }
+
+.cam-chip{
+  position:absolute; z-index:3;
+  display:inline-flex; align-items:center; gap:.45rem;
+  padding:.42rem .85rem; border-radius:2rem;
+  font-size:var(--fs-note); color:var(--ink);
+  background:var(--panel-2); backdrop-filter:blur(8px);
+  border:1px solid var(--line);
+}
+.cam-chip .dot{
+  width:.5rem; height:.5rem; border-radius:50%;
+  background:var(--accent); box-shadow:0 0 .55rem var(--accent);
+  animation:blink 1.9s infinite;
+}
+@keyframes blink{ 0%,100%{opacity:1} 50%{opacity:.35} }
+.cam-chip.live{ left:1rem; top:1rem; }
+.cam-chip.alert{
+  left:1rem; bottom:3.1rem;
+  color:var(--accent); border-color:rgba(var(--rgb),.45);
+  background:rgba(var(--rgb),.14);
+}
+.cam-chip.alert svg{ width:1.05rem; height:1.05rem; }
+.cam-note{
+  position:absolute; z-index:3; left:1rem; bottom:.95rem;
+  font-size:var(--fs-note); color:var(--muted);
+}
+
+/* ---------------------------------------------------------- 独立告警 */
+/* 支路二那两条告警（持续闭眼 / 打哈欠）的**常驻横幅**，见 live.js 的 XQ.alarms。
+   -------------------------------------------------------------------------
+   · **照着 `.cam-chip.alert` 的样子做**（同一族：圆角、`--accent` 描边、
+     `rgba(var(--rgb),…)` 淡底、`svg` 1.05rem），这样它自动跟着四档级别变色。
+   · 但它是**文档流里的一块**，不是 `position:absolute` 的浮标 —— 它是常驻的，
+     不能压在别的卡上。所以这里不写 left/top。
+   · 和 `#toast`（下面，2.8s 自毁）的分工：**这一块只要判据还在就一直挂着**，
+     瞬时的那一响交给 toast。两者都会出现，是用户拍板的"常驻 + 瞬时"两层。
+   · 空的时候由 JS 置 `hidden`；`[hidden]` 由第 256 行那条全局规则兜住
+     （它带 `!important`），这里**不要**再写一遍 `display:none`。
+   · ⚠️ 文案由服务端给（`alarms[].text`，逐字来自 `src/fuse.py`），这边只排版，
+     前端**不另写一套句子** —— 否则两边迟早各说各的。 */
+.alarms{ display:flex; flex-direction:column; gap:.4rem; }
+.alarms .alarm-item{
+  display:flex; align-items:center; gap:.5rem;
+  padding:.42rem .7rem; border-radius:var(--r-sm);
+  font-size:var(--fs-note); color:var(--accent);
+  background:rgba(var(--rgb),.14);
+  border:1px solid rgba(var(--rgb),.45);
+}
+.alarms .alarm-item svg{ width:1.05rem; height:1.05rem; flex:0 0 auto; }
+
+/* ---------------------------------------------------------- 驾驶员状态 */
+/* ⚠️ 这张卡是**固定高度 + `overflow:hidden`**：里面的东西比卡高就直接被裁掉，
+   不滚动、不报错、控制台一个字都没有 —— 直观表现是"底部那行运行日志怎么没了"。
+   所以往卡里加东西之前**先去量**（`_scratch/_probe_panel.py`：它把每个子块的
+   高度和余量都打出来），别凭感觉。
+   ★ 2026-09-24 深夜加「支路二」那块时量到：1920x1080 下重度那一档（告警横幅 +
+   快捷操作都在时）本来就溢出 30px。腾地方的三处都在这一张卡里：
+     · gap .55rem → .45rem（7 条缝，省约 12px）
+     · .hero 上下内边距 .75rem → .6rem（省约 5px）
+     · 「疲劳程度」那行并进 .hero（省约 76px，见 index.html 那段注释）
+   这三处都是**间距**，没有一个字的内容被删掉。 */
+.status{ grid-column:3; grid-row:1; display:flex; flex-direction:column; gap:.45rem; padding:1.05rem 1.15rem; min-height:0; overflow:hidden; }
+.status h2{ font-size:var(--fs-lead); font-weight:600; letter-spacing:.04em; }
+
+.hero{
+  display:flex; align-items:center; gap:.9rem;
+  padding:.6rem .9rem; border-radius:var(--r-md);
+  background:linear-gradient(100deg, rgba(var(--rgb),.24), rgba(var(--rgb),.05));
+  border:1px solid rgba(var(--rgb),.35);
+  transition:.6s;
+}
+.mood{ width:3.5rem; height:3.5rem; flex:0 0 auto; color:var(--accent); transition:color .6s; }
+.mood svg{ width:100%; height:100%; }
+/* 大标题 + 等级标签 + 疲劳程度能量条（★ 2026-09-24 深夜：条是从 `.rows` 里搬过来的）。
+   原来这里是 `flex-wrap:wrap` 两件并排 —— 那样条没法"铺满卡片宽度"（flex 子项的
+   `flex-basis:100%` 是相对**内容宽度**算的，会当场塌成 0 宽）。所以改成两列 grid：
+   第 1 列装标题（按内容宽），第 2 列吃掉剩下的（等级标签落在它左边），
+   条 `grid-column:1 / -1` 跨满两列 —— 这样它和原来那根一样宽。
+   ⚠️ `.hero-txt` 要 `flex:1 1 auto; min-width:0`：它是 `.hero`（flex）的子项，
+      没有这两句它就只有内容宽，条会缩成一条短短的色块。 */
+.hero-txt{
+  flex:1 1 auto; min-width:0;
+  display:grid; grid-template-columns:auto 1fr;
+  align-items:center; justify-content:start; gap:.3rem .65rem;
+}
+.hero-txt b{ font-size:var(--fs-title); font-weight:600; letter-spacing:.05em; }
+.hero-txt .pill{ grid-column:2; justify-self:start; }
+.hero-txt .hbar{
+  grid-column:1 / -1; height:.36rem; margin-top:.1rem;
+  border-radius:2rem; background:var(--track); overflow:hidden;
+}
+.hero-txt .hbar i{
+  display:block; height:100%; width:0; border-radius:2rem;
+  background:linear-gradient(90deg, rgba(var(--rgb),.55), var(--accent));
+  box-shadow:0 0 .7rem rgba(var(--rgb),.7);
+  transition:width .45s ease-out, background .6s;
+}
+.pill{
+  font-size:var(--fs-note); padding:.24rem .8rem; border-radius:2rem;
+  color:var(--accent); border:1px solid rgba(var(--rgb),.55);
+  background:rgba(var(--rgb),.12); transition:.5s;
+}
+
+.rows{ display:flex; flex-direction:column; gap:.1rem; }
+/* ⚠️ `.row` **只有首页的这张卡用**（全站 grep 过：`class="row` 只在 index.html）。
+   所以这一行的内边距可以直接改。
+   ★ 2026-09-24 深夜：上下内边距 .5rem/.3rem → .34rem/.18rem。三行一共省约 14px，
+   还是给新增的支路二板块腾高度（卡片固定高度、超出即裁，见 .status 那段）。 */
+.row{
+  display:grid; grid-template-columns:auto 1fr auto;
+  align-items:center; gap:.55rem;
+  padding:.34rem 0 .18rem;
+}
+.row .ico{ width:1.15rem; height:1.15rem; color:var(--ink-icon); }
+.row .k{ font-size:var(--fs-sm); color:var(--ink-3); }
+.row .v{ font-size:var(--fs-num); font-weight:600; font-variant-numeric:tabular-nums}
+.row .v.muted{ font-size:var(--fs-num); font-weight:400; color:var(--muted); font-variant-numeric:tabular-nums}
+.row .bar{ grid-column:1 / -1; height:.42rem; border-radius:2rem; background:var(--track); overflow:hidden; margin-top:.15rem; }
+.row .bar i{
+  display:block; height:100%; width:0; border-radius:2rem;
+  background:linear-gradient(90deg, rgba(var(--rgb),.55), var(--accent));
+  box-shadow:0 0 .7rem rgba(var(--rgb),.7);
+  transition:width .45s ease-out, background .6s;
+}
+/* 心率那一行：**四件东西挤三列**（图标 / 名字 / 读数 / 心电图），所以那根心电图
+   会被挤到**第二格行**去（它在 `grid-column:3`，也就是读数下面）。
+   ★ 2026-09-24 深夜：行内间距从 .55rem 收到 .1rem、心电图从 2.1rem 收到 1.7rem
+   —— 这两下省出来的约 15px 是给新增的支路二板块腾的（卡片固定高度、超出即裁）。
+   心电图现在是条**装饰性的噪声线**，故意没接真 `hr`（接了就等于画一条假波形），
+   所以收一点看不出来；1.7rem 也还画得下一条真心跳。
+   ★ 2026-09-26 更正：这里原写的是「`hr` 恒为 None」——**那句已经不成立**，
+   心率硬件做出来了（`hr/firmware` + `ui/serial_hr.py`，`hr` 会真的跳）。
+   但**心电图那条线仍然不读 `hr`**，是有意的，不是漏了。 */
+.row.hr{ grid-template-columns:auto auto 1fr; align-items:center; gap:.1rem .55rem; }
+.row.hr .ecg{ grid-column:3; width:100%; height:1.7rem; color:var(--accent); opacity:.42; }
+.row.hr .ecg path{ transition:stroke .6s; }
+
+/* 概率条面板（`.p4-*`）—— **两块共用这一套样式**：`#p4` 是支路一（姿态，三根），
+   `#p5` 是支路二（面部，两根）。`p4` 这个类名是历史名字（当时只有一块、还是四类），
+   现在它就是个"标题行 + 若干 '标签/条/数值' 行"的控件，别按名字理解。
+   ⚠️ 改样式时**两块一起改** —— 它们本来就该长得一样，只有名字和条数不同。 */
+.p4{ margin-top:.2rem; padding-top:.6rem; border-top:1px solid var(--line); }
+.p4-head{ display:flex; justify-content:space-between; font-size:var(--fs-note); color:var(--muted); margin-bottom:.35rem; }
+.p4-head span{ font-size:var(--fs-note); }
+/* ★ 2026-09-24 深夜：标签列从写死的 `3.4rem` 改成 `minmax(3.4rem,auto)`。
+   原因是标签变了：「低头看手机」「疲劳点头」在 3.4rem（1080p 下约 58px）里
+   **本来就折成两行**（五个汉字 ≈ 86px），用户新给的 正常头部姿态 / 疲劳瞌睡点头 /
+   头部持续低垂 更长，折行会更难看、也白占高度。改成按内容自适应之后，
+   标签永远单行，宽度让出来的部分自动加到条上（条是 `1fr`）。
+   ⚠️ `auto` 是 max-content，**标签太长会反过来把条挤瘦** —— 标签保持在 6 个汉字
+      以内；真要更长，就把它挪到 `title=` 或标题行里，别硬塞。 */
+.p4-row{ display:grid; grid-template-columns:minmax(3.4rem,auto) 1fr 2.6rem; align-items:center; gap:.5rem; padding:.14rem 0; font-size:var(--fs-note); }
+.p4-row span{ color:#a9bdcb; }
+.p4-row b{ text-align:right; font-weight:600; font-size:var(--fs-sm); font-variant-numeric:tabular-nums; }
+.p4-row .bar{ height:.32rem; border-radius:2rem; background:var(--track); overflow:hidden; }
+.p4-row .bar i{
+  display:block; height:100%; width:0; border-radius:2rem;
+  background:rgba(var(--rgb),.85); transition:width .4s ease-out, background .6s;
+}
+/* 「疲劳概率」那一行的条：橙黄 → 红。⚠️ 这里的 `.p4-row.fatigue` 是**模型类别名**
+   （支路一那个类别叫 fatigue = 疲劳点头），和 `data-sev="severe"`（重度那一**档**）
+   不是一回事 —— 界面上一共两套名字：**档位**（normal/mild/moderate/severe，
+   配色/大标题/小瑞）和**类别**（normal/phone/fatigue，概率条/attention）。
+   概率条这两行按类别来（那是模型真的输出），渐变借的是档位里"中度→重度"那两条色。 */
+.p4-row.fatigue .bar i{ background:linear-gradient(90deg,var(--sev-moderate),var(--sev-severe)); }
+
+/* 支路二三个原始量：四宫格，数字大、标签小 */
+.stats{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:.4rem;
+  margin-top:.2rem; padding-top:.6rem; border-top:1px solid var(--line);
+}
+.stats div{
+  text-align:center; padding:.35rem .2rem; border-radius:.7rem;
+  background:var(--fill-1); border:1px solid var(--fill-2);
+}
+.stats b{ display:block; font-size:var(--fs-num); font-weight:600; font-variant-numeric:tabular-nums; }
+.stats span{ font-size:var(--fs-note); color:var(--muted); }
+
+/* 顶对齐，不要 margin-top:auto —— 把它推到底部会在卡片中间留一道"断层"，
+   看起来像少了东西。空着就空在下面，那才像是有意留的呼吸。 */
+.status-foot{
+  margin-top:.55rem; padding-top:.5rem; border-top:1px solid var(--line);
+  font-size:var(--fs-note); color:var(--muted); line-height:1.45;
+}
+.status-foot:empty{ display:none; }
+
+/* ---------------------------------------------------------- 小瑞 */
+.xq{ grid-column:4; grid-row:1 / 3; display:flex; flex-direction:column; gap:.8rem; min-height:0; }
+.xq-card{ padding:1rem; display:flex; flex-direction:column; gap:.7rem; }
+
+/* 正常档：小瑞**不占一张卡片**，就这么浮在背景上（参考图 1.jpg 就是这样）。
+   卡片从轻度档才开始出现 —— 状态变差时它才"实体化"，这本身也是一种提示。 */
+body[data-sev="normal"] .xq-card{
+  background:none; border-color:transparent; box-shadow:none; backdrop-filter:none;
+}
+body[data-sev="normal"] .xq-note{ margin-top:3.2rem; }
+
+.xq-head{ display:flex; align-items:center; gap:.5rem; }
+.mascot{ position:relative; width:6.6rem; height:6.6rem; flex:0 0 auto; }
+.mascot-img{ width:100%; height:100%; object-fit:contain; }
+
+/* ---------------------------------------------------------- 小瑞的动作层 */
+/* ⚠️ 动效一律加在 **.mascot-img** 上，不加在 .mascot 上 —— 那个容器里还有
+   .ring，ring 自己就在 `pulse` 里 scale，动容器会和它抢同一个 transform。
+   也一律**只动 transform**：动宽高会触发重排，6.6rem 的槽里看得见抖。
+
+   待机：轻微呼吸浮动（用户选的就是这个 —— 不是完全静止，也不是大幅循环）。
+   4s 一个来回、位移 2.2%、放缩 1.5%，是"看得出活着、但盯着看不烦"的量级。
+   ⚠️ 这一条**对所有 .mascot-img 都生效**，包括 2.2~4.6rem 那 6 个小槽：
+   它们在那个尺寸上只有约 1px 的位移，等于看不见；分开写两套反而多一处要维护。
+   ★ 2026-09-25：那些小槽**现在也换形象了**（用户「把那些出现小瑞的地方都变成
+   可以变化的」）—— 见 live.js 的 `XQ.poseDeck`。待机呼吸仍是它们的"不点时"的
+   样子，点一下挂 `data-act="swap"` 弹一下、620ms 后摘掉、呼吸回来。
+   ⚠️ **"摘掉"这件事是这一整套的关键**：不摘的话下面那些 `[data-act]` 规则
+     权重一直压着 `.mascot-img`，`xqIdle` 永远回不来，那一格就"点过一次之后
+     再也不浮动了"。live.js 的 `poseDeck` / `playOne` 各有一处注释记这个坑。 */
+.mascot-img{ animation:xqIdle 4s ease-in-out infinite; transform-origin:50% 88%; }
+@keyframes xqIdle{
+  0%,100%{ transform:translateY(0) scale(1); }
+  50%    { transform:translateY(-2.2%) scale(1.015); }
+}
+
+/* **10 个动作**，来自设定图 11.png「表情延展」那 10 格
+   （抠图脚本 `_scratch/_mk_xiaorui16.py`，文件名见 live.js 的 ACTS）。
+   ⚠️ 11.png 的「动态动作」6 格（挥手/出发/导航/加油/庆祝/送爱心）**没有采纳**：
+      那 6 格底色是白/极淡蓝、小瑞身体也是白的，抠出来下半身是个洞。
+      为什么不采纳、怎么定量证明的，写在 live.js 的 ACTS 那一段，别在这里重述。
+   ⚠️ 这是「**换一张静止立绘 + 播一段位移**」，**不是逐帧动画** —— 素材是静止立绘。
+      （待机那条底图才是真逐帧：`xiaorui_live.webp`，见 live.js 的 IDLE。）
+      答辩口径别说成骨骼动画。
+   ⚠️ 每个 keyframe **必须收在 transform:none**：动画是 iteration 1、没写
+      fill-mode，结束时若停在非单位变换上，浏览器会"啪"地弹回原位。
+   ⚠️ 时长一律 **≤ 1.35s**：`play()` 缺省 hold 1600ms、MAP 里最短的也是 1200ms，
+      动画比 hold 长的话，`data-act` 被摘掉时动画还没播完，会**从中间硬切**回去。
+      要加长动作就得同时加长 MAP 里的 hold，别只改这里。
+   这些规则的选择器是 .mascot-img[data-act=...]，比上面那条 .mascot-img 更具体，
+   所以**只要挂着 data-act 就盖住待机呼吸**；JS 到点把 data-act 摘掉，呼吸自然回来。 */
+.mascot-img[data-act="happy"]    { animation:xqHappy .8s ease-out 1; }
+.mascot-img[data-act="wink"]     { animation:xqWink .55s ease-in-out 1; }
+.mascot-img[data-act="wow"]      { animation:xqWow .62s cubic-bezier(.2,.9,.3,1.2) 1; }
+.mascot-img[data-act="shy"]      { animation:xqShy 1.25s ease-in-out 1; }
+.mascot-img[data-act="angry"]    { animation:xqAngry .7s ease-in-out 1; }
+.mascot-img[data-act="think"]    { animation:xqThink 1.15s ease-in-out 1; }
+.mascot-img[data-act="sad"]      { animation:xqSad 1.3s ease-in-out 1; }
+.mascot-img[data-act="sleep"]    { animation:xqSleep 1.3s ease-in-out 1; }
+.mascot-img[data-act="like"]     { animation:xqLike .85s ease-out 1; }
+.mascot-img[data-act="heart"]    { animation:xqHeart 1.3s ease-out 1; }
+
+/* ★ 2026-09-25（第十次改版）：**换了形象那一下的"弹一下"**。
+   全站所有能点的小瑞（43 张形象库，见 live.js 的 `XQ.poseDeck`）点一下换一张图，
+   换图的瞬间挂 `data-act="swap"` 播这一段，620 ms 后 JS 把它摘掉。
+   为什么非要有这一段：换形象是**换一张静止图**，不动的话在一张静止图上"啪"地
+   换掉，看着像闪了一下 / 像加载中；给一个 8% 的起落，它就被读成"跳了一下换了个
+   姿势"，和十条动作是同一个语法。
+
+   ⚠️ 两个选择器都写是**必须的**，不是冗余：`img[data-act="swap"]` 那一条管
+      **不是 `.mascot-img` 的那些槽** —— 首页主视觉那张 `.dash-mascot`、设置页
+      两张方图、聊天气泡头像都没有 `.mascot-img` 这个类（它们不在 `.mascot`
+      容器里）。只写 `.mascot-img[data-act=...]` 的话，那几处点下去**只有图换、
+      不会弹**，而且不会报任何错。
+   ⚠️ 第一条选择器**必须带 `.mascot-img`**（不能只写属性）：`.mascot-img` 那条
+     待机呼吸和它权重相同（都是 0,1,0），同权重下靠**源序**决胜负 —— 这条写在
+      它后面所以能盖住；要是只写 `[data-act="swap"]`，下面那些带 `.mascot-img`
+      前缀的动作规则不会受影响，但这条就压不住待机呼吸了。
+   ⚠️ 时长 **0.5s < poseDeck 的 hold 620ms**：动画比 hold 长的话，`data-act` 被
+      摘掉时动画还在播，会**从中间硬切**回浮动态。要改长就得同时改 live.js 里
+      `poseDeck` 的 `hold` 默认值，别只改这里。 */
+img[data-act="swap"], .mascot-img[data-act="swap"]{
+  animation:xqSwap .5s ease-in-out 1; transform-origin:50% 88%;
+}
+@keyframes xqSwap{
+  0%  { transform:none; }
+  35% { transform:translateY(-7%) scale(1.045); }
+  70% { transform:translateY(-1%) scale(.985); }
+  100%{ transform:none; }
+}
+
+/* 下面每条都写明"这个位移是在配合图里哪个姿态"，改的时候别只看数字 ——
+   动作名和图是一一对应的，位移方向跟图里身体朝向反了会很明显。 */
+@keyframes xqHappy{               /* 开心：两下轻快的弹跳，第二下小一些 */
+  0%  { transform:translateY(0) scale(1); }
+  30% { transform:translateY(-7%) scale(1.05); }
+  55% { transform:translateY(0) scale(.99); }
+  78% { transform:translateY(-3%) scale(1.02); }
+  100%{ transform:translateY(0) scale(1); }
+}
+@keyframes xqWink{                /* 眨眼：快速压扁再回来，是 16 个里最短的一个 */
+  0%  { transform:scaleY(1); }
+  35% { transform:scaleY(.945); }
+  100%{ transform:scaleY(1); }
+}
+@keyframes xqWow{                 /* 惊讶：猛地往上一弹再回落。快出慢收（回弹曲线），
+                                     整段最短 —— 惊讶本来就是一瞬的事。 */
+  0%  { transform:translateY(0) scale(1); }
+  22% { transform:translateY(-9%) scale(1.06); }
+  46% { transform:translateY(-4%) scale(1.03); }
+  100%{ transform:translateY(0) scale(1); }
+}
+@keyframes xqShy{                 /* 害羞：小幅缩一下 + 侧转，中段**停住**再慢慢回正。
+                                     停那一拍是"别过脸去"的意思，不是卡住。 */
+  0%  { transform:scale(1) rotate(0); }
+  25% { transform:scale(.965) rotate(-2.5deg); }
+  70% { transform:scale(.965) rotate(-2.5deg); }
+  100%{ transform:scale(1) rotate(0); }
+}
+@keyframes xqAngry{               /* 生气：短促左右摇（3 下），幅度小、频率高，
+                                     和 happy 的"向上弹"在观感上要能一眼分开。 */
+  0%  { transform:translateX(0) rotate(0); }
+  20% { transform:translateX(-3.2%) rotate(-1.5deg); }
+  45% { transform:translateX(3.2%) rotate(1.5deg); }
+  70% { transform:translateX(-2%) rotate(-1deg); }
+  100%{ transform:translateX(0) rotate(0); }
+}
+@keyframes xqThink{               /* 思考：歪头停一下再回正 —— 停那一拍是"在问你" */
+  0%  { transform:rotate(0); }
+  30% { transform:rotate(-6deg); }
+  70% { transform:rotate(-6deg); }
+  100%{ transform:rotate(0); }
+}
+@keyframes xqSad{                 /* 委屈：往下沉一点 + 缩，是 16 个里唯一**向下**的
+                                     主位移。别的动作都往上弹，这条往下才读得出低落。 */
+  0%  { transform:translateY(0) scale(1); }
+  35% { transform:translateY(3.5%) scale(.975); }
+  75% { transform:translateY(2.5%) scale(.985); }
+  100%{ transform:translateY(0) scale(1); }
+}
+@keyframes xqSleep{               /* 睡觉：极慢的一口气。幅度只 1.6%，
+                                     要的是"几乎静止但没死"的观感。 */
+  0%  { transform:translateY(0) scale(1); }
+  45% { transform:translateY(-1.6%) scale(1.018); }
+  100%{ transform:translateY(0) scale(1); }
+}
+@keyframes xqLike{                /* 点赞：干脆地往上一顶，带一点侧倾（图里是抬手）。
+                                     只有一下，不来回 —— 点赞是个"表态"。 */
+  0%  { transform:translateY(0) rotate(0); }
+  32% { transform:translateY(-6.5%) rotate(2deg); }
+  70% { transform:translateY(-1.5%) rotate(.5deg); }
+  100%{ transform:translateY(0) rotate(0); }
+}
+@keyframes xqHeart{               /* 比心：缓慢上浮 + 微微放大，两手往中间送的姿态 */
+  0%  { transform:translateY(0) scale(1); }
+  40% { transform:translateY(-2.5%) scale(1.06); }
+  75% { transform:translateY(0) scale(1.02); }
+  100%{ transform:translateY(0) scale(1); }
+}
+.mascot-svg{ position:relative; width:100%; height:100%; z-index:1; }
+.ring{
+  position:absolute; inset:6%; border-radius:50%;
+  border:2px solid rgba(var(--rgb),.55);
+  box-shadow:0 0 1.6rem rgba(var(--rgb),.5), inset 0 0 1.6rem rgba(var(--rgb),.28);
+  animation:pulse 3.4s ease-in-out infinite;
+}
+.ring.r2{ inset:16%; border-style:dashed; animation-duration:9s; animation-direction:reverse; opacity:.6; }
+@keyframes pulse{ 0%,100%{ transform:scale(1); opacity:.9 } 50%{ transform:scale(1.06); opacity:.55 } }
+/* 圆环心跳：**四档一条单调梯子**（默认 3.4s = 清醒那一档，在 .ring 那条上）。
+   ⚠️ 四个值是上一版就定好的**原值，一个没动**（轻 3.0 / 中 2.4 / 重 1.5）——
+      只是键名从类别换成了档位。
+   ⚠️ 轻度那 3.0s 和清醒的差别故意做得很小（3.4 → 3.0 肉眼几乎看不出）：
+      轻度靠变黄认，不靠心跳变快认。 */
+body[data-sev="mild"] .ring{ animation-duration:3.0s; }
+body[data-sev="moderate"]  .ring{ animation-duration:2.4s; }
+body[data-sev="severe"] .ring{ animation-duration:1.5s; }
+
+.xq-meta{ display:flex; flex-direction:column; gap:.35rem; align-items:flex-start; }
+.xq-meta b{ font-size:var(--fs-sm); font-weight:600; }
+.xq-meta .eq{ width:4rem; height:1.6rem; color:var(--accent); }
+.xq-meta .eq rect{ animation:eq 1.1s ease-in-out infinite; transform-origin:center; }
+.xq-meta .eq rect:nth-child(2){ animation-delay:.13s }
+.xq-meta .eq rect:nth-child(3){ animation-delay:.26s }
+.xq-meta .eq rect:nth-child(4){ animation-delay:.39s }
+.xq-meta .eq rect:nth-child(5){ animation-delay:.52s }
+.xq-meta .eq rect:nth-child(6){ animation-delay:.65s }
+@keyframes eq{ 0%,100%{ transform:scaleY(.55) } 50%{ transform:scaleY(1.25) } }
+
+.xq-note{
+  position:relative; align-self:flex-end; text-align:right;
+  font-size:var(--fs-sm); line-height:1.55; color:var(--ink-2);
+  font-family:"KaiTi","STKaiti","Segoe Script",cursive;
+  letter-spacing:.04em; text-shadow:0 0 1.2rem rgba(var(--rgb),.5);
+  padding:.4rem .2rem;
+}
+.xq-note .swash{
+  position:absolute; right:0; bottom:0; width:78%; height:.7rem;
+  border-bottom:2px solid rgba(var(--rgb),.65); border-radius:50%;
+  transform:rotate(-3deg);
+}
+
+.xq-bubble{
+  padding:.9rem 1rem; border-radius:1.1rem 1.1rem .35rem 1.1rem;
+  font-size:var(--fs-sm); line-height:1.6; color:var(--ink-2);
+  background:rgba(var(--rgb),.16); border:1px solid rgba(var(--rgb),.42);
+  backdrop-filter:blur(8px);
+}
+
+.xq-acts{ display:flex; flex-direction:column; gap:.5rem; }
+.xq-acts:empty{ display:none; }
+.xq-btn{
+  display:flex; align-items:center; gap:.6rem;
+  padding:.72rem .9rem; border-radius:.95rem; cursor:pointer;
+  font:inherit; font-size:var(--fs-sm); color:var(--ink); text-align:left;
+  background:var(--fill-2); border:1px solid var(--line);
+  transition:.25s;
+}
+.xq-btn svg{ width:1.1rem; height:1.1rem; color:var(--accent); flex:0 0 auto; }
+.xq-btn:hover{ background:rgba(var(--rgb),.16); border-color:rgba(var(--rgb),.5); transform:translateX(-.15rem); }
+.xq-btn.primary{
+  background:linear-gradient(90deg, rgba(var(--rgb),.85), rgba(var(--rgb),.55));
+  border-color:transparent; color:var(--on-accent); font-weight:600;
+}
+.xq-btn.primary svg{ color:var(--on-accent); }
+
+.quick{ padding:.9rem 1rem; }
+.quick h3{ font-size:var(--fs-body); font-weight:600; margin-bottom:.6rem; }
+.quick .xq-btn{ margin-bottom:.45rem; }
+.quick .xq-btn:last-child{ margin-bottom:0; }
+
+/* ---------------------------------------------------------- 对话栏 */
+.talk{
+  grid-column:2 / 4; grid-row:2;
+  display:flex; align-items:center; gap:.8rem;
+  padding:.55rem .7rem .55rem .5rem;
+  border-radius:2.6rem;
+  background:var(--glass-2); backdrop-filter:blur(16px);
+  border:1px solid var(--line);
+  box-shadow:0 1rem 2.4rem rgba(0,0,0,.4);
+}
+.talk-ava{
+  width:3.6rem; height:3.6rem; flex:0 0 auto; border-radius:50%;
+  display:grid; place-items:center; overflow:hidden;
+  background:radial-gradient(circle at 50% 40%, rgba(var(--rgb),.35), var(--panel-4));
+  border:1px solid rgba(var(--rgb),.4);
+}
+.talk-ava img,.talk-ava svg{ width:100%; height:100%; object-fit:contain; }
+
+.bubbles{
+  flex:1 1 auto; min-width:0; max-height:3.1rem; overflow-y:auto;
+  display:flex; flex-direction:column; gap:.18rem;
+  font-size:var(--fs-sm); line-height:1.45;
+  scrollbar-width:none;
+}
+.bubbles::-webkit-scrollbar{ width:0; }
+.bubbles .b{ display:flex; gap:.45rem; align-items:baseline; }
+.bubbles .b u{
+  text-decoration:none; font-size:var(--fs-note); color:var(--accent);
+  border:1px solid rgba(var(--rgb),.4); border-radius:.5rem;
+  padding:0 .3rem; flex:0 0 auto; line-height:1.35;
+}
+.bubbles .b.me u{ color:var(--muted); border-color:var(--line); }
+.bubbles .b p{ color:var(--ink-2); overflow-wrap:anywhere; }
+.bubbles .b.me p{ color:#c2d4e0; }
+.bubbles .b.pending p{ color:var(--muted); }
+
+.talk-input{ display:flex; align-items:center; gap:.45rem; flex:0 0 auto; }
+.talk-input input{
+  width:17rem; padding:.62rem .9rem; font:inherit; font-size:var(--fs-body);
+  color:var(--ink); background:var(--fill-2);
+  border:1px solid var(--line); border-radius:2rem; outline:none;
+  transition:.25s;
+}
+.talk-input input::placeholder{ color:#6d8494; }
+.talk-input input:focus{ border-color:rgba(var(--rgb),.55); background:var(--fill-4); }
+.talk-input .send{
+  padding:.62rem 1rem; font:inherit; font-size:var(--fs-sm); font-weight:600; cursor:pointer;
+  color:var(--on-accent); background:var(--accent); border:none; border-radius:2rem;
+  transition:.25s;
+}
+.talk-input .send:hover{ filter:brightness(1.12); }
+.talk-input .mic{
+  width:2.7rem; height:2.7rem; flex:0 0 auto; display:grid; place-items:center;
+  color:var(--accent); cursor:pointer; border-radius:50%;
+  background:var(--fill-3); border:1px solid rgba(var(--rgb),.45);
+  transition:.25s;
+}
+.talk-input .mic svg{ width:1.15rem; height:1.15rem; }
+.talk-input .mic:hover{ background:rgba(var(--rgb),.2); }
+/* 正在听。⚠️ **必须一眼看得出来**：麦克风开着却没有任何视觉反馈，人就会一直说下去，
+   而 max_s 一到它自己停了 —— 表现是"说了半天怎么没反应"。呼吸灯是最省事的说法。 */
+.talk-input .mic.rec{
+  color:#fff; background:rgba(var(--rgb),.5);
+  border-color:var(--accent);
+  animation:micBreath 1.15s ease-in-out infinite;
+}
+@keyframes micBreath{
+  0%,100%{ box-shadow:0 0 0 0 rgba(var(--rgb),.55); }
+  50%    { box-shadow:0 0 0 .55rem rgba(var(--rgb),0); }
+}
+/* 尊重系统的"减少动态效果"：动效关掉，但**状态还得看得出来**（换成常亮描边）。 */
+@media (prefers-reduced-motion: reduce){
+  .talk-input .mic.rec{ animation:none; box-shadow:0 0 0 .18rem rgba(var(--rgb),.6); }
+  /* 小瑞的动作和待机呼吸**全关**，退化成一张静止的立绘。
+     ⚠️ 是"关"不是"换成更小的动"：前庭敏感的人对位移最难受，哪怕只有 2%。
+     ⚠️ 这条必须排在动作规则**之后**（它确实在文件后面）：两边选择器权重一样，
+        靠顺序决胜 —— 哪天把动作层挪到本块下面，这条就静默失效了。
+        写 `.mascot-img[data-act]` 是为了同时盖住待机那条（.mascot-img）和十条动作。
+     ⚠️ `img[data-act="swap"]` 这条**不能省**：换形象那一下（上面那段）有两个
+        选择器，`.mascot-img` 那半边被本级盖住了，但**不带 .mascot-img 的那些槽**
+        （首页主视觉 `.dash-mascot`、设置页两张方图、聊天气泡头像）只有
+        `img[data-act="swap"]` 那一条管着 —— 权重两边都是 (0,1,1)、这条在后面，
+        所以补上就压得住；漏了的话"减少动态效果"的人一点小瑞还是会跳一下。 */
+  .mascot-img,
+  .mascot-img[data-act],
+  img[data-act="swap"]{ animation:none; }
+}
+/* 「展开完整对话」。刻意做得比发送/mic 弱一档 —— 它是"还有更多"，不是主操作，
+   不该和「发送」抢注意力。 */
+.talk-input .talk-more{
+  flex:0 0 auto; white-space:nowrap; text-decoration:none;
+  font-size:var(--fs-note); color:var(--muted); padding:.3rem .2rem;
+  transition:.2s;
+}
+.talk-input .talk-more:hover{ color:var(--accent); }
+
+/* ------------------------------------------------- 常听唤醒（耳朵） */
+/* ★ 2026-09-25：对着车里说「你好，小瑞」就能叫醒小瑞。这一块是**它的开关和状态**。
+   结构是 `.wk > (.wk-btn, .wk-line > (.wk-host, .wk-detail))` —— 三层里
+   **`.wk-line` 那一层不能省**：`web/wake.js` 的 `_render()` 是
+   `host.parentElement.querySelector('.wk-detail')` 去找第二行的，把它俩拆到
+   不同父节点下，第二行就永远不更新（而第一行看着好好的，所以很难发现）。
+   ⚠️ 常态是**关着的**：麦克风只有人点这颗按钮才开，和"只有点接入摄像头才接
+   摄像头"同一条原则。所以 `.wk-host.off` 那一档是默认外观，不是异常。 */
+.wk{ display:flex; align-items:center; gap:.42rem; flex:0 0 auto; }
+.wk-btn{
+  position:relative;             /* `.wk-label` 是绝对定位藏字的，要有定位祖先 */
+  width:2.7rem; height:2.7rem; flex:0 0 auto; display:grid; place-items:center;
+  color:var(--muted); cursor:pointer; border-radius:50%;
+  background:var(--fill-3); border:1px solid var(--line);
+  transition:.25s;
+}
+.wk-btn svg{ width:1.1rem; height:1.1rem; }
+.wk-btn .wk-label{
+  position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%);
+}
+.wk-btn:hover{ background:rgba(var(--rgb),.18); color:var(--accent); }
+/* 在听。和 `.mic.rec` 同一个意思、同一种呼吸灯 —— 麦克风开着而界面没反应，
+   人就会一直说下去或者以为坏了（见上面 `.mic.rec` 那段注释）。 */
+.wk-btn.on{
+  color:#fff; background:rgba(var(--rgb),.5); border-color:var(--accent);
+  animation:micBreath 1.15s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce){
+  .wk-btn.on{ animation:none; box-shadow:0 0 0 .18rem rgba(var(--rgb),.6); }
+}
+.wk-line{ display:flex; flex-direction:column; min-width:0; max-width:13rem; line-height:1.2; }
+.wk-host{
+  font-size:var(--fs-note); color:var(--ink-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.wk-host.off{ color:var(--muted); }
+.wk-host.error{ color:#ff9a9a; }
+.wk-host.listening,.wk-host.starting{ color:var(--accent); }
+.wk-detail{
+  font-size:10px; color:var(--muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+/* ---------------------------------------------------------- toast */
+.toast{
+  position:fixed; left:50%; bottom:5rem; transform:translate(-50%,1.4rem);
+  z-index:50; pointer-events:none; opacity:0;
+  padding:.65rem 1.2rem; border-radius:2rem; font-size:var(--fs-sm);
+  color:var(--ink); background:var(--panel-4);
+  border:1px solid rgba(var(--rgb),.5);
+  box-shadow:0 0 2rem rgba(var(--rgb),.3);
+  transition:.35s;
+}
+.toast.on{ opacity:1; transform:translate(-50%,0); }
+
+/* ---------------------------------------------------------- 小屏兜底 */
+@media (max-width:1180px){
+  html{ font-size:clamp(10px, 100vw / 96, 18px); }
+  .main{ grid-template-columns:10rem minmax(0,1fr) 22rem 17rem; }
+  .talk-input input{ width:12rem; }
+  /* 窄屏上先让出**第二行**（片数/引擎那行是诊断用的），状态那一行必须留着 ——
+     "在听/没在听"是用户唯一能确认麦克风状态的地方，它不该被挤掉。 */
+  .wk-line{ max-width:9rem; }
+  .wk-detail{ display:none; }
+}

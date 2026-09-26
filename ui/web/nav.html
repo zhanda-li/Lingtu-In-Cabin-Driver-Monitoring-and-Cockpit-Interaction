@@ -1,0 +1,2709 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>导航 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* =========================================================================
+   导航（左栏「导航」那一项的目标页）
+   -------------------------------------------------------------------------
+   ★ 版面口径（2026-09-25 用户拍板，**这一版是最终口径**；前面几版"右边三张
+     卡""逐段拆解""单独一块小瑞聊天框"都是过程稿，已经被删掉了）：
+
+   1. **顶上一条搜索栏**：最左边只有一个返回箭头（⚠️ 2026-09-25 用户点名把
+      「导航」标题连着图标一起去掉了 —— 左栏那一格已经写着导航，重复），
+      然后是**起点、终点竖着排成的**一列（用户原话：「起终点在一列 不要分开」；
+      起点占位符「当前位置」、终点「请输入目的地」，交换键在整列右边），
+      再往右是「重新定位」和「搜索路线」两颗键，最右边是连接状态。
+   2. **中间地图是页面第一视觉**：地图占满内容区宽度，**一张图上同时画三条
+      候选路线**（深蓝主推荐 / 浅蓝备选一 / 灰备选二，带行驶方向箭头），
+      起点绿色车辆点、终点红色目的地标。
+   3. **路线面板叠在地图右侧**（半透明浅蓝玻璃、圆角，**一块，不拆卡**）：
+      标题「候选路线」+ 三条路线（名称 / 里程 / 用时 / 简要说明，第一条选中、
+      深蓝高亮边框）+ 当前那条的导航信息（目的地 / 剩余距离 / 预计到达）
+      + 底部两颗主键「开始导航」「语音输入」。
+   4. **地图右下角一条小气泡**：驾驶监测报疲劳时才出现，「检测到疲劳，是否推荐
+      就近服务区休整？」+「忽略」「查看服务区」。**视觉权重低**，不挡正常导航。
+   5. ★★ **「开始导航」之后要真的进导航**（2026-09-25 用户拍板，改的就是第 4 版
+      里那条"只给概览"的旧口径）：「开始导航后 肯定要进入实际了啊 有直行那些
+      前方多少公里有红绿灯那些 这不是最基本的吗」。所以导航态是——
+        · 地图左上角一条**引导条**：转向图标 + 「直行 / 左转 / 右转 / 掉头 / 到达」
+          + 高德那一句原话（「沿静台路向东行驶686米左转」）+ 底下三个数
+          （本段多少米 · 红绿灯几个 · 约几分钟）+ 「第 3 / 8 段」；
+        · 面板里换成**逐段清单**（导航态下替掉候选路线那三行），点一段：图上
+          那一段单独亮出来（每段自己那份折线是高德给的，见 `ui/amap.py`）。
+      🔴 **但"前方 500 米右转"这种会自己变小的数**，这一页**给不出来也不许编**：
+        这台机器上"车在哪"是拿不到的（见 `tryGeo()` 那段），没有实时位置就没有
+        "还剩多少米"。所以它是**全程预览**：段和段不会自己往前走，人点哪段看哪段。
+        屏上每个字每个数都是高德给的（`step_distance` / `cost.traffic_lights` /
+        `instruction`），**一句"路况顺畅"都没有**。
+
+   ⚠️ 三条老规矩在这一版**依然有效**，改这一页之前先看：
+
+   1. 🔴 **查不到就是查不到，一个数都不许给。** 定位拿不到 / 高德连不上 / 附近
+      没搜到 —— 这三种情况下这一页显示全是「—」加一句人话，**不画车、不画路线、
+      不给公里数**。这一页存在的全部理由，就是原来那句「前方 12 公里有一个服务区」
+      是**编的**；编一个默认坐标比不显示坏得多，因为它看起来是真的。
+      ⚠️ 用户给的样张里那些数（28.6 公里 / 36 分钟 / 杭州东站 / 10:30）**是样例**，
+        一个字都没有写进这一页 —— 屏上每个数都来自服务端那一次真查询。
+   2. ★ **"地图不画"分两种情况**（看着矛盾，实际是两件事）：
+      · **SDK 加载失败**（没网 / key 没配 / 白名单没加）→ 地图那一块整个不画；
+      · **定位拿不到** → 地图**照画**（它只是张地图，不是关于你在哪的断言），
+        但不画车、不画路线，并给出**手动起点**那几条路。
+        混了会自相矛盾：定位拿不到时把地图也收掉，用户就没地方去点那个"手动起点"了。
+   3. ★ **所有数字都来自服务端（`ui/amap.py`）**，页面自己一个数都不算 —— 因为
+      同一件事还有第二个出口：小瑞**嘴上也会念**同一个数（`server.py` 的
+      `voice_answer`）。屏上和嘴上必须是同一个来源。
+   ========================================================================= */
+
+/* ------------------------------------------------------------- 顶上搜索栏 */
+/* ⚠️ `.ptitle` 是 pages.css 里的全站样式（flex + wrap + gap），这一页只是往
+   里面多塞了几个控件 —— 别改它，别的地方也在用。 */
+/* ★ 起点和终点**竖着摆成一列**（2026-09-25 用户：「起终点在一列 不要分开」）：
+   两个框左边缘对齐、宽度一样、中间一条虚线，交换键在整列的右边 —— 和手机上的
+   导航 App 是同一个形状。⚠️ 一列 = **一个** `.end-box`，不是两个并排的框：
+   并排的时候它们会被 `.ptitle` 的 `flex` 拉到两头去，看着就是"分开了"。 */
+.end-box{ position:relative; display:flex; flex-direction:column; flex:0 0 auto;
+  width:clamp(15rem, 25vw, 22rem); padding:.12rem .3rem .12rem .6rem;
+  border-radius:.72rem; background:var(--fill-2); border:1px solid var(--line); }
+.end-box:focus-within{ border-color:rgba(var(--rgb),.55);
+  background:rgba(var(--rgb),.06); }
+.end-box .drow{ display:flex; align-items:center; gap:.4rem; }
+/* 两行之间那条虚线：一眼看出是"起点在上、终点在下"的一列 */
+.end-box .drow + .drow{ border-top:1px dashed var(--line); }
+.end-box .ic{ display:grid; place-items:center; flex:0 0 auto; }
+.end-box .ic svg{ width:1rem; height:1rem; }
+/* ⚠️ 起点绿、终点红 = **地图上那两个圆点的颜色**（`draw()` 里写的 #22a06b /
+   #e5484d）。一列里这两行的图标用同一个色系，人不用想就知道哪行是哪头。 */
+.end-box .r-org .ic{ color:#22a06b; }
+.end-box .r-dst .ic{ color:#e5484d; }
+.end-box input{ flex:1 1 auto; min-width:0; font:inherit; font-size:.85rem;
+  padding:.42rem .1rem; color:var(--ink); background:transparent; border:0;
+  outline:0; }
+.end-box input::placeholder{ color:var(--muted); }
+/* 交换键：实心小圆，夹在两个框中间 —— 和高德上那颗是同一个位置、同一个意思。 */
+.swap-btn{ flex:0 0 auto; width:1.9rem; height:1.9rem; display:grid;
+  place-items:center; cursor:pointer; color:var(--accent);
+  background:rgba(var(--rgb),.12); border:1px solid rgba(var(--rgb),.3);
+  border-radius:50%; transition:.25s; }
+.swap-btn:hover{ background:rgba(var(--rgb),.24); transform:rotate(180deg); }
+.swap-btn svg{ width:1rem; height:1rem; }
+.nav-btn{ font:inherit; font-size:.78rem; font-weight:600; cursor:pointer;
+  white-space:nowrap; padding:.5rem .85rem; border-radius:.72rem; transition:.22s;
+  display:inline-flex; align-items:center; gap:.35rem;
+  color:var(--ink-3); background:var(--fill-2); border:1px solid var(--line); }
+.nav-btn:hover{ color:var(--ink); background:rgba(var(--rgb),.12);
+  border-color:rgba(var(--rgb),.5); }
+.nav-btn svg{ width:.9rem; height:.9rem; }
+/* 「搜索路线」是这一行唯一的主键（真正的主操作是地图上那条路，但它是入口）。 */
+.nav-btn.primary{ color:#fff; background:var(--accent); border-color:var(--accent); }
+.nav-btn.primary:hover{ filter:brightness(1.08); }
+
+/* 搜索栏下面那条细线：起点状态 + 一句提示。**不是装饰** —— 定位拿不到的时候，
+   这一行是页面上唯一说得出"你得自己给个起点"的地方（见文件头第 2 条）。 */
+.nav-sub{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+  font-size:.76rem; color:var(--ink-3); margin:-.35rem 0 .1rem; }
+.org-state{ display:flex; align-items:center; gap:.4rem; }
+.org-state .dot{ width:.5rem; height:.5rem; border-radius:50%; flex:0 0 auto;
+  background:var(--muted); }
+.org-state.on .dot{ background:#2f9e6b; }
+.org-state.bad .dot{ background:#d4762f; }
+.nav-sub .spacer{ flex:1 1 auto; }
+
+/* ★★ 打字时冒出来的候选 —— 一颗**悬浮的下拉**，挂在起点/终点那一列的下面。
+   ⚠️ 它**不占版面**（`position:absolute`）：2026-09-25 用户原话「我选择是在起点
+      终点框那点下拉那个就顺带可以选择了啊 而不是下去挤占我地图位置 然后应该
+      就和右上角那个小角标类似的效果 是独立在这个页面顶部的」。第一版是排在
+      页面流里的一个块，候选一出来地图就被推下去 —— 用户当场否掉。
+   ⚠️ 底色要**不透明**（.98）：它是盖在地图瓦片上的，半透明会花。
+   ⚠️ `z-index` 要压过地图卡里那两条（`.nav-panel` 5 / 引导条 7）：同一个层叠
+      上下文里带正 z-index 的定位元素排在所有 `z-index:auto` 的定位元素（含
+      `.nav-mapwrap`）之上，30 够。⚠️ `.sub-body` 是滚动容器，但它只裁**滚动区
+      之外**的东西，这个下拉落在地图那一段里，不会被裁掉。 */
+.dst-list{ position:absolute; left:0; right:0; top:calc(100% + .3rem); z-index:30;
+  display:flex; flex-direction:column; gap:.12rem; padding:.3rem;
+  max-height:15rem; overflow-y:auto; overscroll-behavior:contain;
+  border-radius:.72rem; background:rgba(255,255,255,.98);
+  border:1px solid var(--line); box-shadow:0 .8rem 2rem rgba(24,52,84,.2); }
+.dst-list[hidden]{ display:none; }
+.dst-list button{ display:block; width:100%; text-align:left; font:inherit;
+  font-size:.78rem; padding:.42rem .55rem; border-radius:.55rem; cursor:pointer;
+  color:var(--ink); background:transparent; border:0; }
+.dst-list button:hover{ background:rgba(var(--rgb),.12); }
+.dst-list .dn{ font-weight:600; }
+.dst-list .da{ display:block; font-size:.68rem; color:var(--muted); margin-top:.1rem; }
+/* 下拉框里那种**不是候选**的行：「正在问高德…」「高德一条都没搜到」。
+   见页面脚本里 `listNote()`：打字那条路**永远**要在框下面冒出一块东西，
+   有能点的就点，没有就把为什么没有说清楚。 */
+.dst-list .dtip{ display:block; padding:.42rem .55rem; font-size:.72rem;
+  line-height:1.55; color:var(--ink-3); }
+
+/* ---------------------------------------------------------------- 地图卡 */
+/* ⚠️ 高度给死一个范围（不能靠子元素撑）：高德 2.0 是 WebGL 画布，容器高度 0 时
+   它**不报错**、只是什么都不显示 —— 那种"空"最难查。 */
+.nav-mapwrap{ position:relative; border-radius:.9rem; overflow:hidden;
+  height:clamp(26rem, 66vh, 46rem); background:var(--fill-2);
+  border:1px solid var(--hair-2); }
+.nav-mapwrap #map{ position:absolute; inset:0; }
+/* 没在画地图时盖在上面的一句话（不是遮罩，是"这块现在没有内容"）。 */
+.nav-mapwrap .mapnote{
+  position:absolute; inset:0; display:none; place-items:center; text-align:center;
+  padding:1.4rem; font-size:.82rem; line-height:1.75; color:var(--ink-3);
+  background:repeating-linear-gradient(135deg, rgba(var(--rgb),.05) 0 10px,
+              transparent 10px 20px);
+}
+.nav-mapwrap.empty .mapnote{ display:grid; }
+
+/* 地图上点了一下之后那条"这个点算什么"。⚠️ `[hidden]` 那条**不能省**：
+   UA 样式表里 `[hidden]{display:none}` 的特异性比 `.map-pick` 低，少了它
+   JS 设 `hidden` 也收不起来（前面一版就栽在这儿）。 */
+.map-pick{ position:absolute; left:.6rem; top:.6rem; z-index:6;
+  display:flex; align-items:center; gap:.35rem; padding:.3rem .4rem;
+  border-radius:.6rem; background:rgba(255,255,255,.94);
+  border:1px solid var(--hair-2); font-size:.72rem; }
+.map-pick[hidden]{ display:none; }
+.map-pick span{ color:var(--ink-3); padding-left:.15rem; }
+.map-pick button{ font:inherit; font-size:.72rem; font-weight:600; cursor:pointer;
+  padding:.25rem .55rem; border-radius:.5rem; color:var(--ink-3);
+  background:var(--fill-2); border:1px solid var(--line); white-space:nowrap; }
+.map-pick button:hover{ color:var(--ink); background:rgba(var(--rgb),.12);
+  border-color:rgba(var(--rgb),.5); }
+
+/* ═══════════ 叠在地图右侧的路线面板（半透明浅蓝玻璃，一整块） ═══════════ */
+.nav-panel{
+  position:absolute; right:.7rem; top:.7rem; z-index:5;
+  width:clamp(15rem, 23vw, 20rem);
+  /* ⚠️ 底部留出 ~5.4rem：那块地方是**疲劳气泡**的（用户点名"右下角"）。
+     不留的话气泡会压在按钮上 —— 而那是这一页唯一的项目特色。 */
+  max-height:calc(100% - 5.4rem); overflow-y:auto; overscroll-behavior:contain;
+  padding:.75rem .8rem; border-radius:.9rem;
+  background:linear-gradient(165deg, rgba(139,186,238,.30), rgba(255,255,255,.80));
+  border:1px solid rgba(120,175,235,.5);
+  box-shadow:0 .6rem 1.8rem rgba(28,62,102,.16);
+  backdrop-filter:blur(10px);
+}
+.nav-panel::-webkit-scrollbar{ width:.3rem; }
+.nav-panel::-webkit-scrollbar-thumb{ background:rgba(31,79,168,.25);
+  border-radius:2rem; }
+.np-head{ display:flex; align-items:center; justify-content:space-between;
+  gap:.5rem; margin-bottom:.55rem; }
+.np-head h3{ font-size:.92rem; font-weight:600; color:var(--ink);
+  display:flex; align-items:center; gap:.4rem; }
+.np-head h3 svg{ width:1rem; height:1rem; color:#1f4fa8; }
+.np-head .note{ font-size:.68rem; color:var(--muted); }
+.np-badge{ display:none; font-size:.66rem; font-weight:600; color:#fff;
+  padding:.1rem .4rem; border-radius:.4rem; background:var(--accent); }
+.pg-nav.navigating .np-badge{ display:inline-block; }
+.pg-nav.navigating .nav-panel{ border-color:rgba(var(--rgb),.7); }
+
+/* 三条候选路线：**一行一条**。第一条默认选中、深蓝高亮边框。 */
+.rt-rows{ display:flex; flex-direction:column; gap:.32rem; }
+.rt-rows:empty{ display:none; }
+.rt-row{ display:flex; gap:.5rem; align-items:flex-start; width:100%;
+  text-align:left; font:inherit; cursor:pointer; padding:.45rem .55rem;
+  border-radius:.7rem; transition:.2s;
+  background:rgba(255,255,255,.55); border:1px solid rgba(120,175,235,.38); }
+.rt-row:hover{ border-color:rgba(31,79,168,.5); }
+.rt-row.on{ background:rgba(31,79,168,.12); border-color:#1f4fa8;
+  box-shadow:inset 0 0 0 1px #1f4fa8; }
+/* ⚠️ 那个小圆点的颜色 = **图上那条线的颜色**（`RSTYLE` 里那三个色），
+   照抄一份在 CSS 变量上会让两边各自漂移，所以点色由 JS 用内联 style 给。 */
+.rt-row .sw{ flex:0 0 auto; width:.55rem; height:.55rem; border-radius:50%;
+  margin-top:.34rem; }
+.rt-row .sum{ flex:1 1 auto; min-width:0; }
+.rt-row .l1{ display:flex; align-items:baseline; justify-content:space-between;
+  gap:.4rem; }
+.rt-row .nm{ font-size:.8rem; font-weight:600; color:var(--ink); }
+.rt-row .km{ font-size:.78rem; font-weight:600; color:#1f4fa8;
+  font-variant-numeric:tabular-nums; white-space:nowrap; }
+.rt-row .l2{ font-size:.68rem; color:var(--muted); margin-top:.14rem;
+  line-height:1.45; }
+
+/* 选中那条的导航信息（目的地 / 剩余距离 / 预计到达）。 */
+.np-info{ margin-top:.7rem; padding-top:.65rem;
+  border-top:1px solid rgba(120,175,235,.42); }
+.np-kv{ display:flex; align-items:baseline; justify-content:space-between;
+  gap:.6rem; padding:.22rem .05rem; font-size:.77rem; }
+.np-kv .k{ color:var(--muted); flex:0 0 auto; }
+.np-kv .v{ color:var(--ink); font-weight:600; text-align:right;
+  font-variant-numeric:tabular-nums; word-break:break-word; }
+.np-kv .v.na{ color:var(--muted); font-weight:500; }
+.np-kv .u{ font-size:.68rem; color:var(--muted); font-weight:500;
+  margin-left:.2rem; }
+/* 值和单位是**兄弟**、外面这一层只管贴右边。⚠️ 见 markup 里那段注释：
+   单位不能再嵌回 `<span id="nbKm">` 里面 —— `put()` 用 `textContent` 写值，
+   会把子节点整个删掉。 */
+.np-kv .vw{ display:flex; align-items:baseline; justify-content:flex-end;
+  flex:1 1 auto; min-width:0; }
+/* 说明 / 为什么查不到。★ **这一行是这一页的良心**：查不到的时候，
+   它必须说得出"为什么"，而不是留一整块空白让人以为还没加载完。 */
+.np-over{ font-size:.72rem; line-height:1.6; color:var(--ink-3);
+  padding:.45rem .55rem; border-radius:.6rem; margin-top:.6rem;
+  background:rgba(255,255,255,.55); border:1px solid rgba(120,175,235,.34); }
+
+/* 演示推进的控制（导航态才出现）：播放/暂停 · 倍速 · 跟车/全程。
+   ★ 用户 2026-09-25：「我开始导航后 你地图应该变为我在一点点走啊」。 */
+.sim-row{ display:flex; align-items:center; gap:.35rem; flex-wrap:wrap;
+  margin-top:.6rem; padding-top:.55rem;
+  border-top:1px solid rgba(120,175,235,.42); }
+.sim-row[hidden]{ display:none; }
+.sim-btn{ font:inherit; font-size:.72rem; cursor:pointer; padding:.3rem .6rem;
+  border-radius:.5rem; color:#fff; background:#1f4fa8; border:1px solid #1f4fa8; }
+.sim-btn:hover{ filter:brightness(1.08); }
+.sim-btn.ghost{ color:#1f4fa8; background:rgba(255,255,255,.6);
+  border-color:rgba(31,79,168,.45); }
+.sim-btn.ghost.on{ color:#fff; background:#1f4fa8; }
+/* ⚠️ 这里原来有一条 `.sim-note`（那一行解释"演示是怎么走的"）。2026-09-26 连同
+   它的 `<span id="simNote">` 一起删了 —— 用户说解释文字不要。别再补回来。 */
+
+/* ══════════════ 逐段引导（导航态：地图上一条引导条 + 面板里一张逐段清单） ══════════════
+   ★ 这一块里**每个数都是高德给的**（文件头第 5 条那一段说全了）：
+       「本段 8.2 公里」     = 那一段的 `step_distance`
+       「红绿灯 4 个」       = 那一段的 `cost.traffic_lights`（v5 里逐段都有）
+       「全程 12.4 公里处」  = 到这一段末尾为止各段里程之和（服务端累加的 `at_m`）
+       「左转 / 右转 / 直行」= 从高德那句 `instruction` **尾巴上**读出来的动作词，
+                              只用来挑一个图标，**不产生任何数**
+   ★★ 2026-09-25 用户当场又提了一条：「我开始导航后 你地图应该变为我在一点点走啊
+      我走过的变成灰 这不是高德最基础的功能吗」—— 于是这里**多了一层"演示推进"**
+      （页面脚本里 `SIM` 那一整段），引导条上也就多了一行会变小的数：
+        · 「前方 520 米右转」= 当前位置到**本段末尾那个动作**还有多少米。
+      🔴 这一条**不是把原来那句"不许编"推翻了，是把它兑现了**：原来不许写，是因为
+         屏幕上**没有位置** —— 没有位置却说"还剩 520 米"，那个 520 就是编的。
+         现在位置是**在高德那条折线上按弧长插出来的**（起点、终点、每一段的折线、
+         每一段的米数和用时**全是高德的**），所以这个 520 是从真位置量出来的，
+         只是**位置本身是演示推的**。
+      ⚠️ 因此"演示"两个字**必须留在屏幕上**（引导条第 4 行 + 面板那一行 + 开播
+         那句播报）：数是真的，来源是演示 —— 这两件事不许含糊成一件。 */
+/* 引导条放**左上角**：右边留给路线面板，右下角留给疲劳气泡。 */
+.gd-box{ position:absolute; left:.7rem; top:.7rem; z-index:7;
+  display:flex; align-items:flex-start; gap:.6rem;
+  max-width:min(24rem, calc(100% - 1.4rem));
+  padding:.55rem .7rem; border-radius:.85rem;
+  background:rgba(255,255,255,.96); border:1px solid rgba(31,79,168,.35);
+  box-shadow:0 .6rem 1.6rem rgba(24,52,84,.18); }
+.gd-box[hidden]{ display:none; }
+.gd-ic{ flex:0 0 auto; display:grid; place-items:center; width:2.2rem;
+  height:2.2rem; border-radius:.6rem; color:#fff; background:#1f4fa8; }
+.gd-ic svg{ width:1.5rem; height:1.5rem; }
+.gd-tx{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
+.gd-l1{ display:flex; align-items:baseline; gap:.45rem; }
+.gd-l1 b{ font-size:1rem; font-weight:700; color:var(--ink); }
+.gd-at{ font-size:.68rem; color:var(--muted); white-space:nowrap; }
+.gd-l2{ font-size:.78rem; line-height:1.45; color:var(--ink-2);
+  margin-top:.1rem; word-break:break-word; }
+.gd-l3{ font-size:.68rem; line-height:1.5; color:#1f4fa8; margin-top:.1rem;
+  font-variant-numeric:tabular-nums; }
+/* 引导条第 4 行 = **演示进度那一句实话**。刻意用灰绿色（不是强调色）：
+   它不是高德的话，是我们自己那句"这是演示"。 */
+.gd-l4{ font-size:.66rem; line-height:1.5; color:#5b6b7c; margin-top:.16rem; }
+
+/* 「全程 N 段」那颗折叠键。用户 2026-09-25：「也不用在右边一下把所有细节都
+   列出来啊」→ 逐段清单**默认收起来**，清单本身一个字没少，点一下就摊开。
+   ★ 三行候选路线**不在折叠范围里**（那是选路的功能，见下面那条注释）。 */
+.gd-sum{ display:block; width:100%; text-align:left; font:inherit;
+  font-size:.72rem; cursor:pointer; padding:.38rem .5rem; margin-top:.1rem;
+  border-radius:.55rem; color:#1f4fa8;
+  background:rgba(31,79,168,.07); border:1px dashed rgba(31,79,168,.45); }
+.gd-sum:hover{ background:rgba(31,79,168,.13); }
+.gd-sum[hidden]{ display:none; }
+
+/* 面板里的逐段清单（导航态才有，而且默认收着 —— 见上面那颗键）。 */
+.gd-list{ display:flex; flex-direction:column; gap:.22rem; margin-top:.3rem; }
+.gd-list[hidden]{ display:none; }
+.gd-row{ display:flex; align-items:center; gap:.45rem; width:100%;
+  text-align:left; font:inherit; cursor:pointer; padding:.4rem .5rem;
+  border-radius:.6rem; transition:.18s;
+  background:rgba(255,255,255,.55); border:1px solid rgba(120,175,235,.32); }
+.gd-row:hover{ border-color:rgba(31,79,168,.5); }
+.gd-row.on{ background:rgba(31,79,168,.12); border-color:#1f4fa8;
+  box-shadow:inset 0 0 0 1px #1f4fa8; }
+.gd-row .gi{ flex:0 0 auto; display:grid; place-items:center; width:1.15rem;
+  height:1.15rem; color:#1f4fa8; }
+.gd-row .gi svg{ width:1.15rem; height:1.15rem; }
+.gd-row .gt{ flex:1 1 auto; min-width:0; font-size:.75rem; color:var(--ink);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gd-row .gm{ flex:0 0 auto; font-size:.68rem; color:var(--muted);
+  font-variant-numeric:tabular-nums; white-space:nowrap; }
+/* 🔴 导航态下**候选路线那三行不许收起来**（2026-09-25 用户：「三种可选择的路呢
+   为啥没了」）。这里原本有一条 `.pg-nav.navigating .rt-rows{display:none}`，
+   想的是"导航时面板让位给逐段清单" —— **想错了**：那三条路是这一页的主功能之一
+   （用户拍板过的"给几种情况，我自己选"），进导航反而把它们藏起来，等于一按
+   「开始导航」就把路选不了了。
+   → 现在的排法是**都留着**：面板从上到下 = 候选路线三行 → 逐段清单（导航态才
+     有）→ 导航信息 → 两颗键。面板本来就能滚（`overflow-y:auto`），装得下。 */
+
+/* ---------------------------------------------------------------- 底部两颗键 */
+.np-foot{ display:flex; align-items:center; gap:.5rem; margin-top:.7rem; }
+/* 小瑞那一格。★ 显式传 `base:'head'` —— 见文件末尾那段注释：它同时是
+   `_scratch/_check_mascot.py` 里"显式 base 真的生效"的唯一靶子。 */
+.np-foot .art{ flex:0 0 auto; width:2.6rem; height:2.6rem; border-radius:.7rem;
+  overflow:hidden; display:grid; place-items:center; cursor:pointer;
+  background:radial-gradient(circle at 50% 42%, rgba(var(--rgb),.30), var(--fill-2));
+  border:1px solid rgba(var(--rgb),.20); }
+/* 真图和兜底 SVG 是**同一个格子里的两层**（`grid-area:1/1` 让它们重叠）——
+   不然 `display:grid` 会把两个兄弟排成两行，那一格就翻倍高。 */
+.np-foot .art > *{ grid-area:1/1; }
+.np-foot .art img, .np-foot .art svg{ width:100%; height:100%; object-fit:contain; }
+.np-btncol{ flex:1 1 auto; display:flex; gap:.45rem; min-width:0; }
+.nav-start, .nav-voice{
+  flex:1 1 0; min-width:0; font:inherit; font-size:.79rem; font-weight:600;
+  cursor:pointer; white-space:nowrap; padding:.5rem .5rem;
+  border-radius:.68rem; display:inline-flex; align-items:center;
+  justify-content:center; gap:.32rem; transition:.22s;
+}
+.nav-start{ color:#fff; background:var(--accent); border:1px solid var(--accent); }
+.nav-start svg{ width:.95rem; height:.95rem; }
+.nav-start:hover:not([disabled]){ filter:brightness(1.08);
+  transform:translateY(-1px); }
+/* 路线还没算出来之前它是禁用的（不是一颗死键，旁边的说明写着为什么）。 */
+.nav-start[disabled]{ opacity:.42; cursor:not-allowed; }
+/* 还没有路线时「开始导航」的样子。⚠️ 它**仍然是点得动的**（点了会说还差什么，
+   见页面脚本那段注释）：按下去毫无反应的灰键，人只会以为这一页坏了。 */
+.nav-start.off{ opacity:.5; }
+.nav-voice{ color:var(--ink-3); background:rgba(255,255,255,.6);
+  border:1px solid rgba(120,175,235,.5); }
+.nav-voice svg{ width:.95rem; height:.95rem; }
+.nav-voice:hover{ color:var(--ink); background:rgba(var(--rgb),.14); }
+/* ★ 在听。**判据必须是 `aria-pressed`**：`wake.js` 的 `_render()` 给按钮加
+   `.on` 的同时**会改它的 `title`**，并且在按钮里放了 `.wk-label` 的时候还会
+   把那个字改成「听/停」—— 这颗键要一直写着「语音输入」，所以**不能放
+   `.wk-label`**（放了就会被改字）。`aria-pressed` 是它一定会写的那个属性。 */
+.nav-voice[aria-pressed="true"]{
+  color:#fff; background:rgba(var(--rgb),.5); border-color:var(--accent);
+  animation:micBreath 1.15s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce){
+  .nav-voice[aria-pressed="true"]{ animation:none;
+    box-shadow:0 0 0 .18rem rgba(var(--rgb),.6); }
+}
+/* 状态那两行。⚠️ **类名必须是 `.wk-line / .wk-host / .wk-detail`**（style.css
+   里已经有全套样式），因为 `wake.js` 的 `_render()` 是拿
+   `host.parentElement.querySelector('.wk-detail')` 去找第二行的，而且它给
+   host **整个重写 `className`**（写成 `wk-host <state>`）—— 用别的类名会在
+   第一次 `_render()` 之后被冲掉。 */
+.np-foot .wk-line{ max-width:100%; margin-top:.4rem; }
+.np-foot .wk-host, .np-foot .wk-detail{ text-align:left; }
+
+/* ★ 疲劳建议气泡：**轻量**，浮在地图右下角，不挡路线也不吃地图点击
+   （用户可以完全不管它，照常导航 —— 用户原话"不影响正常导航操作"）。 */
+.fat-bubble{ position:absolute; right:.7rem; bottom:.7rem; z-index:6;
+  display:flex; align-items:center; gap:.5rem; max-width:min(20rem, 55%);
+  padding:.45rem .5rem .45rem .65rem; border-radius:.8rem;
+  background:rgba(255,255,255,.96); border:1px solid rgba(212,118,47,.45);
+  box-shadow:0 .5rem 1.4rem rgba(24,52,84,.16); font-size:.75rem; }
+.fat-bubble[hidden]{ display:none; }
+.fat-bubble .fb-ic{ display:grid; place-items:center; flex:0 0 auto;
+  width:1.4rem; height:1.4rem; border-radius:.45rem; color:#c96a1e;
+  background:rgba(224,128,47,.14); }
+.fat-bubble .fb-ic svg{ width:.95rem; height:.95rem; }
+.fat-bubble .fb-tx{ color:var(--ink); line-height:1.45; }
+.fat-bubble button{ font:inherit; font-size:.72rem; font-weight:600;
+  cursor:pointer; padding:.28rem .6rem; border-radius:.5rem; white-space:nowrap; }
+#fbGo{ color:#fff; background:#d4762f; border:1px solid #d4762f; }
+#fbGo:hover{ filter:brightness(1.06); }
+#fbStay{ color:var(--ink-3); background:var(--fill-2); border:1px solid var(--line); }
+#fbStay:hover{ color:var(--ink); background:rgba(var(--rgb),.12); }
+</style>
+</head>
+<body class="pg-nav" data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ═══════════ 顶上一行：标题 + 起点/终点 + 重新定位/搜索路线 ═══════════
+           ⚠️ 2026-09-25 用户**点名去掉了左上角那个标题**（连着图标一起）：左栏
+             那一格已经写着「导航」了，再来一遍是重复。所以这一行里**没有 `<h1>`
+             也没有 `h1ico`** —— 谁要往回加，别忘了 JS 那边也要一起回来。
+           ★ 用户原话（去掉标题之后的剩下那几件）：「起点框文字为"当前位置"，
+             终点框文字为"请输入目的地"，中间有交换起点和终点的按钮。搜索栏右侧
+             放置"重新定位"和"搜索路线"两个功能按钮。右上角保留用户头像和连接
+             状态。」那颗返回箭头留着：它是"回座舱主界面"的唯一出口。
+           ★ 2026-09-25 用户把"只在回车/点按钮时才问高德"改掉了：「打字的同时
+             顺带出现相关的地点下拉框」「起点也类似」「我在打一个字的时候 相关
+             地点自动出现」。现在**打字就问**（一个字也问），下拉框悬浮在这一列
+             下面 —— QPS 怎么兜见页面脚本里 `TYPING` 那一整段。
+           ⚠️ 右上角那个「用户头像」是 `chrome.js` 的顶栏画的（全站一个），
+              这一行只管右边那颗连接状态。 -->
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <!-- ══ 起点 / 终点：**一列**（用户 2026-09-25：「起终点在一列 不要分开」）══
+             ⚠️ 这两行必须在**同一个** `.end-box` 里。分成两个并排的框的话，
+                `.ptitle` 的 `flex` 会把它们推到两头，看着就是"分开了"。
+             交换键在整列的右边、竖直居中。
+             ★ 起点框的默认值来自电脑定位；拿不到就是**空的**（占位符还是「当前
+                位置」，但我们不会假装那儿有个坐标 —— 状态写在下面那一行）。 -->
+        <span class="end-box">
+          <span class="drow r-org">
+            <span class="ic" data-ic="car"></span>
+            <input id="orgIn" list="orgPresets" type="text" autocomplete="off"
+                   spellcheck="false" placeholder="当前位置">
+          </span>
+          <span class="drow r-dst">
+            <span class="ic" data-ic="nearby"></span>
+            <input id="dstIn" type="text" autocomplete="off" spellcheck="false"
+                   placeholder="请输入目的地">
+          </span>
+          <!-- ★★ 打字时冒出来的候选 —— **悬浮**在这一列的下面（绝对定位），
+               ⚠️ 它必须留在这个 `.end-box` 里：2026-09-25 用户原话「我选择是在
+               起点终点框那点下拉那个就顺带可以选择了啊 而不是下去挤占我地图
+               位置 然后应该就和右上角那个小角标类似的效果 是独立在这个页面
+               顶部的」。它**不占版面**：map 卡不会因为候选出来而被推下去。
+               ⚠️ 起点、终点**共用这一个**框：谁在打字就装谁的候选（`which` 由
+               调用方给，见 `renderList()`）。 -->
+          <span class="dst-list" id="dstList" hidden></span>
+        </span>
+        <button class="swap-btn" id="swapBtn" title="交换起点和终点">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 4.5v13M8 4.5 5 7.5M8 4.5l3 3M16 19.5v-13M16 19.5l3-3M16 19.5l-3-3"
+                  fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="nav-btn" id="orgRetry" title="再试一次电脑定位">
+          <span data-ic="watch"></span>重新定位
+        </button>
+        <button class="nav-btn primary" id="dstGo">
+          <span data-ic="search"></span>搜索路线
+        </button>
+        <span class="spacer"></span>
+        <span class="pill" id="connPill">连接中…</span>
+        <!-- 五个**真实高速点位**（`PRESETS`）。★ 用原生 datalist 挂在上面的
+             起点框上，不再单独摆一个下拉 —— 用户这一版的版面里没有它的位置，
+             而"手动起点"这条路又必须留着（这台机器上它是唯一定得出起点的路）。 -->
+        <datalist id="orgPresets"></datalist>
+      </div>
+
+      <!-- 起点状态 + 一句提示。★ 定位拿不到的时候，这一行是页面上唯一说得出
+           "你得自己给个起点"的地方。
+           ⚠️ 这一行是**短指令**（"做什么"），不是介绍（"这一页怎么用"）——
+           2026-09-26 用户把页面上的解释性段落全删了，这一行留着是因为它只在
+           缺东西的时候出现，而且一句话说完。 -->
+      <div class="nav-sub">
+        <span class="org-state" id="orgState">
+          <i class="dot"></i><span id="orgText">还没定起点</span>
+        </span>
+        <span class="spacer"></span>
+        <span id="navHint">搜个目的地，或者在地图上点一下。</span>
+      </div>
+
+      <!-- ═════════════════════ 地图（页面第一视觉）═════════════════════ -->
+      <section class="card card-pad">
+        <div class="card-h">
+          <h3><span data-ic="grid"></span>地图</h3>
+          <!-- ★ 明写"高德地图"：这是这一页被删过一次的原因，见 chrome.js 那段 -->
+          <span class="note">数据 © 高德地图</span>
+        </div>
+
+        <div class="nav-mapwrap empty" id="mapWrap">
+          <div id="map"></div>
+
+          <!-- ★ 在地图上点一下之后，这儿出来一条"这个点算什么"——和高德一样：
+               同一个点既可以当起点也可以当终点，不问一句没法猜（猜错了就是
+               替人做主，还得让他再点一次）。 -->
+          <div class="map-pick" id="mapPick" hidden>
+            <span>地图上点的位置</span>
+            <button id="pkOrg">设为起点</button>
+            <button id="pkDest">设为终点</button>
+            <button id="pkX">取消</button>
+          </div>
+
+          <!-- ★★ 导航态引导条（地图**左上角**，右下角留给疲劳气泡）。
+               ⚠️ 里面每个数都是高德给的，见文件头第 5 条。
+               ★ 2026-09-25 用户：「也不会在右边一下把细节都列出来啊 在左上角该
+                 几百米干嘛可以列出来 并且伴随播报」—— 所以要看的细节**都在这儿**：
+                 大字 = 前方多少米 + 下一个动作，第二行 = 高德那一句原话，
+                 第三行 = 本段里程/红绿灯/用时，第四行 = **这是演示**（必须有）。 -->
+          <div class="gd-box" id="gdBox" hidden>
+            <span class="gd-ic" id="gdIc"></span>
+            <span class="gd-tx">
+              <span class="gd-l1">
+                <b id="gdMain">—</b><span class="gd-at" id="gdAt"></span>
+              </span>
+              <span class="gd-l2" id="gdSub">—</span>
+              <span class="gd-l3" id="gdMeta"></span>
+              <span class="gd-l4" id="gdSim"></span>
+            </span>
+          </div>
+
+          <!-- ════════ 叠在地图右侧的路线面板（浅蓝玻璃，一整块）════════ -->
+          <aside class="nav-panel" id="navPanel">
+            <div class="np-head">
+              <h3><span data-ic="list"></span><span id="npTitle">候选路线</span></h3>
+              <span class="np-badge">导航中</span>
+              <span class="note" id="nbNote">还没查</span>
+            </div>
+
+            <!-- 三条候选。数字全是高德给的，说明是从那些数里比出来的（见
+                 `routeNote()`）——**不是**"行驶顺畅"那种没来源的话。 -->
+            <div class="rt-rows" id="rtRows"></div>
+
+            <!-- ★ 导航态才出现：**逐段引导清单**。⚠️ 它在候选路线**下面**，
+                 那三行一个字都不动（用户 2026-09-25：「三种可选择的路呢 为啥
+                 没了」—— 进导航不能把选路这件事收走）。点一段 = 图上那一段
+                 单独亮出来 + 上面那条引导条跟着换到这一段。
+                 ★ 2026-09-25 又补了一句「也不用在右边一下把所有细节都列出来啊」
+                   → 清单**默认收着**，由上面那颗 `#gdSum` 摊开；
+                   "现在该干嘛"由左上角那条引导条 + 播报负责。 -->
+            <button class="gd-sum" id="gdSum" hidden>全程 8 段 · 点开逐段清单</button>
+            <div class="gd-list" id="gdList" hidden></div>
+
+            <!-- 选中那条的导航信息。⚠️ 静态 markup 里**不许出现数字或"公里"
+                 这种单位**：查不到的时候这一页必须一个数都不带。 -->
+            <div class="np-info">
+              <div class="np-kv">
+                <span class="k">目的地</span><span class="v" id="nbName">—</span>
+              </div>
+              <div class="np-kv">
+                <span class="k">剩余距离</span>
+                <!-- 🔴 单位那个小格子**不能嵌在值的格子里面**。第一版是
+                     `<span id="nbKm">—<span id="nbKmUnit"></span></span>`，
+                     而 `put()` 写值用的是 `node.textContent = …` ——
+                     **`textContent` 会把子节点整个删掉**，于是第一次填完值
+                     `#nbKmUnit` 就没了，下一次 `clearAll()` 里
+                     `$('nbKmUnit').textContent = ''` 当场抛 TypeError，
+                     而它在 `clearAll` 的中段 → 后面的清屏、重画全都不执行。
+                     现在两个是**兄弟**，外面套一层只负责右对齐的 `.vw`。 -->
+                <span class="vw">
+                  <span class="v" id="nbKm">—</span><span class="u" id="nbKmUnit"></span>
+                </span>
+              </div>
+              <div class="np-kv">
+                <span class="k">预计到达</span><span class="v" id="nbEta">—</span>
+              </div>
+            </div>
+
+            <!-- ★ 演示推进的控制（导航态才有）。
+                 🔴 2026-09-26 用户**第三次**说「这些解释文字不要给了 我说几遍了」
+                 —— 「演示：按高德给的折线 / 段长 / 用时在图上自己走，不是实时定位」
+                 那一整行**删掉了**。这一页只留**按钮和数字**：按钮上写着「▶ 演示」，
+                 屏幕上那个点的标签写着「车（演示）」，引导条第 4 行写着倍速 ——
+                 「这是演示」这件事由**标签**说，不再由段落说。
+                 ⚠️ 别再往这儿加说明文字。 -->
+            <div class="sim-row" id="simRow" hidden>
+              <button class="sim-btn" id="simPlay">▶ 演示</button>
+              <button class="sim-btn ghost" id="simMul60" data-mul="60">×60</button>
+              <button class="sim-btn ghost" id="simMul120" data-mul="120">×120</button>
+              <button class="sim-btn ghost" id="simMul240" data-mul="240">×240</button>
+              <button class="sim-btn ghost" id="simView">看全程</button>
+            </div>
+
+            <!-- **为什么没有结果 / 差什么**。⚠️ 只写状态，不写"这一页怎么用"。 -->
+            <div class="np-over" id="rtWhy">搜个目的地，或者等驾驶监测报疲劳。</div>
+
+            <div class="np-foot">
+              <!-- 小瑞那一格。⚠️ 结构必须和 `XQ.mascotSlot` 的接口对得上：
+                   **img 要在 markup 里就存在**（它 `getElementById(imgId)` 拿），
+                   `#navArtSvg` 是真图没加载出来时的兜底内置 SVG。 -->
+              <span class="art" id="navArt" title="点一下换个形象">
+                <img class="mascot-img" id="navArtImg" alt="小瑞" hidden>
+                <span id="navArtSvg"></span>
+              </span>
+              <span class="np-btncol">
+                <button class="nav-start" id="navStart" disabled>
+                  <span data-ic="play"></span>开始导航
+                </button>
+                <button class="nav-voice" id="wake" aria-pressed="false"
+                        title="点一下让小瑞开始听（说「你好，小瑞」）">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0v-6a3 3 0 0 1 3-3z" fill="currentColor"/><path d="M19 12a7 7 0 0 1-6 6.9V22h-2v-3.1A7 7 0 0 1 5 12h2a5 5 0 0 0 10 0z" fill="currentColor"/></svg>
+                  <span>语音输入</span>
+                </button>
+              </span>
+            </div>
+            <!-- ⚠️ 这两行**必须**是 `.wk-line` 里的一对（见 style.css 那段注释：
+                 `_render()` 靠 `host.parentElement` 找第二行）。 -->
+            <span class="wk-line">
+              <span class="wk-host off" id="wakeHost">没在听</span>
+              <span class="wk-detail" id="wakeDetail"></span>
+            </span>
+          </aside>
+
+          <!-- ★★ 项目特色：驾驶监测报疲劳时，这条**轻量气泡**浮出来。
+               ⚠️ 它只在**真有疲劳档位**的时候出现（`onState` 给的 severity，
+               来自 `ui/state.py` 那条真链路），不是定时器演的。
+               ⚠️ 「忽略」之后同一次疲劳不再弹；「查看服务区」才真的去查。 -->
+          <div class="fat-bubble" id="fatBubble" hidden>
+            <span class="fb-ic" data-ic="alert"></span>
+            <span class="fb-tx" id="fbTx">检测到疲劳，是否推荐就近服务区休整？</span>
+            <button id="fbGo">查看服务区</button>
+            <button id="fbStay">忽略</button>
+          </div>
+
+          <div class="mapnote" id="mapNote">地图还没出来。</div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<!-- ⚠️ wake.js 必须挂在这一页：**问服务区那件事是"谁开麦谁算数"**（服务端只认
+     持麦的那张页面，见 server.py 的 `voice_do`）。不挂它，站在这一页喊小瑞
+     只能得到"这会儿没有页面能帮我定位"。 -->
+<script src="/static/wake.js"></script>
+<script>
+/* =========================================================================
+   导航页的页面逻辑
+   -------------------------------------------------------------------------
+   五件事：① 定起点（电脑定位 → 高德 IP 定位 → 上次用过的 → 手动）
+   ② 搜目的地 / 接住疲劳建议 ③ 问服务端要数据（`/amap/nearby`、`/amap/search`、
+   `/amap/route`）④ 把数据画到图上 + 填进那块面板 ⑤ 语音那条路（wake.js 调）。
+   ⚠️ 页面**不做任何几何计算**：距离、时长、折线全部来自服务端。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+/* 手动起点那五个点位。★ 服务区本来就在高速上，所以这里给的是五条高速边上
+   **真实的地点名**。
+   ⚠️ 三个不做的：**不编服务区坐标**（那正是这一整件事当初要修的毛病）、
+      **不说是"某某服务区"**（牌子写的是"哪儿往外搜"，不是"这就是哪儿"）、
+      **不用市中心**（实测市区 6~10 km 内根本没有服务区，最近那条的 POI 名字
+      就叫「服务区」——那是高德对没有名字的 POI 的写法，摆在卡上像占位符）。
+   ✅ 这五个点都实测过：高德从这儿往外搜，报回来的是**真名字**的服务区
+      （王口停车区 / 堰桥服务区 / 保定服务区 / 和龙服务区 / 郑州东服务区）。
+      「一带」两个字是**故意的**：这是高速边上的位置，不是服务区本身。 */
+const PRESETS = [
+  { n: '静海 · 京沪高速一带',    lat: 38.9600, lng: 116.8800 },
+  { n: '无锡 · 京沪高速一带',    lat: 31.6200, lng: 120.2400 },
+  { n: '保定 · 京港澳高速一带',  lat: 38.8800, lng: 115.4800 },
+  { n: '广州 · 京港澳高速一带',  lat: 23.3000, lng: 113.5000 },
+  { n: '郑州 · 连霍高速一带',    lat: 34.7500, lng: 113.7000 },
+];
+
+/* 三条候选路线的样式。★ 颜色就是用户点名的那三种：深蓝主推荐 / 浅蓝备选 /
+   灰参考；名字按**高德返回的顺序**叫（第一条就是它推荐的那条）。
+   ⚠️ 这三个颜色在 CSS 里**一次都不出现**（面板上那个小圆点的点色由 JS 内联
+      给），所以改这里就够，不会两边漂移。 */
+const RSTYLE = [
+  { c: '#1f4fa8', w: 7, nm: '推荐路线' },
+  { c: '#7fb2ea', w: 5, nm: '备选路线一' },
+  { c: '#9aa3ad', w: 4, nm: '备选路线二' },
+];
+
+let link = null;
+let AMAP = null;                 // 高德命名空间（SDK 加载成功之后才有）
+let map = null;
+let amapP = null;                // 加载 Promise，重复调用只加载一次
+let ovOrigin = null, ovDest = null;
+let ovLines = [];                // 图上那三条线（下标 = routes 的下标）
+let hiIdx = -1;                  // 现在高亮的是第几条（画完/换完才知道）
+let AMAP_KEY = '', AMAP_SEC = '';
+let origin = null;               // {lat, lng, label, manual}
+let dest = null;                 // {name, address, lat, lng} —— 当前这条路的终点
+let destKind = '';               // 'user'（人自己搜的）/ 'rest'（疲劳建议的服务区）
+let userDest = null;             // 人自己搜的终点 —— 疲劳建议来了先存着
+let lastDaily = null;            // 最近一次查询的返回值（重画 + 排错用）
+let routes = [];
+let curRoute = null;
+let navOn = false;
+let sevRank = 0;                 // 最近一次的疲劳档位序（0 清醒 / 1 轻 / 2 中 / 3 重）
+let pick = null;                 // 地图上刚点的那个点，等人说它算什么
+
+/* ★★ 从**别的页面**跳进来时这一页要干嘛。
+   用户 2026-09-25：「并且其他页面有导航到最近服务区 或者导航啥的按钮 要真的有这个
+   功能 不是摆设」。
+   → 别的页面那颗「导航」/「导航服务区」不再自己说一句「已执行：导航」糊弄过去，
+     而是**跳到这里**、带上 `?do=nearby`；这一页真的去问高德、真的把路线画出来、
+     真的进导航（见 `showResult()` 尾巴上那一段）。
+   ★ 认一次就消掉（`WANT = ''`）：这一趟之后的搜索不该再自动进导航 —— 那是人
+     自己在下指令，不该被一个几秒前的跳转劫持。 */
+let WANT = '';
+/* ★★ 2026-09-26：`?ask=<id>` —— **语音跳过来那一趟要小瑞说一句话**。
+   链路是：主人说「给我导航」→ 服务端判成 `rest_stop` → 发 `ev:"do"` → 上一页回执
+   之后带 `?ask=rest_stop` 跳到这儿 → 这一页**定完起点**（`tryGeo`）再替它要那句话
+   → 服务端说「主人，导航页给你调出来了。要不要我导到最近的服务区？」并挂上
+   "待确认" → 主人说「要」→ 服务端再发一次 `ev:"do" id:"rest_stop"`，而这一页
+   此刻就站在导航页上、起点也有了，于是**就地查 + 画路线 + 进导航**。
+   🔴 **为什么不是 `?do=nearby`**：那是"跳过来什么都不问、直接查并进导航"。用户
+      拍板的是「跳过去 + 问一句」—— 两个都带的话页面已经在导航了，问的那句就是
+      多余的。判据写在 `wake.js` 的 `go:`/`rest_stop` 那一支里。
+   ⚠️ **必须在起点定完之后才要**（见 `onHello` 里那一句）：`origin` 决定服务端说
+      哪一句 —— 有起点才是问句、才挂得上「要」；没起点就是那句"拿不到定位"的
+      实话，而且**不挂**（答应了也没坐标可查）。抢着问会永远问成第二档，
+      那就成了"话和屏幕不一致"。 */
+let ASK = '';
+try {
+  const q = new URLSearchParams(location.search);
+  WANT = q.get('do') || '';
+  ASK = q.get('ask') || '';
+} catch (e) { WANT = ''; ASK = ''; }
+
+/* 导航态（逐段引导）的几个变量。★ 2026-09-25 起 `stepIdx` 是**跟着演示位置走
+   的**（`SIM` 那段每前进一段就更新它）；点清单里的某一段 = 把演示**挪到**那一段
+   的开头并暂停（见 `pickStep()`）—— 不再是"只是看看"。 */
+let stepIdx = -1;
+let ovStep = null;               // 图上那一段的高亮线（单独一条，不进 ovLines）
+let ovCar = null;                // 演示里那个会动的点（`SIM` 那段）
+let ovDone = null;               // 已走过那一段的灰线（同上）
+/* 🔴 2026-09-26 这里原来有一条 `NAV_WHY` —— 进导航时往面板的 `#rtWhy` 里灌一段
+   「导航中（演示推进）：屏幕上那个点不是定位，是拿高德给的折线和每段的里程/用时
+   自己往前推的……下面是演示的控制和逐段清单。」用户点名要删（「这些解释文字不要
+   给了 我说几遍了」）。⚠️ 那一版还有个毛病：`**不是定位**` 的星号是 Markdown 的
+   写法，写进 `textContent` 是**原样印出来的两颗星**。
+   ⚠️ 别再往面板里写介绍这一页怎么用的段落 —— 进导航时 `#rtWhy` 保持原样不动，
+   现在该干嘛由左上角引导条 + 播报说，数字由面板里的格子说。 */
+
+/* ---------------------------------------------------------------- 小工具 */
+function el(id) { return document.getElementById(id); }
+/** 往一个"值格子"里写东西。`txt == null` = **查不到**，写「—」并调成灰的。
+ *  ⚠️ 这里**只写 textContent**（绝不 innerHTML）：值可能是高德给的地名或者
+ *     人打的字，拼进 HTML 就是把外面来的字符串当标记解析。 */
+function put(node, txt) {
+  if (!node) return;
+  node.textContent = (txt == null ? '—' : String(txt));
+  node.className = (txt == null) ? 'v na' : 'v';
+}
+/** 面板底下那一行「为什么」。★ **有话说才出来** —— 空的只剩一个带边框的空框子，
+ *  比不写还难看。
+ *  🔴 2026-09-26 用户第四次说不要解释文字，点名的是这里原来那句「按高德的驾车路线
+ *     算的，和图上那三条线是同一个来源。点一条换一条。」（算成功的时候什么都不用
+ *     说：`公里（驾车）` 和标题右边那个 `数据 © 高德地图` 两个**标签**已经把来源
+ *     说清楚了，不需要再用一句话解释一遍）。
+ *  ⚠️ 所以这一行只许写三种**状态**：缺什么（起点/终点）、为什么没查成、为什么这个
+ *     数只是直线距离。**不许**写"这一页怎么用"、不许解释数字是从哪来的。 */
+function why(txt) {
+  const n = $('rtWhy');
+  if (!n) return;
+  n.textContent = txt || '';
+  n.hidden = !txt;              // 没话说 = 连框一起收掉
+}
+/** 秒 → 「9 小时 52 分」/「42 分钟」。**只是把高德那个数换个写法**，不重算。 */
+function fmtDur(s) {
+  const m = Math.round((s || 0) / 60);
+  if (m < 60) return m + ' 分钟';
+  const h = Math.floor(m / 60);
+  return (m % 60) ? (h + ' 小时 ' + (m % 60) + ' 分') : (h + ' 小时');
+}
+/** 现在时刻 + 高德给的用时 = 预计到达（HH:MM）。
+ *  ⚠️ 这是**算出来的**，但用的是两个真数：本机的钟 + 高德那一条路线的 `drive_s`
+ *     （高德自己的 App 也是这么显示的）。它是这一页唯一的"推出来的数"，
+ *     所以只要路线是它算的、就一定跟着改；`by !== 'drive'` 时**不给**。 */
+function fmtEta(sec) {
+  const d = new Date(Date.now() + (sec || 0) * 1000);
+  const p = (n) => (n < 10 ? '0' : '') + n;
+  return p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function mapNote(txt) {
+  const w = $('mapWrap');
+  if (!w) return;
+  if (txt) { w.classList.add('empty'); $('mapNote').textContent = txt; }
+  else { w.classList.remove('empty'); }
+}
+function hint(txt) { const h = $('navHint'); if (h) h.textContent = txt; }
+
+/* -------------------------------------------------------------- 定位/起点 */
+function paintOrigin() {
+  const st = $('orgState'), tx = $('orgText');
+  if (!st || !tx) return;
+  if (!origin) {
+    st.className = 'org-state';
+    tx.textContent = '还没定起点';
+    return;
+  }
+  st.className = 'org-state ' + (origin.manual ? '' : 'on');
+  tx.textContent = (origin.manual ? '起点（手动）：' : '起点：') + origin.label;
+}
+
+/** 定一个起点。**四条路都走这里**：手输 / 预设点位 / 地图上点 / 电脑定位。 */
+async function useOrigin(lat, lng, label, manual) {
+  origin = { lat: +lat, lng: +lng, label: label || '—', manual: !!manual };
+  if (window.XQ && XQ.geo) {
+    XQ.geo.remember({ lat: origin.lat, lng: origin.lng, manual: origin.manual });
+  }
+  saveOrg();
+  paintOrigin();
+  $('orgIn').value = origin.label;
+  await restOrRoute();
+}
+
+/**
+ * 起点定了（或终点变了）之后走哪条路：
+ *   · 已经有终点 → 算「起点→终点」（人自己搜的，或者疲劳建议那个服务区）；
+ *   · 没有终点   → 问高德最近能停的地方（`/amap/nearby`）。
+ *     ⚠️ 这一问**不是**"替用户定终点"—— 它只在**没人指定目的地**的时候发生，
+ *     结果写在面板上（名字 + 公里 + "推荐休息点"），人一眼看得见这是什么。
+ */
+async function restOrRoute() {
+  if (!origin) return null;
+  if (dest) return await routeTo();
+  const o = await fetchNearby(origin.lat, origin.lng);
+  showResult(o, 'rest');
+  return o;
+}
+
+/** 电脑自己那个位置：**先问浏览器，再问高德（IP 定位），最后才请人自己给**。 */
+async function tryGeo() {
+  $('orgText').textContent = '正在定位…';
+  $('orgState').className = 'org-state';
+  const p = (window.XQ && XQ.geo) ? await XQ.geo.ask() : null;
+  if (p && p.lat != null) {
+    /* ⚠️ `XQ.geo.ask()` 会**先给它 5 分钟内的缓存**（`fresh()`），那个缓存里
+       可能是**人在别的页面上自己设的起点**（`remember({... manual:true})`）。
+       把那种坐标说成「电脑定位」就是撒谎 —— 所以这里按 `manual` 分开说。 */
+    if (p.manual) await useOrigin(p.lat, p.lng, '上次选的起点', true);
+    else await useOrigin(p.lat, p.lng, '我的位置（电脑定位）', false);
+    return;
+  }
+  // ① 浏览器定位拿不到（这台机器上就是这条）→ 试高德的城市级 IP 定位。
+  const ip = await fetchJSON('/amap/ip');
+  if (ip && ip.ok) {
+    await useOrigin(ip.lat, ip.lng,
+                    '电脑位置（IP 定位 · ' + (ip.city || ip.province) + '）', false);
+    return;
+  }
+  // ② 两条机器定位都不成 → 用**上一次人自己定的那个起点**（存在浏览器里）。
+  if (restoreOrg()) return;
+  // ③ 都没有：**不编坐标**，把能自己给起点的三条路指出来。
+  // 🔴 2026-09-26 这儿原来写的是「起点框里打一个地名，或者在地图上点一下。」——
+  //   那是**教人怎么用这一页**（用户连说四次不许有这种句子）。状态上面两行已经
+  //   说全了（`#orgText`=「定位没打开，我拿不到你在哪」、`#nbNote`=「还没定起点」），
+  //   所以这一行只留**还差什么**。那三条路怎么走，是注释和页面自己该懂的事，
+  //   不是印给人看的一句话。
+  origin = null;
+  paintOrigin();
+  $('orgState').className = 'org-state bad';
+  $('orgText').textContent = '定位没打开，我拿不到你在哪';
+  hint('还差一个起点');
+  clearAll();
+  $('nbNote').textContent = '还没定起点';
+  why('起点还没定。');
+}
+
+/* 起点记在浏览器里 —— 用户要的是"起点默认就是我电脑位置"，而**这台机器上两条
+   机器定位都给不出坐标**（浏览器定位超时、高德 `v3/ip` 回空数组）。那就把
+   "人上次自己定的那个起点"当成默认：它是个**真的、他自己选的**坐标，标签上也
+   写清了是上次用的，不是我们偷偷编的。
+   ⚠️ 只在**两条定位都失败**时才用它；能定位就以定位为准（车会动，人不会）。 */
+const ORG_KEY = 'xq.nav.org';
+function saveOrg() {
+  if (!origin) return;
+  try {
+    localStorage.setItem(ORG_KEY, JSON.stringify(
+      { lat: origin.lat, lng: origin.lng, label: origin.label }));
+  } catch (e) { /* 隐私模式 / 存储满了：存不下就算了，不影响这一趟 */ }
+}
+function restoreOrg() {
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem(ORG_KEY) || 'null'); } catch (e) {
+    return false;
+  }
+  if (!v || v.lat == null || v.lng == null) return false;
+  origin = { lat: +v.lat, lng: +v.lng, label: v.label || '上次用的起点',
+             manual: true };
+  paintOrigin();
+  $('orgIn').value = origin.label;
+  hint('定位没打开，起点用上次那个。');
+  restOrRoute();                    // 起点有了，照常出结果
+  return true;
+}
+
+/* ------------------------------------------------------------- 问服务端 */
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    return await r.json();
+  } catch (e) {
+    return { ok: false, why: '这一页连不上服务端（' + (e && e.name) + '）' };
+  }
+}
+const fetchNearby = (lat, lng) => fetchJSON(
+  '/amap/nearby?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng));
+/* ★ `full=true` = **上屏那一下**（回车 / 「搜索路线」）：服务端会再并上
+   `place/text` 的结果（整地名「无锡市」、看得懂的分类只有它有）。
+   打字那条路**不许**带它 —— 一个字两个请求 = QPS 翻倍，见 `TYPING` 那段。
+   ★ `lat`/`lng` = **起点的坐标**（有就给）：服务端拿它把候选**拉到身边**。
+     实测（`_scratch/_t_amap_tips.py`）：不给它，敲「站」第一屏是合肥站/北京站/
+     大连站；给了（无锡）就是站前商贸城/无锡站(北进站口)。「服」那一屏更直白
+     —— 给了之后头两条就是**京沪高速上的梅村服务区**。
+   ⚠️ 起点还没定就不带（服务端会退回"按出口 IP 就近"），**不许**为这个先编一个
+     起点出来 —— 那是拿一个没发生的位置去决定给人看什么。 */
+const fetchSearch = (kw, full) => fetchJSON(
+  '/amap/search?kw=' + encodeURIComponent(kw) + (full ? '&mode=full' : '')
+  + (origin ? ('&lat=' + encodeURIComponent(origin.lat)
+               + '&lng=' + encodeURIComponent(origin.lng)) : ''));
+const fetchRoute = (org, d) => fetchJSON(
+  '/amap/route?olat=' + org.lat + '&olng=' + org.lng +
+  '&dlat=' + d.lat + '&dlng=' + d.lng +
+  '&name=' + encodeURIComponent(d.name || '') +
+  '&addr=' + encodeURIComponent(d.address || ''));
+
+/* ---------------------------------------------- 搜（起点 / 终点都走这儿）
+   ★★ 2026-09-25 用户拍板改了两件事，这一块现在是那个新口径：
+     ① 原话「我点搜索路线 你要出现路线啊」→ 「搜索路线」按一次要**尽量把这趟
+        跑完**：两个框都定下来了就直接算路画线，不再让人按第二第三次；
+     ② 原话「然后我在搜索终点的时候 打字的同时顺带出现相关的地点下拉框」
+        「起点也类似」→ **打字就给候选**，下拉框顶在输入框下面。
+   🔴 **代价是 QPS**（这就是当初那条"不做输入即搜"的理由，`ui/amap.py` 的
+      `search()` 文首记着）：个人 key 连着问会被限流。所以打字那一路有五道闸：
+        · **一个字就问**（用户 2026-09-25：「而且我在打一个字的时候 相关地点
+          自动出现」）—— 闸不在字数上，在下面这四条；
+        · **防抖 450 ms**（手不停的时候一个请求都不发）—— 它才是主要的那道；
+        · **同一个词只问一次**：会话内缓存，连"没搜到"也缓存 —— 改一个字回来
+          不会重问；缓存上限 60 条，超了整张丢掉（前缀会攒得很快）；
+        · **同时只允许一条在飞**，多的**丢掉不 abort**（abort 也已经算过一次
+          调用，省不下 QPS）；
+        · 高德回限流码（10003 日配额 / 10004 一分钟窗 / 10019·10020·10021 各种
+          QPS / 10044 账号日量）→ **停 30 秒不再问**，并把原因写在框下面
+          （照实说，不假装还在搜）。
+      ⚠️ 拼音**没上屏之前不问**（`isComposing`）：用中文输入法敲「无锡站」，键盘
+         上先出来的是 w/u/x/i 四个字母 —— 那四个音节的候选一个都不是人要的，
+         问了就是白烧配额。所以打字这条路对 IME 是**上屏那一下才算一次输入**。
+   🔴 **2026-09-25 用户又补了一句：「比如我输了一个字 它相关的地点要自动弹出让我
+      选择啊」** —— 他打一个字，屏幕上什么都没发生。查下来根因两条：
+        ① **一个字在 `v3/place/text` 上真的搜不出东西**：当场量的，
+           `keywords=无`/`站`/`服` 全回 `status=1 / infocode=10000 / count=0`
+           —— 不是坏了、不是限流，是**那个接口不认一个字**。
+        ② 失败的几种（限流、key、断网）原来只写在页面别处的提示行上，
+           眼睛盯着输入框的人看不见。
+      → 于是立了一条规矩：**文字进框 → 下拉框一定冒出来**。有候选就摆候选，
+        没有就摆一行 `listNote()`：正在问 / 为什么没有 / 下一步该怎么办。
+      ⚠️ 所以 `#dstList` 里**不只有 button**，还有 `.dtip` 那种纯文字行 ——
+        `XQ.nav.state().list` 数的是 `button`，别把那行也数进去。
+   🔴🔴 **2026-09-26 用户第四次追这一条**：「我在起点终点每输入一个字 都要有相关
+      的地点推荐啊 不要我点enter才推荐以及去除字才推荐」。这次量出来的是**两个
+      页面自己的毛病**（服务端那边另说，见 `ui/amap.py` 的 `search()` 文首：搜索
+      接口已换成 `assistant/inputtips`，**一个字也回十条**）：
+        ① **`busy` 那一条是"丢掉"，而且是丢掉之后不重排**（`_t_nav_type.py`
+           量到的：快敲时框里永远停在「正在问高德「无锡站」…」，一直到最后
+           一次请求落地才刷出来一次）。人正常速度打字时，防抖排的那一发正好撞在
+           上一发还在飞的时候 —— 撞一次就**再也没有下一发**了。所以看现象是
+           "打字的时候它不推荐"。
+        ② **"删字才有"是这个 bug 的另一面**：删出来的前缀多半早先问过，
+           `TYPING.cache` 一命中就**立刻**回（不占 `busy`），于是只有删字那一路
+           看起来是灵的。
+      → 修法：`busy` 时**记下还有一件待办**（`TYPING.pending`），在飞的那一发
+        落地后**补排一次**，用的是**框里现在的词**。丢掉的那一发不补 = 那一发
+        等于没发生。
+      ⚠️ 防抖仍然是 450 ms，**不要再调小**：QPS 已经很紧（单字在别的接口上撞过
+        `CUQPS_HAS_EXCEEDED_THE_LIMIT`）。"每个字都有推荐"靠的是**最后一发一定
+        补上**，不是靠缩短防抖。
+   ★ 点候选**不猜**：只有高德回来的第一条名字和敲的**一字不差**时才自动用它
+     （那不是猜，是没有歧义）；否则一律把候选摆出来让人点 —— 高德的关键词是
+     模糊匹配，拿废话去搜它也会硬凑几条。
+     ⚠️ **这条判据和 `full` 是一对**：服务端并进来的 `place/text` 排**在最前**
+       （`ui/amap.py::search()`，那里记了为什么 —— tips 先放会把 `lim` 填满、
+       合并等于没做）。所以上屏那条路上"第一条"= **`place/text` 的头一名**。
+       2026-09-26 实测过，换序之后判据没坏：敲「无锡站」头一名还是「无锡站」
+       （照样自动用），敲「无锡」头一名是「无锡市」（摆表 —— 本来就该摆）。
+       以后要是再动服务端那个顺序，这一段和 `_scratch/_t_amap_full.py` 一起看。
+   ★ **上屏那一下（回车 / 「搜索路线」）走 `full=true`**：服务端再并上
+     `place/text`（「无锡」→「无锡市」这种**整地名**、还有看得懂的分类，只有它
+     有）。打字那条路只打一个接口，理由同上。 */
+const TYPING = { timer: 0, seq: 0, busy: false, pending: '', stopUntil: 0,
+                 cache: {}, ime: false };
+
+/** 问一次高德。`full` 只由**上屏那一下**传 true（见上面）。 */
+async function lookup(kw, full) {
+  // ⚠️ 缓存键要**带上两件事**：
+  //   ① `full`：同一串字，"打字"和"上屏"回来的是**两张不同的表**（后者多几条）。
+  //      共用一把键的话，打字问过之后按回车只会看见打字那份 —— 而那正是需要
+  //      「无锡市」的时候。
+  //   ② **起点**（粗到 ~1 km，两位小数）：候选现在是**按起点偏置**过的（见
+  //      `fetchSearch` 那段）。换了起点还拿旧那张表，等于拿别处的地点回答这里
+  //      的问题。粗着取整是为了让人挪几步不至于把整张缓存废掉。
+  const ok0 = origin ? (Math.round(origin.lat * 100) + ',' +
+                        Math.round(origin.lng * 100)) : '-';
+  const key = (full ? 'F|' : 'T|') + ok0 + '|' + kw;
+  if (TYPING.cache[key]) return TYPING.cache[key];
+  const r = await fetchSearch(kw, full);
+  if (r && !r.ok && SLOW_CODE.test(r.why || '')) {
+    TYPING.stopUntil = Date.now() + 30000;      // 高德说别问了
+    return r;                                   // ⚠️ 这种失败**不进缓存**
+  }
+  if (Object.keys(TYPING.cache).length > 60) TYPING.cache = {};
+  TYPING.cache[key] = r;
+  return r;
+}
+
+/* 「高德叫你别问了」那一族码。⚠️ 这几个是**官方错误码表上核对过的**
+   （`lbs.amap.com/api/webservice/guide/tools/info`，2026-09-25 拉的原文）：
+     10003 DAILY_QUERY_OVER_LIMIT 访问已超出日访问量
+     10004 ACCESS_TOO_FREQUENT    单位时间内（1 分钟）访问量超限
+     10019 CQPS_HAS_EXCEEDED_THE_LIMIT  某个服务总 QPS 超限
+     10020 CKQPS_HAS_EXCEEDED_THE_LIMIT 某个 Key 用某个接口 QPS 超限
+     10021 CUQPS_HAS_EXCEEDED_THE_LIMIT 账号用某个接口 QPS 超限
+     10044 USER_DAILY_QUERY_OVER_LIMIT  账号维度日调用量超限
+   它们的**正确反应都是同一件事：等一会儿**，所以合成一条。
+   ⚠️ 10021 是当场量到的（打「站」一个字，`v3/place/text` 回的 `info` 原文就是
+      `CUQPS_HAS_EXCEEDED_THE_LIMIT`）—— 打字这条路最容易撞的就是它。 */
+const SLOW_CODE = /码 (10003|10004|10019|10020|10021|10044)/;
+
+function hideList() { const b = $('dstList'); if (b) b.hidden = true; }
+
+/** 只管一件事：**把下拉框打开，并且里面一定有一行字**。
+   ★ 2026-09-25 用户当场说的：「比如我输了一个字 它相关的地点要自动弹出让我选择啊」
+     —— 那之前打一个字屏幕上什么都没发生。为什么没发生，见 `TYPING` 上面那段：
+     一个字高德常常真的搜不出来，而"搜不出来"原来是**一声不吭**的。
+   ★ 所以：这不是候选，是一行**说人话的状态**（正在问 / 没搜到 / 被限流 /
+     连不上），它照样占着框的位置，眼睛就不用去别处找原因。
+   ⚠️ 用 `span`：`#dstList` 自己是 `<span>`。 */
+function listNote(txt) {
+  const box = $('dstList');
+  if (!box) return;
+  box.innerHTML = '';
+  const d = document.createElement('span');
+  d.className = 'dtip';
+  d.textContent = txt;
+  box.appendChild(d);
+  box.hidden = false;
+}
+
+/** 打字时的入口：**先把框打开**，再排一次防抖（被限流时改为照实说 + 不排）。 */
+function onType(which) {
+  const inp = $(which === 'org' ? 'orgIn' : 'dstIn');
+  const kw = (inp.value || '').trim();
+  clearTimeout(TYPING.timer);
+  if (!kw) { hideList(); return; }
+  if (Date.now() < TYPING.stopUntil) {
+    const w = Math.ceil((TYPING.stopUntil - Date.now()) / 1000);
+    listNote('高德说问得太快了 —— ' + w + ' 秒后自动接着搜。');
+    hint('高德限流了，' + w + ' 秒后再自动搜。');
+    return;
+  }
+  // ★ 敲下第一个字就冒这一行：450 ms 的防抖里屏幕也不是死的（用户点名的那件事）。
+  listNote('正在问高德「' + kw + '」…');
+  TYPING.timer = setTimeout(() => { runType(which); }, 450);
+}
+
+async function runType(which) {
+  const inp = $(which === 'org' ? 'orgIn' : 'dstIn');
+  const kw = (inp.value || '').trim();
+  if (!kw) return;
+  // ★★ 在飞的时候**不是"丢掉"，是"排到它后面"**（见 `TYPING` 那段 ①）。
+  //    直接 return 的话，防抖排的这一发就白排了 —— 人接着打字，下一发又撞在
+  //    同一个请求上，屏幕就一直停在「正在问高德…」，表现是"打字不推荐"。
+  if (TYPING.busy) { TYPING.pending = which; return; }
+  // ★ 起点框里正好是一个预设点位名 → 那是**我们自己手里就有的坐标**，别拿去问
+  //   高德（同 `resolveBox()` 里那条）。既省一次调用，也免得把「京沪高速一带」
+  //   这种人话喂给模糊搜索、换回几个不相干的地方。
+  if (which === 'org') {
+    const p = PRESETS.find((x) => x.n === kw);
+    if (p) {
+      // 🔴 2026-09-26：这行原来是「「X」是预设点位 —— 按回车就用它。」——
+      //   用户那条「只留标签和数字、不许有解释这一页怎么用的句子」（连说四次）
+      //   点的正是这种。**状态**留着（这串字是我们自己的点位、不是高德搜来的，
+      //   所以下面不会有候选），"按回车它就好了"那半句是**教人用页面**，删掉。
+      listNote('预设点位「' + kw + '」');
+      return;
+    }
+  }
+  TYPING.busy = true;
+  const seq = ++TYPING.seq;
+  const r = await lookup(kw, false);
+  TYPING.busy = false;
+  // ★ 有排队的就**立刻补一发**，用的是**框里现在的词**（不是刚回来这一发那个词）
+  //   —— 补上才叫"每个字都有推荐"。⚠️ 不 await：这一发该走完自己的"过时"判断。
+  const nxt = TYPING.pending;
+  TYPING.pending = '';
+  if (nxt) runType(nxt);
+  // ⚠️ 两道"过时"判断：这期间又敲了字（`seq` 变了）、或者框里的词已经不是
+  //    刚才那个了 —— 迟到的答案不能盖住新的（同 `_voice_watchdog` 那个思路）。
+  if (seq !== TYPING.seq) return;
+  if ((inp.value || '').trim() !== kw) return;
+  if (!r || !r.ok) {
+    // ⚠️ 名字**别叫 `why`** —— 上面刚加了一个全局的 `why()`（写面板那一行），
+    //    这里再来一个同名 const 就是遮蔽：块内看着没问题，日后在这个块里调
+    //    `why(...)` 会当场 TDZ 抛错（这个项目栽过同类的跟头，见 `simDur` 那段）。
+    const bad = (r && r.why) || '';
+    // 「一条都没搜到」和「这次调用失败」要分开说：前者是**人话太短**，让人接着
+    // 打字；后者是**这次不行**，让人等一下重试。混成一句就是把人指错方向。
+    if (/没搜到/.test(bad)) {
+      // ⚠️ 别再写「再打一个字」了（2026-09-26）：换 `inputtips` 之后**一个字
+      //    也是有推荐的**（`ui/amap.py` 的 `search()` 文首有那张对照表），还这么
+      //    劝就把人指错了方向 —— 一个字搜不到的时候多半是这串字本身没东西。
+      listNote('高德给「' + kw + '」一条都没搜到 —— 换个说法试试。');
+      hint('高德没搜到「' + kw + '」。');
+    } else {
+      listNote('没搜成：' + (bad || '这一页连不上服务端') + '。等一下再试。');
+      hint('没搜成：' + (bad || '这一页连不上服务端'));
+    }
+    return;
+  }
+  // 🔴 2026-09-26 用户第四次说不要解释文字，点的就是这里原来那句
+  //   「打字时给的候选（8 个，按高德自己的顺序）：点一个当终点。」
+  //   —— **候选自己就是证据**：一列能点的名字摆在那儿，不用再来一句话解释
+  //   它们是什么、该怎么点。所以这一趟只把上一句提示清掉，不写新的。
+  hint('');
+  renderList(r.list, which);
+}
+
+/** 把候选摆进下拉框。`which` 决定点中之后是"当起点"还是"当终点"。
+ *  ⚠️ 这里**没有第三个"注释"参数**了（2026-09-26 去掉的）—— 见调用处的注释：
+ *     候选摆出来就是全部的话，别再配一句解释。 */
+function renderList(list, which) {
+  const box = $('dstList');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!list || !list.length) {
+    listNote('高德一条都没搜到 —— 换个说法试试。');
+    return;
+  }
+  list.forEach((it) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const n = document.createElement('span');
+    n.className = 'dn';
+    n.textContent = it.name || '（高德没给名字）';
+    const a = document.createElement('span');
+    a.className = 'da';
+    a.textContent = [it.address, (it.type || '').split(';').slice(-1)[0]]
+      .filter(Boolean).join(' · ');
+    b.appendChild(n); b.appendChild(a);
+    // ⚠️ `mousedown` 上拦一下：不然输入框先失焦，那一瞬间的 click 会丢
+    b.onmousedown = (e) => e.preventDefault();
+    b.onclick = () => takePlace(it, which);
+    box.appendChild(b);
+  });
+  box.hidden = false;
+}
+
+/** 把一个框里的字定成一个**确定的点**。回 true = 定好了（可以接着算路）；
+ *  false = 还没定（候选已经摆出来了等人点，或者压根搜不到）。 */
+async function resolveBox(which) {
+  const isOrg = (which === 'org');
+  const inp = $(isOrg ? 'orgIn' : 'dstIn');
+  const kw = (inp.value || '').trim();
+  if (!kw) { inp.focus(); XQ.flash(isOrg ? '先输入一个起点' : '先输入一个目的地'); return false; }
+  // ★ 起点框里正好写着一个预设点位名 → **直接用它的坐标**，别拿去问高德。
+  //   那几个名字是"京沪高速一带"这种人话，高德的模糊搜索会把它当废话（而且
+  //   我们要的就是那个**已知的**坐标，不是高德猜出来的另一个地方）。
+  if (isOrg) {
+    const p = PRESETS.find((x) => x.n === kw);
+    if (p) { await useOrigin(p.lat, p.lng, p.n, true); return true; }
+  }
+  // ★ **上屏那一下**：`full=true` —— 服务端再并上 `place/text`，整地名
+  //   （「无锡」→「无锡市」）和看得懂的分类只有那边有。打字那条路不带它。
+  const r = await lookup(kw, true);
+  if (!r || !r.ok) {
+    hideList();
+    why('没搜成：' + ((r && r.why) || '服务端没回话'));
+    return false;
+  }
+  // ★ **一字不差**才自动用：高德回来的第一条名字和敲的完全一样时没有歧义，
+  //   不是"替你猜一个"。差一个字都不行 —— 那种就摆候选让人点。
+  if (r.list.length && (r.list[0].name || '') === kw) {
+    await takePlace(r.list[0], which);
+    return true;
+  }
+  hint('');
+  renderList(r.list, which);
+  return false;
+}
+
+/** 点中一条候选（或者"一字不差"自动中了一条）。⚠️ 是起点还是终点**由调用方
+ *  说**（`which`），不再靠一个"刚才搜的是哪个框"的全局变量 —— 打字那条路是
+ *  异步的，全局变量在两个框之间会串（先敲起点、再敲终点，第一趟的回声就会
+ *  拿着"终点"的身份去当起点）。 */
+async function takePlace(it, which) {
+  hideList();
+  if (which === 'org') {
+    await useOrigin(it.lat, it.lng, it.name || '（高德没给名字）', true);
+    return;
+  }
+  $('dstIn').value = it.name || '';
+  userDest = { name: it.name, address: it.address, lat: it.lat, lng: it.lng };
+  await goTo(userDest, 'user');
+}
+
+/** `#dstGo`「搜索路线」：**按一次就把这趟跑完**（用户 2026-09-25：「我点搜索路线
+ *  你要出现路线啊」）。
+ *  顺序：目的地先定 → 起点没定就现在定 → 两个都有了就 `routeTo()` 把三条路
+ *  画到图上。中途只要有一件定不下来（候选摆出来了等人点、或者搜不到），就停在
+ *  那儿说清楚差什么 —— **绝不拿文字猜坐标**。
+ *  ⚠️ 目的地排在前面：这一趟人想看的本来就是"去那儿怎么走"。 */
+async function searchRoute() {
+  const ot = ($('orgIn').value || '').trim();
+  const dt = ($('dstIn').value || '').trim();
+  if (!dt) {
+    $('dstIn').focus();
+    XQ.flash(ot ? '还差一个目的地' : '先写一个目的地');
+    return;
+  }
+  // ① 目的地
+  if (!dest || dest.name !== dt) {
+    TYPING.timer && clearTimeout(TYPING.timer);
+    if (!await resolveBox('dest')) return;
+  }
+  // ② 起点：还没定（或者框里的字和当前起点对不上）就现在定
+  const orgStale = ot ? (!origin || origin.label !== ot) : !origin;
+  if (orgStale) {
+    if (!ot) {
+      // 这台机器上电脑定位给不出坐标（`tryGeo()` 那一段），起点得人来给。
+      $('orgIn').focus();
+      XQ.flash('还差一个起点');
+      // 🔴 2026-09-26：这行原来也是「起点框里打一个地名，或者在地图上点一下。」
+      //   （同 `tryGeo()` 那处：教人用页面）。提示条只闪 2.8 秒，所以下面这行
+      //   **常驻**的话还是得留 —— 但只说差什么，不教怎么给。
+      hint('还差一个起点');
+      return;
+    }
+    if (!await resolveBox('org')) return;
+  }
+  // ③ 两个都定了 → 算路（`routeTo()` 里会画图 + 填面板）
+  if (origin && dest) routeTo();
+}
+
+/** 交换起点和终点。
+ *  ⚠️ 两边**都定过**的时候才是真的交换（坐标对调、直接重算，一个请求）；
+ *     否则只把框里的字对调，然后请人再按一次「搜索路线」—— **绝不拿文字去猜
+ *     坐标**（"无锡站"这三个字既不是起点的坐标也不是终点的坐标）。 */
+async function swapEnds() {
+  const o = origin, d = dest;
+  const ot = ($('orgIn').value || '').trim();
+  const dt = ($('dstIn').value || '').trim();
+  if (!o || !d) {
+    $('orgIn').value = dt;
+    $('dstIn').value = ot;
+    // 🔴 2026-09-26：削掉「按「搜索路线」重新定一次」那半句（那也是教人用页面）。
+    //   这是**降级那一支**（有一边还没定成坐标，所以只把框里的字对调了、没重算），
+    //   按用户那条规矩，降级可以说状态 —— 就说状态，不说下一步。
+    hint('两边对调了（有一边还没定）');
+    return;
+  }
+  origin = { lat: d.lat, lng: d.lng, label: d.name || '（高德没给名字）',
+             manual: true };
+  // ⚠️ 这里**不调 `useOrigin()`**：那个函数会顺手 `XQ.geo.remember()`，而
+  //    "交换"的意思是**车没动、只是重新选了个起点**（汽车的定位不该被这个改掉）。
+  paintOrigin();
+  saveOrg();
+  $('orgIn').value = origin.label;
+  dest = { name: o.label, address: '', lat: o.lat, lng: o.lng };
+  destKind = 'user';
+  userDest = dest;
+  $('dstIn').value = dest.name;
+  await routeTo();
+}
+
+/** 把某个地方定成终点并算路线。`kind` 决定面板右上角写它从哪儿来。 */
+async function goTo(d, kind) {
+  dest = { name: d.name, address: d.address || '', lat: d.lat, lng: d.lng };
+  destKind = kind || 'user';
+  hideFat();
+  // 换了个目的地 = 上一趟导航作废（不然面板还写着"导航中"，人以为还在导老路）
+  if (navOn) setNav(false);
+  if (!origin) {
+    // 只有终点、没有起点 —— 高德算不了路线。**如实说**，一个数都不编。
+    clearAll();
+    put($('nbName'), dest.name || null);
+    $('nbNote').textContent = '还没有起点';
+    why('终点定好了：' + (dest.name || '') + '。还差一个起点。');
+    paintStart();
+    return;
+  }
+  await routeTo();
+}
+
+async function routeTo() {
+  if (!origin || !dest) return null;
+  why('正在算「' + origin.label + ' → ' + (dest.name || '') + '」…');
+  const o = await fetchRoute(origin, dest);
+  showResult(o, destKind);
+  return o;
+}
+
+/** 把"该收的都收掉"：数字变「—」、路线清空、图上清画。 */
+function clearAll() {
+  routes = []; curRoute = null; lastDaily = null;
+  put($('nbName'), null);
+  put($('nbKm'), null);
+  $('nbKmUnit').textContent = '';
+  put($('nbEta'), null);
+  $('rtRows').innerHTML = '';
+  simStop();                 // ★ 没有路了就不能还有一个点在图上走（演示跟着停）
+  SIM.geoms = []; SIM.t = 0; SIM.step = -1; SIM.done = false;
+  clearOverlays();
+  stepIdx = -1;
+  paintSteps();            // 逐段清单跟着清（没有路线就不该还挂着上一趟的段）
+  paintStart();
+}
+
+/**
+ * 把服务端回来的那一份填进面板 + 画到图上。
+ *
+ * `kind`：`rest` = 疲劳建议那条（`/amap/nearby` 的"最近能停的地方"），
+ * `user` = 人自己搜的目的地。**面板右上角写清是哪一种**，别混。
+ */
+function showResult(o, kind) {
+  if (!o || !o.ok) {
+    clearAll();
+    $('nbNote').textContent = '没查到';
+    // ★ 查不到就**照实说为什么**，并且一个字都不留（数字全变「—」）。
+    why((o && o.why) ? ('高德这次没查成：' + o.why)
+      : '高德没返回结果 —— 附近可能真的没有能停的地方。');
+    return;
+  }
+  lastDaily = o;
+  routes = o.routes || [];
+  curRoute = routes[0] || null;
+  destKind = kind || destKind;
+  if (kind === 'rest') {
+    // 服务区是**高德按起点搜出来的那个真的 POI**，名字和坐标都照抄。
+    dest = (o.poi_lat && o.poi_lng)
+      ? { name: o.name, address: o.address, lat: o.poi_lat, lng: o.poi_lng }
+      : null;
+  }
+  $('nbNote').textContent = (kind === 'rest') ? '推荐休息点 · 高德' : '高德搜的';
+  put($('nbName'), o.name || null);
+  // ★ 公里数**照抄服务端那个数**（`o.km`），不在这儿换算。
+  // ⚠️ 只有直线距离的时候必须把"直线"两个字摆出来 —— 说成"开车 12 公里"等于
+  //    把一条没算出来的路说成算出来了。
+  const hasKm = (o.km != null && !!o.km);
+  put($('nbKm'), hasKm ? String(o.km) : null);
+  $('nbKmUnit').textContent = hasKm
+    ? (o.by === 'drive' ? ' 公里（驾车）' : ' 公里（直线）') : '';
+  // ⚠️ 预计到达只在**真有驾车路线**时给（直线距离配不出一条路的时间）。
+  put($('nbEta'), (o.by === 'drive' && o.min) ? fmtEta(o.min * 60) : null);
+  if (o.by === 'drive' && o.min) {
+    $('nbEta').title = '按现在的时间加上高德给的那条路线的用时算的';
+  }
+  // 🔴 2026-09-26 用户第四次说解释文字不要，点的就是上面原本那一句
+  //   「按高德的驾车路线算的，和图上那三条线是同一个来源。点一条换一条。」
+  //   —— **算成功的时候一个字都不说**（`why('')` 连框一起收掉）。
+  //   ⚠️ 下面那一支留着：`by !== 'drive'` 是**降级态**，"为什么只有直线距离"
+  //      必须说出来（不说就等于把一条直线说成算出来的路）。
+  why((o.by === 'drive') ? ''
+    : '高德没算出驾车路线（' + (o.route_why || '原因没给') + '），只有直线距离。');
+  paintRoutes();
+  draw(o, origin, curRoute);
+  // ★ 逐段清单：路线换了、或者刚从"没有路线"恢复，都在这儿跟着重建
+  //   （不导航的时候它只做一件事：把自己收起来）
+  paintSteps();
+  // 🔴 **换了整条路 = 演示那套几何也得跟着换**。`SIM.geoms` 里存的是
+  //    **每段的折线/段长/用时**，它是照着**当时那条 `curRoute.step_list`**
+  //    算的；换了路还在用旧的，段号和清单就会对不上（`simLocate()` 落在
+  //    第 3 段，清单上亮的却是别的行）。
+  //    ⚠️ 这是实测出来的：`_scratch/_t_nav_car.py` 里"起点一定就自动问服务区"
+  //       那条路先回来（8 段），人搜的目的地那条后回来（46 段），进导航正好
+  //       卡在中间 → `geoms` 8 个、清单 46 行。
+  //    ★ 换路之后**不自己播**，和刚进导航一样：落到第 1 段 + 念第 1 段。
+  if (navOn) simEnter();
+  paintStart();
+  // ★★ `nav.html?do=nearby` 进来的那一趟（别的页面那颗「导航服务区」）——
+  //    到这儿路已经**真的**算出来、也画在图上了，把它接成"真的进了导航"。
+  //    用户要的就是这个：不是摆设，点了确实到这页、确实有路线、确实开始引导。
+  //    🔴 **不自动放演示**（同 `setNav`）：进去之后是"落在第 1 段 + 念第 1 段"。
+  //    ⚠️ 只在 `kind === 'rest'` 时认:那条路才是"最近的服务区"；人自己搜的
+  //       目的地不算，而且这一步要把 `WANT` 消掉，免得几秒后被别的查询触发。
+  if (WANT === 'nearby' && kind === 'rest') {
+    WANT = '';
+    if (o.by === 'drive' && curRoute) setNav(true);
+  }
+}
+
+/* ═════════════════════ 三条候选（**一行一条，不拆路段**）════════════════════
+   数字全是高德给的（里程/用时/过路费/红绿灯）；**说明**只有两种来源：
+     · 「用时最短」这类 = 从上面那几个数里**比出来的**，而且**只在严格唯一
+       最小**时才挂 —— 三条都是 9 个红绿灯的时候写"红绿灯最少"等于没说；
+     · 「红绿灯 15 个 · 过路费 515 元」= 高德原样给的数。
+   🔴 **不写"行驶顺畅""路况稳定"这种话** —— 那是样张上的字，这一页没有那个
+      数据源，写上去就是编的。 */
+
+function uniqMin(key) {
+  const vs = routes.map((r) => r[key]);
+  const m = Math.min.apply(null, vs);
+  return vs.filter((v) => v === m).length === 1 ? vs.indexOf(m) : -1;
+}
+function routeTags() {
+  const tags = routes.map(() => []);
+  const add = (i, t) => { if (i >= 0 && tags[i] && tags[i].length < 2) tags[i].push(t); };
+  add(uniqMin('min'), '用时最短');
+  add(uniqMin('drive_m'), '里程最短');
+  if (routes.some((r) => r.tolls > 0)) add(uniqMin('tolls'), '过路费最少');
+  if (routes.some((r) => r.lights > 0)) add(uniqMin('lights'), '红绿灯最少');
+  return tags;
+}
+function routeNote(r, tags) {
+  const bits = (tags || []).slice();
+  if (r.lights != null) bits.push('红绿灯 ' + r.lights + ' 个');
+  if (r.tolls != null) bits.push('过路费 ' + r.tolls + ' 元');
+  return bits.length ? bits.join(' · ') : '高德没给更细的路况';
+}
+function styleOf(i) {
+  return RSTYLE[i] || { c: '#9aa3ad', w: 4, nm: '第 ' + (i + 1) + ' 条' };
+}
+
+function paintRoutes() {
+  const box = $('rtRows');
+  box.innerHTML = '';
+  if (!routes.length) return;
+  const tags = routeTags();
+  routes.forEach((r, i) => {
+    const st = styleOf(i);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rt-row' + (curRoute === r ? ' on' : '');
+    const sw = document.createElement('i');
+    sw.className = 'sw';
+    // ⚠️ 点色 = 图上那条线的颜色。**内联给**，别在 CSS 里再抄一份（会漂移）。
+    sw.style.background = st.c;
+    const sum = document.createElement('span');
+    sum.className = 'sum';
+    const l1 = document.createElement('span');
+    l1.className = 'l1';
+    const nm = document.createElement('i');
+    nm.className = 'nm';
+    nm.textContent = st.nm;
+    const km = document.createElement('i');
+    km.className = 'km';
+    km.textContent = (r.drive_m / 1000).toFixed(1) + ' 公里 · ' + fmtDur(r.drive_s);
+    l1.appendChild(nm); l1.appendChild(km);
+    const l2 = document.createElement('span');
+    l2.className = 'l2';
+    l2.textContent = routeNote(r, tags[i]);
+    sum.appendChild(l1); sum.appendChild(l2);
+    b.appendChild(sw); b.appendChild(sum);
+    b.onclick = () => pickRoute(i);
+    box.appendChild(b);
+  });
+}
+
+/** 人选了第几条 —— **图上那条线跟着高亮**，面板上的数也换。
+ *  ⚠️ 这里**不重画折线**（三条一直在图上，几千个点重画一次会闪），
+ *     只改线宽/透明度/层级（`paintRouteStyles()`），几何一个字不动。 */
+function pickRoute(i) {
+  if (!routes.length) return;
+  curRoute = routes[i] || routes[0];
+  paintRoutes();
+  paintRouteStyles();
+  const r = curRoute;
+  put($('nbName'), dest ? (dest.name || null) : null);
+  put($('nbKm'), r ? (r.drive_m / 1000).toFixed(1) : null);
+  $('nbKmUnit').textContent = r ? ' 公里（驾车）' : '';
+  put($('nbEta'), r ? fmtEta(r.drive_s) : null);
+  if (r) $('nbEta').title = '按现在的时间加上高德给的那条路线的用时算的';
+  // ★ 换了一条路 = 换了一整套段（每条路自己的 `step_list`）→ 逐段清单跟着重建，
+  //   演示的几何也要重来（折线、段长、用时全是那一条路自己的）。
+  //   🔴 **但不许自己播**（用户 2026-09-26：「不用自动演示好吧 我没让你自动演示」）：
+  //      换一条路 = 重新落到第 1 段 + 念第 1 段，跟刚进导航一模一样。
+  if (navOn) { simEnter(); paintSteps(); }
+}
+
+/* ═════════════════════════ 逐段引导（导航态）═════════════════════════════════
+   「开始导航」按下去之后**真的进导航**（用户 2026-09-25：「然后我点开始导航
+   你要实际开始导航后啊」）—— 地图左上角一条引导条 + 图上一条会走的点 + 播报，
+   面板里一张**默认收着**的逐段清单。
+   ★ 每个字每个数都是高德给的：`instruction`（那一句原话）、`step_distance`、
+     `cost.traffic_lights`（逐段都有，实测过）、`at_m`（服务端按各段里程累加），
+     以及演示推进用的 `step.poly` 和 `cost.duration`（见 `SIM` 那一整段）。
+   ★★ 2026-09-25 用户当天就把这条口径推着往前走了一步：
+     「还有我开始导航后 你地图应该变为我在一点点走啊 我走过的变成灰 这不是高德
+     最基础的功能吗 然后给我语言告诉我那些走的细节 也不用在右边一下把所有细节
+     都列出来啊 在左上角该几百米干嘛可以列出来 并且伴随播报」
+     → 于是有了 `SIM`（位置 = 高德那条折线上按弧长插出来的、速度 = 高德那段时间
+     ÷ N）、左上角那句「前方 X 米干嘛」、以及逐段清单的折叠。
+   🔴 这一页**仍然不许编**：那个位置是**演示**推的，所以屏幕上三处写着"演示"
+     （引导条第 4 行 / 面板那一行 / 开播那句播报）—— 数是高德的数，位置是演示的
+     位置，两件事分开说，不许含糊成"实时导航"。 */
+const MAN_SVG = {
+  straight: '<path d="M12 20V5"/><path d="M7.6 9.4 12 5l4.4 4.4"/>',
+  left: '<path d="M14 20v-8a3 3 0 0 0-3-3H6"/><path d="M9 5.5 5.5 9 9 12.5"/>',
+  right: '<path d="M10 20v-8a3 3 0 0 1 3-3h5"/><path d="M15 5.5 18.5 9 15 12.5"/>',
+  uturn: '<path d="M8 20v-9a4 4 0 0 1 8 0v7"/><path d="M13.2 14.8 16 17.6l2.8-2.8"/>',
+  arr: '<path d="M6 21V4"/><path d="M6 5h11l-2.2 3.5L17 12H6"/>',
+};
+const MAN_WORD = { straight: '直行', left: '左转', right: '右转',
+                   uturn: '掉头', arr: '到达' };
+
+/** 从高德那句 `instruction` 的**尾巴**上读动作 —— 只用来挑一个图标，**不产生
+ *  任何数**。「沿静台路向东行驶686米左转」→ 左转（这一段走完要做的动作，和高德
+ *  App 上那个大箭头是同一个意思）。
+ *  ⚠️ 只看**最后 8 个字**：动作词一定在句尾，而路名里带"左/右"的（「右安门
+ *     大街」「左家庄」）在句中 —— 整句找的话会把它们认成转向。
+ *  ⚠️ 「到达」必须排在最前面：最后一段的原文是「向东行驶52米到达目的地」。 */
+function maneuver(tx) {
+  const s = tx || '';
+  const tail = s.slice(-8);
+  if (tail.indexOf('到达') >= 0 || tail.indexOf('抵达') >= 0) return 'arr';
+  if (tail.indexOf('掉头') >= 0) return 'uturn';
+  if (tail.indexOf('右') >= 0) return 'right';
+  if (tail.indexOf('左') >= 0) return 'left';
+  return 'straight';               // 「沿X行驶…」这种就是继续走，直行
+}
+function manSVG(k) {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
+    (MAN_SVG[k] || MAN_SVG.straight) + '</svg>';
+}
+/** 米 → 「686 米」/「8.2 公里」。**只是换个写法**，不重算任何距离。 */
+function fmtM(m) {
+  const v = +m || 0;
+  return (v < 1000) ? (v + ' 米') : ((v / 1000).toFixed(1) + ' 公里');
+}
+
+function curSteps() { return (curRoute && curRoute.step_list) || []; }
+function curStep() {
+  const list = curSteps();
+  return (navOn && stepIdx >= 0 && stepIdx < list.length) ? list[stepIdx] : null;
+}
+
+/** 把图上那一段单独亮出来。⚠️ 用**那一段自己的折线**（`step.poly`，高德给的
+ *  原样点），不切片、不重算；`ovStep` 是**另一条**线，不动 `ovLines` 里那三条。 */
+function clearStepHL() {
+  if (ovStep && map) { try { map.remove(ovStep); } catch (e) { /* 没了就算了 */ } }
+  ovStep = null;
+}
+function paintStepHL() {
+  clearStepHL();
+  const st = curStep();
+  if (!map || !st || !st.poly || st.poly.length < 2) { paintBanner(); return; }
+  try {
+    ovStep = new AMap.Polyline({
+      path: st.poly.map((s) => s.split(',').map(Number)),
+      strokeColor: '#ff7a18', strokeWeight: 9, strokeOpacity: .95,
+      lineJoin: 'round', lineCap: 'round', zIndex: 90 });
+    map.add(ovStep);
+  } catch (e) { ovStep = null; }
+  paintBanner();
+}
+
+/** 地图左上角那条引导条：**前方多少米 + 下一步干嘛** + 高德那一句原话 + 三个真数。
+ *  ★ 2026-09-25 用户：「在左上角该几百米干嘛可以列出来 并且伴随播报」——
+ *    所以大字从"动作词"改成了「前方 520 米右转」。
+ *  ⚠️ 那个数**不是编的**：它 = 本段的 `step_distance` × 还没走完的比例，
+ *     比例由演示位置给（见 `SIM` 那段）。演示没跑起来（高德没给折线）时
+ *     就退回只写动作词 —— **宁可不给那个数，也不给它一个假的**。 */
+function paintBanner() {
+  const box = $('gdBox');
+  if (!box) return;
+  const st = curStep();
+  if (!st) { box.hidden = true; return; }
+  box.hidden = false;            // ⚠️ 这一行**不能省**：少了它引导条的字都填好了、
+                                 //    盒子却还挂着 markup 里那个 `hidden`（第一版
+                                 //    就漏了这一行，看着就是"引导条没出来"）
+  const list = curSteps();
+  const k = maneuver(st.tx);
+  const word = (k === 'arr') ? '到达目的地' : (MAN_WORD[k] || '直行');
+  $('gdIc').innerHTML = manSVG(k);
+  const g = SIM.geoms[stepIdx];
+  let left = null;
+  if (g && navOn) {
+    const loc = simLocate(SIM.t);
+    // 演示位置正好在本段里 → 用"本段还剩多少"；不在（比如人刚点了别的段、
+    // 演示还没挪过去）→ 用本段的**整段**里程，仍然是高德那个数。
+    left = (loc.k === stepIdx) ? (g.m * (1 - loc.frac)) : g.m;
+    if (SIM.done) left = 0;
+  }
+  $('gdMain').textContent = (left == null) ? word
+    : ('前方 ' + fmtM(Math.max(0, Math.round(left / 10) * 10)) + word);
+  $('gdAt').textContent = '第 ' + (stepIdx + 1) + ' / ' + list.length + ' 段 · 全程 '
+    + fmtM(st.at_m) + '处';
+  $('gdSub').textContent = st.tx || '（高德没给这一步的说明）';
+  const bits = ['本段 ' + fmtM(st.m)];
+  if (st.lights) bits.push('红绿灯 ' + st.lights + ' 个');
+  if (st.s) bits.push('约 ' + fmtDur(st.s));
+  $('gdMeta').textContent = bits.join(' · ');
+  simPaintNote();                // 第 4 行："这是演示"
+}
+
+/** 画/收那张逐段清单。**导航态才有**；不导航时它整个收起来，面板标题也还给
+ *  「候选路线」。★ 候选路线那三行**一直在**（用户点名：「三种可选择的路呢
+ *  为啥没了」——进导航不能把选路这件事收走）。
+ *  ★ 2026-09-25 用户：「也不用在右边一下把所有细节都列出来啊」→ 清单**默认
+ *    收着**，由上面那颗 `#gdSum` 摊开；该干什么由左上角引导条 + 播报说。 */
+function paintSteps() {
+  const box = $('gdList'), sum = $('gdSum');
+  if (!box) return;
+  const list = navOn ? curSteps() : [];
+  const t = $('npTitle');
+  if (t) t.textContent = navOn ? '演示导航' : '候选路线';
+  box.innerHTML = '';
+  const open = !!list.length && SIM.listOpen;
+  box.hidden = !open;
+  if (sum) {
+    sum.hidden = !list.length;
+    if (list.length) {
+      sum.textContent = (open ? '收起逐段清单' : ('全程 ' + list.length +
+        ' 段 · 点开逐段清单'))
+        + (SIM.playing ? ('（现在第 ' + (stepIdx + 1) + ' 段）') : '');
+    }
+  }
+  if (!list.length) { clearStepHL(); paintBanner(); simRowPaint(); return; }
+  if (stepIdx < 0 || stepIdx >= list.length) stepIdx = 0;
+  list.forEach((st, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'gd-row' + (i === stepIdx ? ' on' : '');
+    const gi = document.createElement('span');
+    gi.className = 'gi';
+    gi.innerHTML = manSVG(maneuver(st.tx));
+    const gt = document.createElement('span');
+    gt.className = 'gt';
+    gt.textContent = st.tx || '（高德没给这一步的说明）';
+    gt.title = gt.textContent;
+    const gm = document.createElement('span');
+    gm.className = 'gm';
+    gm.textContent = fmtM(st.m) + (st.lights ? (' · 灯 ' + st.lights) : '');
+    b.appendChild(gi); b.appendChild(gt); b.appendChild(gm);
+    b.onclick = () => pickStep(i);
+    box.appendChild(b);
+  });
+  paintStepHL();
+  simRowPaint();
+}
+
+/** 点清单里的第 i 段：**演示挪到那一段的开头并暂停**（高亮、引导条、播报跟着
+ *  一起换）。⚠️ 2026-09-25 之前这里只是"看看" —— 现在有了会走的位置，"看"和
+ *  "走"必须是同一件事，不然图上那个点还在老地方，人一下就糊涂了。 */
+function pickStep(i) {
+  stepIdx = i;
+  simRowClasses();
+  if (SIM.geoms.length) simSeek(i);
+  paintStepHL();
+}
+
+function paintStart() {
+  const b = $('navStart');
+  if (!b) return;
+  // ⚠️ **不做成一颗死键**（用户 2026-09-25：「我点开始导航你要实际开始导航后
+  //    啊」）：没有路线的时候它照样点得动，点了会告诉你还差什么（见下面那颗
+  //    键的接线）。按下去一点反应都没有的灰键，人只会以为这一页坏了。
+  b.className = 'nav-start' + (curRoute ? '' : ' off');
+  b.disabled = false;
+  b.title = curRoute ? '进入导航（逐段引导）' : '还没有算出来的路线';
+  b.innerHTML = '';
+  const s = document.createElement('span');
+  s.innerHTML = XQ.icon(navOn ? 'pause' : 'play');
+  b.appendChild(s);
+  b.appendChild(document.createTextNode(navOn ? '结束导航' : '开始导航'));
+}
+
+/* ═════════════════ 演示推进：让车在**高德那条折线上**一点点走 ═════════════════
+   ★ 用户 2026-09-25 原话：「还有我开始导航后 你地图应该变为我在一点点走啊
+     我走过的变成灰 这不是高德最基础的功能吗 然后给我语言告诉我那些走的细节
+     也不用在右边一下把所有细节都列出来啊 在左上角该几百米干嘛可以列出来
+     并且伴随播报」
+   → 四件事：① 图上有个点在走 ② 走过的路变灰 ③ 左上角写「前方 X 米干嘛」
+     ④ 同时念出来；右边那张逐段清单反过来**默认收起来**（细节改由前两条承担）。
+
+   🔴 **它是演示，不是定位** —— 这台机器拿不到实时定位（见 `tryGeo()` 那一段）。
+     所以这一段每条都得守着：
+       · 屏幕上**三处**写着"演示"：引导条第 4 行、面板那一行、开播那句播报；
+       · 走的数**全是高德的**：折线 = `step.poly`，秒数 = `step.cost.duration`，
+         米数 = `step.step_distance`；位置 = 在这条折线上按**弧长**插出来的点；
+       · 倍速 = 「高德算的那段时间 ÷ N」，`SIM_MULS` 里那三个数就是 N ——
+         不是我自己编一个"每秒走多少米"；
+       · 高德没给折线的段**不推进**（`simBuild()` 如实少算，并且说出来）。
+   ⚠️ 原来这里写着「不许有会自己变小的数」。那句**没有作废，是被兑现了**：那时候
+     屏幕上没有位置，写"还剩 520 米"就是编的；现在 520 是从真位置量出来的。变的
+     只是"看到哪一段"，数还是高德的数 —— 所以"演示"两个字必须留在屏幕上。
+   ⚠️ 位置参数取 `t ∈ [0,1]`（全程进度）而不是"第几米"：这样上面四条在任何路线上
+     都是同一套算法，换倍速只改快慢、不改数。 */
+const SIM = {
+  playing: false, t: 0,          // t = 全程进度（0..1）
+  mul: 120,                      // 演示倍速 = 高德那段时间 ÷ N
+  raf: 0, last: 0, frame: 0,
+  step: -1,                      // 现在走到第几段（和 `stepIdx` 同步）
+  listOpen: false,               // 面板那张逐段清单摊开了没有
+  follow: true,                  // 跟车 / 看全程
+  done: false,
+  said: {}, lastSay: 0, lastTxt: '',
+  geoms: [], totalS: 0, totalM: 0, totalW: 0,
+};
+const SIM_MULS = [60, 120, 240];
+
+/** 两个 `[lng,lat]` 之间大概多少米（等距圆柱，够用）。
+ *  ⚠️ **只用来在折线上找位置**，不产生任何给人看的数 —— 给人看的那个数
+ *     永远是高德的 `step_distance`。 */
+function geoM(a, b) {
+  const R = 6371008.8, r = Math.PI / 180;
+  const dl = (b[1] - a[1]) * r;
+  const dg = (b[0] - a[0]) * r * Math.cos((a[1] + b[1]) / 2 * r);
+  return Math.sqrt(dl * dl + dg * dg) * R;
+}
+
+/** 把当前这条路的每一段折线**预处理成能按弧长取点**的样子。
+ *  返回 false = 这条路推不了（没有逐段折线，或者高德一个用时都没给）——
+ *  那时候**宁可不演示**，也不拿别的数顶上。 */
+function simBuild() {
+  SIM.geoms = [];
+  let ws = 0, wm = 0;
+  // 用哪一列当"进度尺"：优先**高德给的秒数**（那才是导航的时间轴）；
+  // 秒数一个都没有时退回米数（有路必有里程），并且如实标出来。
+  const bySec = curSteps().some((st) => (+st.s || 0) > 0);
+  curSteps().forEach((st) => {
+    const pts = (st.poly || []).map((s) => String(s).split(',').map(Number))
+      .filter((p) => p.length === 2 && isFinite(p[0]) && isFinite(p[1]));
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) {
+      cum.push(cum[i - 1] + geoM(pts[i - 1], pts[i]));
+    }
+    const len = cum.length ? cum[cum.length - 1] : 0;
+    const m = +st.m || 0, s = +st.s || 0;
+    const w = bySec ? s : m;
+    SIM.geoms.push({ pts: pts, cum: cum, len: len, w: w,
+                     w0: ws, w1: ws + w, m: m, s: s,
+                     tx: st.tx || '', lights: st.lights || 0 });
+    ws += w; wm += m;
+  });
+  SIM.totalS = curSteps().reduce((a, st) => a + (+st.s || 0), 0);
+  SIM.totalM = wm;
+  // ★ 进度尺的总长（= 上面最后一段的 `w1`）。**推进要拿它当分母**：
+  //   高德偶尔一段用时都不给（`totalS` 就是 0），那时候尺子换成米数 ——
+  //   少了这一句，演示会一格都不走（第一版就写成过用 `totalS` 当分母）。
+  SIM.totalW = SIM.geoms.length ? SIM.geoms[SIM.geoms.length - 1].w1 : 0;
+  const usable = SIM.geoms.filter((g) => g.pts.length > 1).length;
+  return (usable > 0) && (ws > 0);
+}
+
+/** 全程进度（0..1）→ 第几段 + 段内走了多少（0..1）。
+ *  ⚠️ 先归一化到**全程那一把尺**上再比：`w0/w1` 存的是原始秒数（或原始米数），
+ *     直接和 0..1 比会立刻错位 —— 第一版就写成过那样。 */
+function simLocate(t) {
+  const gs = SIM.geoms;
+  if (!gs.length) return { k: 0, frac: 0 };
+  const tot = gs[gs.length - 1].w1 || 1;
+  const f = Math.max(0, Math.min(1, t));
+  for (let i = 0; i < gs.length; i++) {
+    const g = gs[i];
+    const f0 = g.w0 / tot, f1 = g.w1 / tot;
+    if (f < f1 || i === gs.length - 1) {
+      const span = f1 - f0;
+      const k = span > 1e-9 ? (f - f0) / span : 1;
+      return { k: i, frac: Math.max(0, Math.min(1, k)) };
+    }
+  }
+  return { k: gs.length - 1, frac: 1 };
+}
+
+/** 第 k 段走了 `frac`（0..1）时的坐标。**在折线上按弧长插值** ——
+ *  直接按顶点下标取会走得忽快忽慢（顶点密的地方慢、疏的地方跳）。 */
+function simPos(k, frac) {
+  const g = SIM.geoms[k];
+  if (!g || !g.pts.length) return null;
+  if (g.pts.length === 1 || g.len <= 0) return g.pts[0].slice();
+  const want = Math.max(0, Math.min(1, frac)) * g.len;
+  let lo = 0, hi = g.cum.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (g.cum[mid] < want) lo = mid + 1; else hi = mid;
+  }
+  const i = Math.max(1, lo);
+  const a = g.pts[i - 1], b = g.pts[i];
+  const seg = g.cum[i] - g.cum[i - 1];
+  const u = seg > 0 ? (want - g.cum[i - 1]) / seg : 0;
+  return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+}
+
+/** 已经走过的那一截（第 0 段到当前位置），给灰线用。 */
+function simDonePath(k, frac) {
+  const path = [];
+  for (let i = 0; i < k; i++) {
+    const p = SIM.geoms[i] && SIM.geoms[i].pts;
+    if (p && p.length > 1) path.push.apply(path, p);
+  }
+  const g = SIM.geoms[k];
+  if (g && g.pts.length > 1) {
+    const want = Math.max(0, Math.min(1, frac)) * g.len;
+    const end = Math.max(1, SIM.geoms[k].cum.findIndex((c) => c >= want));
+    for (let i = 0; i < end; i++) path.push(g.pts[i]);
+  }
+  const p = simPos(k, frac);
+  if (p) path.push(p);
+  return path;
+}
+
+/** 把那个会走的点挪到 `pos`。
+ *  🔴 实测（`_scratch/_t_nav_car.py` ①b，2026-09-26）：这一版 SDK 的
+ *     `Overlay.CircleMarker` **只有 `setCenter`、没有 `setPosition`**
+ *     （`typeof o.setPosition === 'undefined'`）—— 圆点没有"位置"，只有"圆心"。
+ *  ⚠️ 原来这里写的是 `ovCar.setPosition(pos)`：**那一句每帧都抛**，外层的 catch
+ *     把 `ovCar` 置回 `null`，于是下一帧**又新建一个圆点 add 上去** —— 图上不是
+ *     "一个点在走"，是**一帧堆一个点**（十秒的演示能堆几百个覆盖物）；量出来的
+ *     现象是 `XQ.nav.state().car` 在 0/1 之间一跳一跳（"那个点有时在有时不在"）。
+ *  → 两种方法都试，谁有就用谁；**两个都没有就什么都别做**（宁可这个点停在原地，
+ *     也绝不每帧往图上再堆一个）。 */
+function simCarTo(o, pos) {
+  try {
+    if (typeof o.setCenter === 'function') o.setCenter(pos);
+    else if (typeof o.setPosition === 'function') o.setPosition(pos);
+  } catch (e) { /* 挪不动就停在那儿 —— 不新建 */ }
+}
+
+/** 图上那两样东西：会动的点 + 走过的灰线。 */
+function simPaintCar(pos) {
+  if (!map || !pos) return;
+  try {
+    if (ovCar) { simCarTo(ovCar, pos); return; }
+    ovCar = new AMap.CircleMarker({
+      center: pos, radius: 8, fillColor: '#1f4fa8', fillOpacity: 1,
+      strokeColor: '#ffffff', strokeWeight: 3, zIndex: 96,
+      label: { content: '车（演示）', direction: 'top' } });
+    map.add(ovCar);
+  } catch (e) { ovCar = null; }
+}
+function simPaintDone(k, frac) {
+  if (!map) return;
+  const path = simDonePath(k, frac);
+  if (path.length < 2) return;
+  try {
+    if (ovDone) { ovDone.setPath(path); return; }
+    ovDone = new AMap.Polyline({
+      path: path, strokeColor: '#98a4b2', strokeWeight: 9, strokeOpacity: .95,
+      lineJoin: 'round', lineCap: 'round', zIndex: 94 });
+    map.add(ovDone);
+  } catch (e) { ovDone = null; }
+}
+function simClearMap() {
+  if (map) {
+    if (ovCar) { try { map.remove(ovCar); } catch (e) {} }
+    if (ovDone) { try { map.remove(ovDone); } catch (e) {} }
+  }
+  ovCar = null; ovDone = null;
+}
+
+/** 跟车时该用哪一级缩放：按**演示速度**算"一屏大概看几秒"。
+ *  ⚠️ 高德 zoom z 下每像素 ≈ 40075016×cos(lat)/(256×2^z) 米（墨卡托的定义），
+ *     我们要"一屏（约 900px）看 6 秒"—— 反解出 z。**这只是镜头怎么摆**，
+ *     和路线上的任何数都没关系。 */
+function simZoom() {
+  if (!SIM.totalS) return 14;
+  const lat = (origin && origin.lat) || 39;
+  const v = (SIM.totalM / SIM.totalS) * SIM.mul;        // 演示速度 m/s
+  const span = Math.max(200, v * 6);
+  const z = Math.log(40075016 * Math.cos(lat * Math.PI / 180) * 900 /
+                     (256 * span)) / Math.LN2;
+  return Math.max(8, Math.min(17, Math.round(z)));
+}
+
+/** 播报。⚠️ 静音开关由 `XQ.speak` 自己把关（它返回 false 就是没出声），
+ *  这里只多两道：**别抢话**（距上一句不到 2.5 s 就咽回去，不然高速演示里
+ *  一串提示会互相截断成半句话）、**同一句不连着说两遍**。 */
+function simSay(txt, force) {
+  const t = String(txt || '').trim();
+  if (!t) return false;
+  const now = Date.now();
+  if (!force && (now - SIM.lastSay < 2500)) return false;
+  if (!force && t === SIM.lastTxt) return false;
+  SIM.lastSay = now; SIM.lastTxt = t;
+  return XQ.speak(t, { emotion: 'normal' });
+}
+
+/** 走完一段时念一遍**这一段自己的说明**（高德那句原话 + 它的红绿灯/用时）。
+ *  `force` = 不听那两道节流（进导航念第 1 段要用：那时候 `SIM.lastTxt` 里
+ *  可能还留着上一次导航念过的同一段）。 */
+function simSayStep(k, force) {
+  const g = SIM.geoms[k];
+  if (!g) return;
+  const bits = [];
+  if (g.lights) bits.push('红绿灯 ' + g.lights + ' 个');
+  if (g.s) bits.push('约 ' + fmtDur(g.s));
+  simSay('第 ' + (k + 1) + ' 段：' + (g.tx || '（高德没给这一步的说明）') +
+         (bits.length ? ('；' + bits.join('，')) : ''), !!force);
+}
+
+/** 「前方 500 米右转」这一句。500 / 100 两档各只念一次（`SIM.said` 记账）。 */
+function simSayAhead(k, frac) {
+  const g = SIM.geoms[k];
+  if (!g) return;
+  const left = g.m * (1 - Math.max(0, Math.min(1, frac)));
+  const w = MAN_WORD[maneuver(g.tx)] || '';
+  const say = (tag, d) => {
+    const key = tag + k;
+    if (SIM.said[key]) return;
+    SIM.said[key] = 1;
+    simSay('前方 ' + d + ' 米' + (maneuver(g.tx) === 'arr' ? '到达目的地'
+                                                          : (w || '继续直行')), false);
+  };
+  if (left <= 100) say('c', Math.max(10, Math.round(left / 10) * 10));
+  else if (left <= 500) say('b', Math.round(left / 50) * 50);
+}
+
+/** 秒 → 「45 秒」/「4 分 30 秒」/「1 小时 12 分」。**演示时长专用**：
+ *  `fmtDur()` 只到分钟，而演示常常只有一分多钟，差一分钟就是差一半。
+ *  🔴 **名字不许叫 `fmtClock`** —— `live.js:1186` 顶层有一个
+ *     `const fmtClock = (ms) => …`（那是"还剩几分几秒"的另一个东西）。
+ *     `const` 进的是**全局词法作用域**，而这一页的内联脚本和 `live.js`
+ *     **共用同一个全局作用域** → 这边再 `function fmtClock` 就是
+ *     `SyntaxError: Identifier 'fmtClock' has already been declared`，
+ *     **整段内联脚本编译不过、一行都不执行**（`XQ.nav` 都不存在，地图也不画）。
+ *     ⚠️ 症状极隐蔽：`<script src>` 那几支照样跑，所以 `XQ`、左栏、时钟都正常，
+ *        只有这一页自己的东西全没了；控制台只有**一条**报错，而且报在
+ *        **脚本第一行**（654:9）上，看着和 `fmtClock` 毫无关系。
+ *     ⚠️ 用 `node --check` 抠出内联脚本单独检查**查不出这一条** ——
+ *        冲突的另一半在 `live.js` 里，单独看这个文件是干净的。
+ *        真正能查出它的是"在真浏览器里跑一遍、断言控制台零报错"
+ *        （`_scratch/_probe_nav_boot.py`、`_probe_nav_sim.py`）。
+ *     ⚠️ 拿不准就叫 `simXxx` —— 这一页自己的名字统一带 `sim`/`gd`/`np` 前缀。 */
+function simDur(s) {
+  const v = Math.max(0, Math.round(s || 0));
+  if (v < 60) return v + ' 秒';
+  const m = Math.floor(v / 60), r = v % 60;
+  if (m < 60) return r ? (m + ' 分 ' + r + ' 秒') : (m + ' 分钟');
+  const h = Math.floor(m / 60);
+  return h + ' 小时 ' + (m % 60) + ' 分';
+}
+
+/** 面板上那两个会跟着走的数：剩余距离 / 预计到达。
+ *  ⚠️ 「剩余距离」= 还有多少米（高德各段的米数累加，位置由演示给）；
+ *     「预计到达」= 本机的钟 + **剩下的高德用时**（不按倍速折算）——
+ *     那是"真开过去几点到"，演示快慢不改它。 */
+function simPaintPanel(k, frac) {
+  let m = 0, s = 0;
+  SIM.geoms.forEach((g, i) => {
+    if (i < k) return;
+    const f = (i === k) ? Math.max(0, Math.min(1, frac)) : 0;
+    m += g.m * (1 - f);
+    s += g.s * (1 - f);
+  });
+  if (SIM.done) { m = 0; s = 0; }
+  put($('nbKm'), (m / 1000).toFixed(1));
+  $('nbKmUnit').textContent = ' 公里（演示剩余）';
+  put($('nbEta'), s > 0 ? fmtEta(s) : '—');
+  $('nbEta').title = '本机的钟 + 高德剩下的那段用时（演示快慢不改它）';
+}
+
+/** 引导条第 4 行。
+ *  🔴 2026-09-26 **只留一个标签**：「演示 ×120」。原来这儿是一整句
+ *     「演示中 ×120：高德算这趟 1 小时 12 分，按这个倍速在屏幕上走 36 秒。
+ *      这个点是演示推的，不是实时定位。」—— 用户点名删（「这些解释文字不要给了」）。
+ *  ⚠️ 「演示」这两个字**必须留着**：屏幕上一个会动的点如果只叫"车"，那就是在假装
+ *     实时定位。标签说明一切，段落不说明。 */
+function simPaintNote() {
+  const n = $('gdSim');
+  if (!n) return;
+  if (!SIM.geoms.length) { n.textContent = '高德没给逐段折线'; return; }
+  n.textContent = (SIM.done ? '演示已走完'
+                            : (SIM.playing ? '演示中' : '演示')) + ' ×' + SIM.mul;
+}
+
+/** 一帧。⚠️ 用 `requestAnimationFrame` 而不是 200 ms 的定时器：用户要看的是
+ *  「一点点走」，定时器那样是一跳一跳的（而且掉帧时步长会乱）。 */
+function simTick(now) {
+  if (!SIM.playing) { SIM.raf = 0; return; }
+  const dt = Math.min(.25, Math.max(0, (now - SIM.last) / 1000));
+  SIM.last = now;
+  SIM.frame++;
+  if (SIM.totalW) SIM.t = Math.min(1, SIM.t + dt * SIM.mul / SIM.totalW);
+  const loc = simLocate(SIM.t);
+  const pos = simPos(loc.k, loc.frac);
+  if (loc.k !== SIM.step) {
+    SIM.step = loc.k; stepIdx = loc.k;
+    simRowClasses();                 // 清单里那一行跟着走（清单收着也改）
+    paintStepHL();                   // 图上那一段的高亮跟着换
+    if (!SIM.done) simSayStep(loc.k);
+  }
+  simPaintCar(pos);
+  if (SIM.follow && pos) { try { map.setCenter(pos); } catch (e) {} }
+  if (SIM.frame % 8 === 0) simPaintDone(loc.k, loc.frac);   // 灰线重画别每帧都做
+  simPaintPanel(loc.k, loc.frac);
+  paintBanner();
+  simSayAhead(loc.k, loc.frac);
+  if (SIM.t >= 1) { simFinish(); return; }
+  SIM.raf = requestAnimationFrame(simTick);
+}
+
+/** 开播。`fromScratch` = 从头（重新开始），否则接着暂停那一点走。 */
+function simStart(fromScratch) {
+  simStop();
+  if (!simBuild()) {
+    simPaintNote();
+    hint('高德这次没给逐段折线，演示放不了。');
+    return false;
+  }
+  if (fromScratch) {
+    SIM.t = 0; SIM.step = -1; SIM.said = {}; SIM.lastTxt = '';
+    SIM.listOpen = false; SIM.done = false;
+  }
+  if (curSteps().length && (stepIdx < 0 || stepIdx >= curSteps().length)) stepIdx = 0;
+  SIM.playing = true; SIM.last = performance.now();
+  simPaintNote();
+  simRowPaint();
+  if (SIM.follow) {
+    const p0 = simPos(0, 0);
+    try { if (p0) map.setZoomAndCenter(simZoom(), p0); } catch (e) {}
+  }
+  if (fromScratch) {
+    // ⚠️ 就这两件事：走了多远、高德说多久。**不再跟一句"这是演示，不是实时
+    //    定位"**（用户 2026-09-26：「以后不要弄这些解释文字 我不需要」）——
+    //    "演示"两个字在屏幕上已经有三处：这颗按钮、引导条第 4 行、图上那个点的
+    //    标签「车（演示）」。
+    simSay('演示开始：全程 ' + fmtM(SIM.totalM) + '，高德算 ' + fmtDur(SIM.totalS) +
+           '。', true);
+  }
+  SIM.raf = requestAnimationFrame(simTick);
+  return true;
+}
+
+/** 暂停/停下。⚠️ 不动 `navOn`、不动面板上的数（暂停了还剩多少米就停在那儿）。 */
+function simStop() {
+  SIM.playing = false;
+  if (SIM.raf) { try { cancelAnimationFrame(SIM.raf); } catch (e) {} }
+  SIM.raf = 0;
+  simRowPaint();
+}
+
+/** 走到头了。★ **不假装还在走**：停下、把话说明白。 */
+function simFinish() {
+  SIM.playing = false; SIM.raf = 0; SIM.t = 1; SIM.done = true;
+  const last = SIM.geoms.length - 1;
+  SIM.step = last; stepIdx = last;
+  const p = simPos(last, 1);
+  simPaintCar(p);
+  simPaintDone(last, 1);
+  simPaintPanel(last, 1);
+  simRowClasses(); paintBanner(); simRowPaint();
+  simSay('演示结束，到达' + ((dest && dest.name) || '目的地') + '。', true);
+  // 🔴 这里原来还有一句横条提示「演示走完了全程（这不是真开到了……）」。删了 ——
+  //    引导条第 4 行那会儿写着「演示已走完」，播报也说到了，不用第三遍。
+}
+
+/** 把演示挪到第 i 段的开头并**暂停** —— 点清单那一行就是这个意思。 */
+function simSeek(i) {
+  if (!SIM.geoms.length) return false;
+  simStop();
+  const gs = SIM.geoms;
+  const g = gs[Math.max(0, Math.min(gs.length - 1, i))];
+  SIM.t = Math.max(0, Math.min(1, g.w0 / (gs[gs.length - 1].w1 || 1)));
+  SIM.done = false; SIM.step = -1;
+  SIM.said = {};
+  const loc = simLocate(SIM.t);
+  const pos = simPos(loc.k, loc.frac);
+  SIM.step = loc.k; stepIdx = loc.k;
+  simPaintCar(pos); simPaintDone(loc.k, loc.frac);
+  if (pos && SIM.follow) { try { map.setCenter(pos); } catch (e) {} }
+  simPaintPanel(loc.k, loc.frac); paintBanner(); simPaintNote();
+  simSay('演示挪到第 ' + (loc.k + 1) + ' 段：' + (g.tx || ''), true);
+  return true;
+}
+
+/** 跟车 / 看全程。看全程 = 不再跟着走，把整条路铺满视野 ——
+ *  **"走过的变灰"就是在这个视角下最清楚**。 */
+function simView() {
+  SIM.follow = !SIM.follow;
+  if (!SIM.follow && ovLines.length) {
+    try { map.setFitView(ovLines, false, [80, 80, 80, 80]); } catch (e) {}
+  } else if (SIM.follow) {
+    const p = simPos(SIM.step < 0 ? 0 : SIM.step,
+                     SIM.step < 0 ? 0 : simLocate(SIM.t).frac);
+    try { if (p) map.setZoomAndCenter(simZoom(), p); } catch (e) {}
+  }
+  simRowPaint();
+}
+
+/** 演示那一排按钮的样子（播放/暂停 · 倍速选中 · 跟车/看全程）。 */
+function simRowPaint() {
+  const b = $('simPlay');
+  if (!b) return;
+  simRowShow(navOn && !!curRoute);
+  b.textContent = SIM.playing ? '⏸ 暂停' : '▶ 演示';
+  b.title = SIM.playing ? '停一下' : '接着走';
+  SIM_MULS.forEach((n) => {
+    const e = $('simMul' + n);
+    if (e) e.className = 'sim-btn ghost' + (SIM.mul === n ? ' on' : '');
+  });
+  const v = $('simView');
+  if (v) {
+    v.textContent = SIM.follow ? '看全程' : '跟车';
+    v.title = SIM.follow ? '不再跟车，把整条路铺满视野（看得见走过的灰线）'
+                         : '镜头跟回车上';
+  }
+  simPaintNote();
+}
+function simRowShow(on) { const r = $('simRow'); if (r) r.hidden = !on; }
+
+/** 清单里那一行的 `.on`（车走到哪一段，哪一行就亮）。 */
+function simRowClasses() {
+  const box = $('gdList');
+  if (!box) return;
+  for (let j = 0; j < box.children.length; j++) {
+    box.children[j].className = 'gd-row' + (j === stepIdx ? ' on' : '');
+  }
+}
+
+/* ═══════════════════════════ 导航态（开始导航之后）═════════════════════════
+   ★ 按下去**真的进导航**（用户 2026-09-25：「然后我点开始导航你要实际开始导航后
+   啊」）：图上出现引导条 + 那一段的高亮，面板里出现演示控制和逐段清单
+   （清单默认收着）、标题换成「演示导航」、整条路线铺满视野。
+     ① 路线铺满视野 ② 面板打上「导航中」 ③ 落到第 1 段并**念出第 1 段**
+     ④ 退出时把面板还原成"没在导航"的样子。
+   🔴 **进导航不自动放演示**（用户 2026-09-26：「不用演示啊 只需要念一下逐段清单
+     的第一个好了 因为我不会实际动」）。这一点 2026-09-25 晚是反的 —— 那时是
+     "进导航 = 开播"，会看到那个点在图上自己走。**现在那个点是按 ▶ 演示才有的**：
+     人不会实际动，屏幕上也不该自己动。
+     · 进导航时仍然 `simBuild()`：**只为拿到高德自己的段长**（引导条上
+       "前方 520 米右转"那个数是高德这一段的米数，不是演示推出来的）。
+     · 位置停在**第 1 段的开头**（`t=0`，暂停），不画车、不画灰线 ——
+       那两个东西一出现就说明"有东西在走"，而此刻没有任何东西在走。
+   ★ 「会自己变小的数」只在**真的在走**（▶ 之后）时出现，且来源是演示推出来的
+     位置（折线、段长、段用时全是高德的），所以引导条第 4 行和面板那一行
+     那时候**必须写着"演示"**。 */
+function setNav(on) {
+  const was = navOn;
+  navOn = !!on;
+  document.body.classList.toggle('navigating', navOn);
+  paintStart();
+  if (navOn && !was) {
+    stepIdx = 0;
+    // ⚠️ 进导航**不动** `#rtWhy`（原来这里会灌一段介绍这一页怎么用的文字）。
+  } else if (!navOn && was) {
+    stepIdx = -1;
+  }
+  if (map && lastDaily) {
+    try {
+      if (navOn && ovLines.length) map.setFitView(ovLines, false, [80, 80, 80, 80]);
+      else draw(lastDaily, origin, curRoute);
+    } catch (e) { /* 视野动不了不影响事实：路线已经在图上了 */ }
+  }
+  if (navOn) {
+    simEnter();          // ★ 进导航 = 落到第 1 段 + **念第 1 段**（不放演示）
+  } else if (was) {
+    simStop();
+    simClearMap();
+    SIM.t = 0; SIM.step = -1; SIM.done = false; SIM.geoms = [];
+    simPaintNote();
+    paintRouteKm();      // 面板上的数回到"整条路"的口径（演示的数收掉）
+  }
+  paintSteps();          // ⚠️ 必须放在 `draw()` **后面**：`draw()` 会清掉图上
+                         //    所有覆盖物（连那一段的高亮一起），先画清单就白画了
+}
+
+/** 进导航：**念一遍逐段清单的第 1 段**，位置停在第 1 段的开头、**不播**。
+ *  ⚠️ 和 `simStart()` 的区别就一个字：**不播**。图上的车和灰线都等 ▶ 演示 ——
+ *     一进导航就自己走，屏幕上就有了"我在动"的假象，而人根本没动。
+ *  ⚠️ 仍然 `simBuild()`：引导条上「前方 520 米右转」那个 520 是**高德这一段的
+ *     米数**（`step_distance`），不 build 就拿不到、那行字只能退成光一个"右转"。
+ *  ⚠️ 面板上的数**不许换成演示口径**（`simPaintPanel`）：没在走却写"演示剩余
+ *     12.3 公里"是拿一个没发生的事当数。这里写的是整条路的 `drive_m/drive_s`。 */
+function simEnter() {
+  simStop();                       // 万一上一次还开着
+  simClearMap();                   // 图上不留车、不留灰线（没有东西在走）
+  const built = simBuild();
+  SIM.t = 0; SIM.step = -1; SIM.said = {}; SIM.lastTxt = '';
+  SIM.done = false; SIM.listOpen = false;
+  stepIdx = 0;
+  const loc = simLocate(0);
+  SIM.step = loc.k; stepIdx = loc.k;
+  paintRouteKm();                  // 面板 = 整条路（不是演示剩余）
+  simRowClasses();
+  if (!built) {
+    simPaintNote();
+    simSay('导航开始。高德这一趟没给逐段折线。', true);
+    return false;
+  }
+  // ★ 只念**第 1 段**（用户点名：「只需要念一下逐段清单的第一个好了」）。
+  //   `paintSteps()`（在 `setNav()` 尾巴上）会顺手把这行字刷到引导条上。
+  simSayStep(0, true);
+  return true;
+}
+
+/** 面板上「剩余距离 / 预计到达」回到**整条路**的口径 —— 退出演示导航时用。
+ *  ⚠️ 只写高德那条路线的两个数（`drive_m` / `drive_s`），和 `pickRoute()` 同源；
+ *     没有路线就留「—」，不拿别的数顶上。 */
+function paintRouteKm() {
+  const r = curRoute;
+  put($('nbKm'), r ? (r.drive_m / 1000).toFixed(1) : null);
+  $('nbKmUnit').textContent = r ? ' 公里（驾车）' : '';
+  put($('nbEta'), r ? fmtEta(r.drive_s) : null);
+}
+
+/** 「开始导航」那颗键。没有路线时**不是没反应**，而是说清楚差什么。 */
+function toggleNav() {
+  if (!curRoute) {
+    XQ.flash('还没有路线 —— 先按「搜索路线」');
+    return;
+  }
+  setNav(!navOn);
+}
+
+/* ══════════════════ 疲劳联动（这一页和 DMS 的那个"创新点"）══════════════════
+   ⚠️ 判据是**服务端真的报上来的档位**（`onState` 的 `s.severity`，来自
+      `ui/state.py` 那条真链路），不是定时器演的、也不是页面自己猜的。
+   ⚠️ 只在**档位往上走**的那一下弹一次（`sevRank` 记着上一次）：一直弹就是噪音，
+      而"忽略"过一次之后同一次疲劳里也不该再弹。
+   ⚠️ 两条路**不冲突**：这条气泡只是**加一条建议**，人自己搜的那条路线一个字都不动
+      （用户原话"平时正常搜地点导航；疲劳时给出休息建议，二者不冲突"）。 */
+const SEV_RANK = { normal: 0, mild: 1, moderate: 2, severe: 3 };
+
+function paintFatigue(s) {
+  const sev = (s && s.severity) || 'normal';
+  const r = SEV_RANK[sev];
+  const rank = (r == null) ? 0 : r;         // 未知档位按"清醒"算，不猜
+  const up = rank > sevRank;
+  sevRank = rank;
+  if (rank < 2) { hideFat(); return; }      // 缓过来了 → 那条建议就撤掉
+  if (!up) return;
+  // ⚠️ 已经在去服务区的路上就**别再说一次** —— 那不是提醒，那是噪音。
+  if (destKind === 'rest') return;
+  $('fbTx').textContent = '检测到疲劳，是否推荐就近服务区休整？';
+  $('fatBubble').hidden = false;
+}
+function hideFat() { const b = $('fatBubble'); if (b) b.hidden = true; }
+
+/** 「查看服务区」：真的去查、真的画。查不到就照实说，**不编一个地方**。 */
+async function fatGo() {
+  hideFat();
+  if (navOn) setNav(false);      // 改去服务区 = 上一趟导航作废（同上）
+
+  if (!origin) {
+    why('起点还没定。');
+    return;
+  }
+  why('正在找前面的服务区…');
+  const o = await fetchNearby(origin.lat, origin.lng);
+  showResult(o, 'rest');
+}
+
+/** 「忽略」：收起气泡。人自己那条路线**原样不动**（本来就没被动过）。 */
+function fatStay() { hideFat(); }
+
+/* ------------------------------------------------------------- 地图那条路 */
+function loadAMap() {
+  if (amapP) return amapP;
+  amapP = new Promise((res, rej) => {
+    // 🔴 安全密钥必须在 SDK 脚本**之前**挂上：2.0 的鉴权是拿它算签名的，
+    //    挂晚了那一次请求已经发出去了，表现是 INVALID_USER_DOMAIN / 签名错。
+    window._AMapSecurityConfig = { securityJsCode: AMAP_SEC };
+    const s = document.createElement('script');
+    s.src = 'https://webapi.amap.com/maps?v=2.0&key=' + encodeURIComponent(AMAP_KEY);
+    s.onload = () => (window.AMap ? res(window.AMap)
+                                 : rej(new Error('脚本下来了但没挂上 AMap')));
+    s.onerror = () => rej(new Error('脚本没下来'));
+    document.head.appendChild(s);
+  });
+  return amapP;
+}
+
+function clearOverlays() {
+  // ★ 演示那两样（会走的点 + 走过的灰线）也得跟着收 —— 它们不在 `ovLines` 里，
+  //   收漏了就会出现"路都没了，还有一个点在图上走"。
+  simClearMap();
+  if (!map) { ovLines = []; hiIdx = -1; ovStep = null; return; }
+  try {
+    if (ovOrigin) map.remove(ovOrigin);
+    if (ovDest) map.remove(ovDest);
+    // ⚠️ 那一段的高亮（`ovStep`）是**单独一条**线，不在 `ovLines` 里，得单独收
+    if (ovStep) map.remove(ovStep);
+    // 路线自己那条 + 线上那几张小标签（标签挂在对象上，一起收）
+    ovLines.forEach((p) => { if (p) { if (p._label) map.remove(p._label);
+                                      map.remove(p); } });
+  } catch (e) { /* 已经没了就算了 */ }
+  ovOrigin = ovDest = null; ovLines = []; hiIdx = -1; ovStep = null;
+}
+
+/** 只改那三条线的**粗细/透明度/层级** —— 换选中的那条时用（几何一个字不动）。 */
+function paintRouteStyles() {
+  const ci = routes.indexOf(curRoute);
+  hiIdx = -1;
+  ovLines.forEach((p, i) => {
+    if (!p) return;
+    const st = styleOf(i);
+    const on = (i === ci);
+    try {
+      p.setOptions({ strokeColor: st.c, strokeWeight: on ? st.w + 2 : st.w,
+                     strokeOpacity: on ? .95 : .62, zIndex: on ? 60 : 40 + i });
+      if (p._label) p._label.setOptions({ style: labelStyle(i, on) });
+    } catch (e) { /* 改不动就保持原样，几何还在 */ }
+    if (on) hiIdx = i;
+  });
+}
+function labelStyle(i, on) {
+  const st = styleOf(i);
+  return {
+    'font-size': '11px', 'font-weight': '600',
+    'padding': '1px 5px', 'border-radius': '8px',
+    'background-color': on ? st.c : 'rgba(255,255,255,.9)',
+    'color': on ? '#fff' : '#3a4654',
+    'border': '1px solid ' + (on ? st.c : 'rgba(120,175,235,.6)'),
+  };
+}
+
+/**
+ * 把起点、终点、**三条候选路线**一起画上去。返回真的画出了线没有。
+ *
+ * ★ 两个标记点（用户点名的）：**绿色 = 当前位置（车）**、**红色 = 目的地**。
+ *   用 `AMap.CircleMarker` 而不是图片图标：这一页**没有图标资产**，画一个真彩色
+ *   的圆点比引一张外链图可靠（离线也不会变成空白）。
+ * ★ **三条线同时画**（用户点名）：深蓝主推荐 / 浅蓝备选一 / 灰备选二，
+ *   `showDir:true` 给行驶方向箭头，中点上挂一张小标签写着这是哪一条
+ *   （"地图上还可以看到少量路线编号"—— 就是它，字号刻意小、不喧宾夺主）。
+ * ⚠️ 折线点本来就是 `"lng,lat"` 字符串，**不要 reverse** —— 反了会画到地球
+ *    另一边去（而且不报错，只是图上一条线都没有）。
+ */
+function draw(o, org, rt) {
+  if (!map || !org) return false;
+  let drew = false;
+  try {
+    clearOverlays();
+    ovOrigin = new AMap.CircleMarker({
+      center: [org.lng, org.lat], radius: 8,
+      fillColor: '#22a06b', fillOpacity: 1,
+      strokeColor: '#ffffff', strokeWeight: 3,
+      label: { content: org.manual ? '当前位置（手动）' : '当前位置',
+               direction: 'top' } });
+    map.add(ovOrigin);
+    if (o.poi_lat && o.poi_lng) {
+      ovDest = new AMap.CircleMarker({
+        center: [o.poi_lng, o.poi_lat], radius: 9,
+        fillColor: '#e5484d', fillOpacity: 1,
+        strokeColor: '#ffffff', strokeWeight: 3,
+        label: { content: o.name || '目的地', direction: 'top' } });
+      map.add(ovDest);
+    }
+    const list = (rt && o.routes && o.routes.length) ? o.routes : [];
+    list.forEach((r, i) => {
+      if (!r.polyline || r.polyline.length < 2) return;
+      const st = styleOf(i);
+      const path = r.polyline.map((s) => s.split(',').map(Number));
+      const line = new AMap.Polyline({
+        path: path, strokeColor: st.c, strokeWeight: st.w,
+        strokeOpacity: .62, lineJoin: 'round', lineCap: 'round',
+        showDir: true, zIndex: 40 + i });
+      map.add(line);
+      // 线上那张小标签。位置取**折线中点那个顶点**（不用真算中点：这条线本来
+      // 就是几千个点连出来的，"中间那个点"落在路上，眼睛看着就是线上）。
+      const m = path[Math.floor(path.length / 2)];
+      try {
+        const t = new AMap.Text({ text: st.nm, position: m, anchor: 'center',
+                                  style: labelStyle(i, false) });
+        map.add(t);
+        line._label = t;
+      } catch (e) { /* 标签画不出来不影响线 */ }
+      ovLines[i] = line;
+      drew = true;
+    });
+    // ⚠️ 避让范围给**对称的 80px**：面板浮在右边、气泡浮在右下，路线会从它们
+    //    底下穿过去 —— 高德自己的 App 也是这样的（线继续画，卡片盖在上面）。
+    //    不要去猜 `avoid` 那四个数的顺序（[上下左右] 还是 [上右下左]），猜错了
+    //    图会往反方向偏，而且看起来"只是没居中"，很难查。
+    map.setFitView(null, false, [80, 80, 80, 80]);
+    paintRouteStyles();
+  } catch (e) {
+    return false;                       // 画不出来就老实说没画出来
+  }
+  return drew;
+}
+
+async function initMap() {
+  if (!AMAP_KEY) {
+    mapNote('没拿到高德地图 key（`hello.amap.js` 是空的）。这一块不画。');
+    return;
+  }
+  mapNote('正在加载高德地图…');
+  try {
+    AMAP = await loadAMap();
+  } catch (e) {
+    // ★ 用户拍板：SDK 加载失败 → **这一块不画**，把原因写清楚
+    mapNote('高德地图没加载上（' + (e && e.message) + '）。'
+      + '多半是连不上 webapi.amap.com，或者 key 的白名单不对。这一块不画。');
+    return;
+  }
+  try {
+    map = new AMap.Map('map', { zoom: 11, viewMode: '2D',
+      center: [PRESETS[0].lng, PRESETS[0].lat] });
+  } catch (e) {
+    mapNote('高德地图起不来（' + (e && e.message) + '）。');
+    return;
+  }
+  mapNote(null);
+  // 在地图上点一下 —— **先问"这个点算什么"，别替人决定**。高德也是这么干的：
+  // 同一个点既可以当起点也可以当终点，猜错了就要人再点一次。
+  map.on('click', (ev) => {
+    const g = ev && ev.lnglat;
+    if (!g) return;
+    pick = { lat: g.getLat(), lng: g.getLng() };
+    $('mapPick').hidden = false;
+  });
+  if (origin && lastDaily) draw(lastDaily, origin, curRoute);
+}
+
+/* ------------------------------------------------- 语音那条路（wake.js 调） */
+/* wake.js 收到 `ev:"do" id:"nearby"` 时会找 `XQ.nav.doNearby`：这一页有地图，
+   所以由它顺手画出来，并回一个**真的画成了没有**（服务端拿它决定 severe 那档
+   能不能说"路线我已经准备好了"）。没有地图的页面没有这个函数，那条路也照走。 */
+XQ.nav = {
+  /** 这一页此刻的状态 —— **给检查脚本用的窗**（`_scratch/_smoke_nav_loop.py`）。
+   *  回的都是页面里**真有**的东西，不新算任何数。 */
+  state() {
+    return {
+      origin: origin ? { lat: origin.lat, lng: origin.lng,
+                         label: origin.label, manual: !!origin.manual } : null,
+      dest: dest, dest_kind: destKind, nav: navOn,
+      routes: routes.length, cur: routes.indexOf(curRoute),
+      /** 图上真画出来的线：条数 + 每条的点数（**从图上那根线读回来的**） */
+      lines: ovLines.filter(Boolean).length,
+      pts: ovLines.map((p) => (p && p.getPath ? p.getPath().length : 0)),
+      /** 现在高亮的是第几条（-1 = 没有高亮） */
+      hi: hiIdx,
+      km: lastDaily ? lastDaily.km : null,
+      eta: $('nbEta').textContent,
+      fat: $('fatBubble').hidden ? 0 : 1,
+      zoom: (map && map.getZoom) ? map.getZoom() : 0,
+      /** 逐段引导：一共几段 / 现在看的是第几段（-1 = 没在导航） */
+      steps: curSteps().length, step: stepIdx,
+      /** 图上那一段的高亮线画出来了没有 */
+      hl: ovStep ? 1 : 0,
+      /* ★ 演示推进（`SIM` 那段）—— 用户 2026-09-25 点名要看的那几件：
+           `sim` = 在走没有，`t` = 全程进度 0..1，`mul` = 倍速，
+           `car` = 图上那个点画出来了没有，`done` = 走完全程了没有，
+           `left_m` = 到本段末尾那个动作还有多少米（引导条上那个数，
+           从**折线上的演示位置**量出来的），`gray` = 走过的灰线点数。 */
+      sim: SIM.playing ? 1 : 0, t: SIM.t, mul: SIM.mul,
+      car: ovCar ? 1 : 0, done: SIM.done ? 1 : 0,
+      gray: (ovDone && ovDone.getPath) ? ovDone.getPath().length : 0,
+      sim_steps: SIM.geoms.length,
+      left_m: (function () {
+        const g = SIM.geoms[stepIdx];
+        if (!g) return null;
+        const loc = simLocate(SIM.t);
+        return Math.round((loc.k === stepIdx) ? (g.m * (1 - loc.frac)) : g.m);
+      })(),
+      /** 左上角那条引导条此刻写的字（"前方 520 米右转"就是它） */
+      banner: $('gdMain') ? $('gdMain').textContent : '',
+      /** 逐段清单摊开了没有（默认收着，用户点名） */
+      list_open: $('gdList') && !$('gdList').hidden ? 1 : 0,
+      /** 候选下拉框现在开着没有 + 里面有几条**能点的候选**（打字即搜那条路的
+          证据）。⚠️ 只数 `button`：框里除了候选项还可能有 `.dtip` 那种纯文字
+          行（「正在问高德…」「一条都没搜到」）—— 那些不是候选，数进去就成了
+          假证据。 */
+      list: $('dstList').hidden ? 0
+        : $('dstList').querySelectorAll('button').length,
+      /** 下拉框现在开着没有（哪怕是只有一行说明文字）。**用户点名的那件事**：
+          打一个字，框底下就必须冒出来一块东西。 */
+      listOpen: $('dstList').hidden ? 0 : 1,
+    };
+  },
+  /* 这一页**此刻显示的那个起点**（人选的预设 / 地图上点的地方 / 手输的），
+     没有就是 null。⚠️ 只回页面上真有的东西 —— 绝不凭空造一个坐标。
+     语音那条路（wake.js）在定位拿不到时拿它兜底：人已经在屏上选过起点了，
+     就不该回一句"定位没打开"当作什么都没发生。 */
+  originNow() {
+    return origin ? { lat: origin.lat, lng: origin.lng, manual: !!origin.manual }
+                  : null;
+  },
+  /** 服务端 `state` 那条消息的**落脚点** —— 页面那一侧的接线只有这一个地方
+   *  （`onState:` 里就这一句）。留成公开的那个名字是为了**检查脚本能走同一个
+   *  口子**：`XQ.connect` 把 socket 关在闭包里，外面塞不进一条假消息，而
+   *  "疲劳时到底弹不弹"是这一页唯一的项目特色，不能只靠读代码说它是对的。
+   *  ⚠️ 它做的仍然是**服务端报什么就画什么**，不是一个"手动弹气泡"的开关。 */
+  onState(s) { paintFatigue(s); },
+  /** 查最近的服务区并画出来。`nav=true` = **顺便真的进逐段引导**。
+   *
+   *  ⚠️ 两个调用方要的**不是同一件事**，所以这个开关必须有：
+   *    · 「附近有服务区吗」那一问（`wake.js` 的 `id === 'nearby'`）只要答案 ——
+   *      画出来就够了，**不能**把这一页拖进导航（用户只是问了句路况）；
+   *    · 「导航过去」那条路（`rest_stop`，包括跳过来之后主人说了「要」的那一下）
+   *      要的是**真的在导航** —— 用户原话「我让它导航它肯定真导航啊」。
+   *  ★★ 2026-09-26：`nav` 参数是随 `?ask=rest_stop` 那一趟加的。原来"进导航"
+   *     这件事只发生在 `?do=nearby` 进来的那条路（见 `showResult` 尾巴上
+   *     `WANT === 'nearby'` 那一段）；改成跳过来先问一句之后，那条路不再走了，
+   *     于是"进导航"必须由**「要」那一下**自己带过来 —— 否则路线画出来了、
+   *     面板上却不在引导，而小瑞说"就在这一页上，我这就给你查"，屏幕看着像没做完。 */
+  async doNearby(p, nav) {
+    const manual = (p.manual == null)
+      ? !!(window.XQ && XQ.geo && XQ.geo.last && XQ.geo.last.manual) : !!p.manual;
+    origin = { lat: +p.lat, lng: +p.lng,
+               label: manual ? '起点（手动）' : '我的位置', manual: manual };
+    paintOrigin();
+    const o = await fetchNearby(origin.lat, origin.lng);
+    showResult(o, 'rest');
+    const drew = !!(o && o.ok && o.has_route && map);
+    // ⚠️ 只在**真画成了**的时候进导航：没路线还进引导，屏上是一条空路配着
+    //    "前方 520 米右转"，那是"话和事不一致"的另一种写法。
+    if (nav && drew) setNav(true);
+    return drew;
+  },
+};
+
+/* ---------------------------------------------------------------- 起步 */
+/* 把 `data-ic="名字"` 换成真图标。⚠️ 这个函数在别的页里也各有一份（它是
+   **页内**的，不在 live.js/chrome.js 里）。⚠️ 图标名写错**不报错**：
+   `XQ.icon()` 会退成 `info`（一个"i"）。 */
+function paintIcons(root) {
+  for (const e of (root || document).querySelectorAll('[data-ic]')) {
+    e.innerHTML = XQ.icon(e.dataset.ic);
+  }
+}
+paintIcons();
+/* ⚠️ 这里原来有一行 `$('h1ico').innerHTML = …`（左上角那个标题图标）。
+   2026-09-25 用户点名把标题连着图标一起去掉了，那行**必须跟着删** ——
+   元素不在 DOM 里，`$('h1ico')` 是 `null`，`null.innerHTML = …` 当场抛
+   TypeError，**这一行后面的代码整段不执行**（页面上看着就是"点了没反应"，
+   控制台里只有一条不显眼的错）。 */
+$('backBtn').innerHTML = '<svg viewBox="0 0 24 24">' + XQ.ICON.chevL + '</svg>';
+
+/* 小瑞那一格。★ **显式传 `base:'head'`**（方形头像版）：这一页**不跑任何档位
+   事件**，所以这个槽的底图在 DOM 里看得见 —— 它同时是 `_scratch/_check_mascot.py`
+   里 `check_bind_bases()` 唯一能证明"显式传 base 真的生效"的靶子。
+   ⚠️ 不传 base 的话底图是 `hello`（141px 立绘），塞进 2.6rem 的方槽里糊成一团。
+   ⚠️ `cycle:true` = 点一下换一个形象（全站统一的手感，见 live.js 的 opts.cycle）。 */
+$('navArtSvg').innerHTML = XQ.mascotSVG({ simple: true });
+XQ.mascot.bind('navArtImg', 'navArtSvg', { base: 'head', cycle: true });
+
+/* 预设点位填进起点框下面那个原生下拉（`<datalist>`）。 */
+PRESETS.forEach((p) => {
+  const o = document.createElement('option');
+  o.value = p.n;
+  $('orgPresets').appendChild(o);
+});
+
+/* ---------------------------------------------------- 那几颗键的接线
+   ⚠️ 2026-09-25 用户把原来那条"不做输入即搜"翻过来了（原话：「然后我在搜索终点
+      的时候 打字的同时顺带出现相关的地点下拉框」「起点也类似」）：现在**打字就
+      问**，一个字也问（用户又追了一句「我在打一个字的时候 相关地点自动出现」），
+      QPS 靠上面 `TYPING` 那几道闸兜着（450 ms 防抖 / 同词只问一次 / 同时只飞
+      一条 / 限流停 30 秒）—— **闸不在字数上**。起点、终点**两把框都是这一套**
+      （用户最后补的：「终点那个地方也应该有那个下角标栏可选啊」）：区别只在
+      `which`，候选点下去一个当起点、一个当终点，共用 `#dstList` 那一个浮层。
+   ★ 回车 = **不等防抖，立刻问这一个框**；Escape = 把下拉框收掉。 */
+[['orgIn', 'org'], ['dstIn', 'dest']].forEach((p) => {
+  const inp = $(p[0]);
+  const which = p[1];
+  // ⚠️ 拼音**上屏之前不问**（见 `TYPING` 那段最后一条）：`isComposing` 那一下
+  //    只清掉待发的防抖，等 `compositionend` 再问一次。
+  inp.oninput = (e) => {
+    if (TYPING.ime || (e && e.isComposing)) { clearTimeout(TYPING.timer); return; }
+    onType(which);
+  };
+  inp.oncompositionstart = () => { TYPING.ime = true; };
+  inp.oncompositionend = () => { TYPING.ime = false; onType(which); };
+  inp.onfocus = () => { if ((inp.value || '').trim()) onType(which); };
+  inp.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      clearTimeout(TYPING.timer);
+      resolveBox(which);
+    } else if (e.key === 'Escape') {
+      hideList();
+    }
+  };
+});
+// 点到别处就把下拉框收掉（不然它会一直挂在那儿挡着下面的东西）
+document.addEventListener('click', (e) => {
+  const box = $('dstList');
+  if (!box || box.hidden) return;
+  if (box.contains(e.target)) return;
+  if ($('orgIn').contains(e.target) || $('dstIn').contains(e.target)) return;
+  hideList();
+});
+$('dstGo').onclick = searchRoute;
+$('swapBtn').onclick = swapEnds;
+$('orgRetry').onclick = tryGeo;
+$('navStart').onclick = toggleNav;
+$('fbGo').onclick = fatGo;
+$('fbStay').onclick = fatStay;
+// 地图上点的那个点：两条出口各自定一头，第三条是"算了"。
+$('pkOrg').onclick = () => {
+  const p = pick; pick = null; $('mapPick').hidden = true;
+  if (p) useOrigin(p.lat, p.lng, '地图上点的位置', true);
+};
+$('pkDest').onclick = () => {
+  const p = pick; pick = null; $('mapPick').hidden = true;
+  if (p) goTo({ name: '地图上点的位置', address: '', lat: p.lat, lng: p.lng },
+              'user');
+};
+$('pkX').onclick = () => { pick = null; $('mapPick').hidden = true; };
+
+/* ------------------------------------------------ 演示推进那几颗键（`SIM` 段）
+   ★ 播放/暂停：暂停就**停在原地**（不是重新开始）——「▶ 演示」按下去接着走。
+   ★ 倍速：三个数，选中那个是实心的。换倍速**不改已经走的进度**（改了就跟
+     人预期不符：他按 ×240 是想快点走完，不是想跳到终点）。
+   ★ 「看全程」：不再跟车，把整条路铺满视野 —— 用户要看的那条"走过的变灰"，
+     在这个视角下最清楚（跟车时它在你身后）。 */
+if ($('simPlay')) {
+  $('simPlay').onclick = () => {
+    if (!SIM.playing) {
+      if (SIM.done) simStart(true);          // 走完了再按 = 从头再来一遍
+      else simStart(false);                  // 暂停在这 → 接着走
+    } else {
+      simStop();
+      simPaintNote();
+      // 🔴 2026-09-26 这儿原来有一句 hint（「演示暂停在这一段了。按「▶ 演示」
+      //    接着走，或者点清单里的某一段跳过去。」）—— 用户点名删。暂停这件事
+      //    按钮自己就写着（那颗键从「⏸ 暂停」变回「▶ 演示」）。
+    }
+  };
+}
+SIM_MULS.forEach((n) => {
+  const b = $('simMul' + n);
+  if (b) b.onclick = () => { SIM.mul = n; simRowPaint(); };
+});
+if ($('simView')) $('simView').onclick = simView;
+if ($('gdSum')) {
+  $('gdSum').onclick = () => { SIM.listOpen = !SIM.listOpen; paintSteps(); };
+}
+simRowPaint();
+paintStart();
+
+/* 语音绑定。⚠️ 和别的页一样：**只绑按钮**，引擎状态在 onHello 里 attach，
+   自动开麦由 `XQ.wake.autostart()` 决定（`sessionStorage` 里记着"用户说过停"）。
+   ⚠️ `#wake` 里**不能放 `.wk-label`** —— 放了 `_render()` 会把按钮上的字改成
+      「听/停」，而这颗键要一直写着「语音输入」（见 CSS 那段注释）。 */
+if ($('wake')) XQ.wake.bind($('wake'), $('wakeHost'));
+
+link = XQ.connect({
+  onHello: (d) => {
+    $('connPill').textContent = '已连接';
+    XQ.wake.attach(link, d.voice);
+    XQ.wake.autostart();
+    const a = (d && d.amap) || {};
+    AMAP_KEY = (a.js && a.js.key) || '';
+    AMAP_SEC = (a.js && a.js.security) || '';
+    if (!a.js_ready) {
+      // ⚠️⚠️ 这里**分两种写法，而且不许留下一个空括号**。2026-09-25 用户报
+      //    「为啥显示服务端没配高德的地图 key（）。这一块就不画了。」—— 那个
+      //    空括号是第一版留的坑：`d.amap` 整段不在时 `a` 是 `{}`，`a.note` 是
+      //    undefined，于是拼出一句**看起来像"key 配错了"、实际是"服务端是旧
+      //    进程"**的话。两件事要修的地方完全不同（一个是去高德控制台，一个是
+      //    重启服务），所以必须分开说。
+      mapNote(a.note
+        ? '服务端没配高德的地图 key（' + a.note + '）。这一块就不画了。'
+        : '服务端这条 hello 里没有高德那一段 —— 多半服务端还是旧进程（这一版才'
+          + '加的），重启一次 run_ui.bat 再刷新这一页。这一块先不画。');
+      return;
+    }
+    if (!a.configured) {
+      // 服务端那把 Web 服务 key 没配 = 查也查不了，先说清楚，别等用户点
+      why('服务端没配高德（' + (a.note || '原因没给') + '），我查不到路线。');
+    }
+    initMap();
+    // 页面一进来就自己定一次起点：定位能给就给，给不了就摆出那几条手动路
+    // ★★ 2026-09-26：`?ask=` 那一趟要**等它定完**才要那句话（见 `ASK` 那段）。
+    //    `tryGeo()` 内部每条出路都自己收尾（成功/两条定位都不成/请人自己给），
+    //    所以这里 `await` 它一个就够了 —— 不用再猜一个时间。
+    (async () => {
+      try { await tryGeo(); } catch (e) { /* 它自己的失败都已经写在屏上了 */ }
+      if (!ASK) return;
+      const a = ASK;
+      ASK = '';                       // 要一次就消掉：之后的搜索不该再被它劫持
+      if (window.XQ && XQ.wake && XQ.wake.ask) XQ.wake.ask(a, XQ.nav.originNow());
+    })();
+  },
+  onInfo: XQ.flash,
+  /* ★ 疲劳联动：档位**往上走**到中度/重度时，地图右下角浮出那条建议气泡。
+     ⚠️ 这条只是"加一条建议"，**不影响**人自己搜的那条路线。
+     ⚠️ 只转一手到 `XQ.nav.onState`（见那里的注释：检查脚本走同一个口子）。 */
+  onState: (s) => { XQ.nav.onState(s); },
+  onDown: (down) => {
+    if (!down) return;
+    $('connPill').textContent = '未连接';
+    why(XQ.isFile()
+      ? '这一页是 file:// 直接打开的，没有服务端可查。'
+      : '连不上座舱服务（用 run_ui.bat 启动）。');
+    mapNote('连不上服务端 —— 这一块就不画了。');
+  },
+  /* ⚠️ 这一句是**必须的**：wake.js 的 `ev:"do"` 就走 `XQ.wake.onMsg`，
+     漏了它，站在这一页喊「最近有服务区吗」服务端会等到超时（4 s），
+     然后说一句"没拿到定位" —— 而实际上这一页本来能画。 */
+  onMsg: (type, d) => {
+    if (type === 'voice' && XQ.wake && XQ.wake.onMsg) XQ.wake.onMsg(d);
+  },
+});
+
+XQ.mountChrome({ active: 'navi' });
+</script>
+</body>
+</html>

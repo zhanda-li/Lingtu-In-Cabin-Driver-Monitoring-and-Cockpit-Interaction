@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>车机 + 手机 多端联动 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* ---------------- 页面局部样式：只在这一页有意义 ----------------
+   06 的首屏要塞下"设备行 + 联动链路 + 推送记录"三块，而共享表里的
+   .dev / .glyph 是照着"一屏只有这一块"定的（4.4rem 图标 + 1rem 留白）。
+   这里只收 06 这一页的两行，不动共享表 —— 04 / 09 那几页的卡片还得那么大。 */
+.link-grid{ align-items:stretch; }             /* 共享表是 start：三张卡描述行数不同，
+                                                  不等高时那条底线会一高一低，很难看 */
+.link-grid .dev{ padding:.85rem .7rem; gap:.45rem; }
+.link-grid .glyph{ width:3.6rem; height:3.6rem; }
+.link-grid .tag{ margin-top:auto; }             /* 状态签钉在卡底：三张并排时它对齐 */
+</style>
+</head>
+<body data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ============ 页标题 ============ -->
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1>车机 + 手机 多端联动</h1>
+        <span class="spacer"></span>
+        <span class="pill" id="linkPill">—</span>
+      </div>
+
+      <!-- ============ 三端 ============ -->
+      <!-- 三张卡不是并列介绍，是"这一次判决往外走到哪一端"——
+           所以同一时刻只有一张 .on，跟着 severity 走。 -->
+      <div class="link-grid">
+        <section class="dev" id="devCar">
+          <div class="glyph" id="gCar"></div>
+          <b>车机 · 座舱大屏</b>
+          <span>摄像头和两条支路都跑在这台机器上，判决与预警的第一现场。</span>
+          <span class="tag" id="tagCar">—</span>
+        </section>
+        <section class="dev" id="devPhone">
+          <div class="glyph" id="gPhone"></div>
+          <b>手机 App</b>
+          <span>同一份 state 的另一个订阅者：疲劳提醒、趋势、服务区导航。</span>
+          <span class="tag" id="tagPhone">—</span>
+        </section>
+        <section class="dev" id="devCloud">
+          <div class="glyph" id="gCloud"></div>
+          <b>家属 · 云端</b>
+          <span>只在重度疲劳时被惊动，用来兜住"驾驶员自己已经撑不住"的情况。</span>
+          <span class="tag" id="tagCloud">—</span>
+        </section>
+      </div>
+
+      <!-- ============ 联动链路 ============ -->
+      <section class="card card-pad">
+        <div class="card-h"><h3 id="chainH">联动链路</h3><span class="note" id="chainNote">—</span></div>
+        <div class="chain" id="chain">
+          <span class="st">摄像头感知</span><span class="ar">→</span>
+          <span class="st">支路一 / 支路二判决</span><span class="ar">→</span>
+          <span class="st">座舱响应</span><span class="ar">→</span>
+          <span class="st">手机推送</span><span class="ar">→</span>
+          <span class="st">家属 / 云端</span>
+        </div>
+      </section>
+
+      <!-- ============ 底部一排 ============ -->
+      <div class="bottom3">
+        <section class="card card-pad">
+          <div class="card-h"><h3>推送记录</h3><span class="note" id="pushNote">本次会话</span></div>
+          <ul class="push" id="pushList"></ul>
+        </section>
+
+        <section class="card card-pad">
+          <div class="card-h"><h3>这一条推送里到底有什么</h3><span class="note" id="payNote">—</span></div>
+          <div class="mtiles">
+            <div class="mt"><div class="k">档位 severity</div><div class="v" id="kSev">—</div></div>
+            <div class="mt"><div class="k">PERCLOS</div><div class="v" id="kPc">—</div></div>
+            <div class="mt"><div class="k">疲劳概率（支路二）</div><div class="v" id="kPFat">—</div></div>
+            <div class="mt"><div class="k">L_fused</div><div class="v" id="kLevel">—</div></div>
+            <div class="mt wide">
+              <div class="k">手机端收到的正文</div>
+              <div class="v" id="kBody" style="font-size:.86rem;font-weight:400;line-height:1.5">—</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card card-pad">
+          <div class="card-h"><h3>联动规则</h3><span class="note">都写在服务端代码里</span></div>
+          <ul class="spec-list">
+            <li><span class="k">跨档才推</span><span class="v">只在 severity 变化的那一拍往外发，不反复念同一档</span></li>
+            <li><span class="k">开口冷却</span><span class="v">同一档 20 秒内不重复开口（<code>last_proactive</code>）</span></li>
+            <li><span class="k">出声线</span><span class="v">轻度/中度<b>立刻</b>出声；重度要这一档<b>稳住 2.5 秒</b>才开口</span></li>
+            <li><span class="k">支路二封顶</span><span class="v">L_fused = max(L1, min(L2, 2))，它撑不起"紧急"</span></li>
+          </ul>
+        </section>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script src="/static/player.js"></script>
+<script>
+/* =========================================================================
+   06 车机 + 手机 多端联动
+   -------------------------------------------------------------------------
+   这一页回答一个问题：**判决出来之后，往外走的那一步是什么。**
+
+   车机这头是真的 —— 本页订阅的 WebSocket 就是 server.py 在推 state，
+   设备卡、链路、推送正文里的每个数字都来自那一拍。
+
+   手机那头没有第二条通道，所以这里的规矩是：
+     · 推送记录**只记本次会话真实发生过的跨档**，打开页面前的一律不补；
+     · "家属 / 云端"那一跳明确写成未实现，不画成已经通了的能力。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+/* 拿不到元素就静默跳过：跟 04 详情页一样的写法，省得每个字段外面套一层 if */
+const T = (id, txt) => { const e = $(id); if (e) e.textContent = txt; };
+
+/* 档位 -> 链路停在哪一步 / 哪一端被点亮。
+   为什么 normal 也点亮"座舱响应"而不是第一步：链路上真正**在这一档发生的事**
+   是"判决留在本地用"，前两步任何时候都在跑，点亮它们等于没点亮。
+
+   ★ 2026-09-24「只做疲劳」：键名就是**疲劳档位**（severity 四值）。上一版这里
+   跟的是"安全级别"（normal/glance/phone/fatigue 那四个类别），因为那时外推策略
+   是按 L 编号定的。现在后端出口只有一条疲劳轴，外推跟着**档位**升级：
+     清醒 → 本机盯着，不外推
+     轻度 → 座舱内提醒，仍不外推（黄警该在车里解决，不惊动手机和家属）
+     中度 → 推给车主手机
+     重度 → 追加家属 / 云端（这一段**未实现**，见下面那条 unwired）
+   ⚠️ 一档都不外推是错的，全推也是错的：级别越往上，打扰的范围才越大。
+   ⚠️ 文案里的等级词一律取 `s.severity_name`（服务端给的档位名），别在本地
+      再编一套 —— 上一版这里是 `L${s.level} ${s.level_name}`，而"安全通道的
+      级别"和"疲劳档位"在 PERCLOS 单独超标时会不一致（级别还是 L0，档位已经
+      中度），同一张卡上并排写着两个互相打架的等级就是自相矛盾。 */
+const SEV_LOOK = {
+  normal: { pill: '本机联动 · 不外推', chain: 2, dev: 'devCar',
+            devTag: ['本机显示', '待机', '待机'],
+            body: () => '小瑞：状态回到清醒，我继续盯着，不往外发。' },
+  mild: { pill: '座舱内提醒 · 不外推', chain: 2, dev: 'devCar',
+            devTag: ['本机提醒', '待机', '待机'],
+            body: (s) => `小瑞提醒：${s.severity_name || '轻度疲劳'}`
+                       + `（打哈欠 / 闭眼变长）。`
+                       + `已在座舱内提醒驾驶员 —— 这一档不外推，怕为一次犯困打扰手机那头。` },
+  moderate: { pill: '已推送手机', chain: 3, dev: 'devPhone',
+            devTag: ['判决源 · 已连接', '推送中', '待机'],
+            body: (s) => `小瑞提醒：${s.severity_name || '中度疲劳'}（持续闭眼）。`
+                       + `PERCLOS ${pct(s.perclos)} · 疲劳概率 ${num(s.p_fat)} · `
+                       + `已推送到车主手机，已建议就近找服务区休整。` },
+  severe: { pill: '已上报家属 / 云端', chain: 4, dev: 'devCloud',
+            devTag: ['判决源 · 已连接', '推送中', '已上报'],
+            /* ⚠️ 归因那半句用 `s.attention`（支路一判的"头部持续低垂 / 疲劳点头"），
+               **不要**自己写死"低头" —— 重度这两个入口的外观一样，只有这一行
+               分得出是哪一个。
+               ⚠️ `phone` 那一类的**显示名**2026-09-24 深夜从「低头看手机」改成了
+                  「头部持续低垂」（首页那张卡上也是这么写的）—— 改在 `ui/state.py`
+                  的 `attention` 里，一处改、这里跟着变，别在页面里抄一份字面量。 */
+            body: (s) => `小瑞提醒：${s.severity_name || '重度疲劳'}`
+                       + `（${s.attention || '低头 / 点头'}）。`
+                       + `建议立即靠边停车休息 —— 已同步给绑定家属。` },
+};
+
+const pct = (v) => (v == null ? '—' : (v * 100).toFixed(1) + '%');
+const num = (v) => (v == null ? '—' : v.toFixed(2));
+
+/* 推送记录：只往里放**真的发生过**的跨档。回到"清醒"也算一次
+   —— "危险解除"不比"危险出现"次要，手机那头要知道可以放心了。
+   ⚠️ `lv` 是**档位键**（四档，`severity`）；记的是"疲劳档跨了哪一格"。 */
+const PUSHES = [];
+const PUSH_MAX = 5;
+
+function pushEntry(lv, s, first) {
+  const t = new Date();
+  const TITLE = {
+    normal: '已恢复清醒', mild: '疲劳提醒（座舱内）',
+    moderate: '困倦预警', severe: '疲劳预警',
+  };
+  const IC = { normal: 'shield', mild: 'eye', moderate: 'alert', severe: 'alert' };
+  const SUB = {
+    normal: '本机继续监测，停止外推。',
+    mild: `${s.severity_name || ''} · 仅座舱内提醒，未外推`,
+    moderate: `${s.severity_name || ''} · 已推送车主手机`,
+    severe: `${s.severity_name || ''} · 支路一判"${s.attention || '—'}" · 已追加家属上报`,
+  };
+  /* `first` = 这一条不是"变化"，是打开页面时就看到的现状。得写出来 ——
+     不然它会读成"刚才推送过一次"，而刚才这个页面还不存在。 */
+  const p = SUB[lv] + (first ? ' · 接入时已是这一档' : '');
+  PUSHES.unshift({ t, lv, ic: IC[lv], b: TITLE[lv], p });
+  if (PUSHES.length > PUSH_MAX) PUSHES.pop();
+  renderPush();
+  /* 车上那一步做了动作，界面上也得有个"发生了"的回执 —— 只闪一下，不弹窗 */
+  XQ.flash('已推送：' + TITLE[lv]);
+}
+
+/* 标题栏那句"已记录多久"每拍都要变，但**列表本身不能每拍重建** ——
+   state 是 8 Hz 推的，每拍 innerHTML 一次等于每秒揉 8 遍 DOM，
+   鼠标悬停和文本选中都会被搓掉。所以拆成两个函数：一句一句话的走 note，
+   整条列表只在真的加了一条时重建。 */
+function renderPushNote() {
+  T('pushNote', PUSHES.length
+    ? `本次会话 ${XQ.Hist.fmtSpan()} · ${PUSHES.length} 条`
+    : `本次会话 · 已记录 ${XQ.Hist.fmtSpan()}`);
+}
+
+function renderPush() {
+  const el = $('pushList');
+  renderPushNote();
+  if (!PUSHES.length) {
+    /* 空着就是空着。这里不摆几条"示例推送"占位 —— 那种东西答辩时
+       会被当成真实记录，而它连时间戳都是编的。 */
+    el.innerHTML = `<li><div class="ic">${XQ.icon('clock')}</div>`
+      + `<div class="tx"><b>还没有推送</b>`
+      + `<p>状态跨档时才会出现一条。打开这个页面之前发生过的，这里不补 —— `
+      + `本页没有落库，补出来的时间戳只会是假的。</p></div><time>--:--:--</time></li>`;
+    return;
+  }
+  el.innerHTML = PUSHES.map((e) => {
+    /* class 直接用**档位键**（pages.css 的 `.tl li.normal/mild/moderate/severe`）。
+       认不出的键退回 normal —— 留空 class 的话圆点会掉回主题色，是静默错。 */
+    const c = SEV_LOOK[e.lv] ? e.lv : 'normal';
+    const hh = String(e.t.getHours()).padStart(2, '0');
+    const mm = String(e.t.getMinutes()).padStart(2, '0');
+    const ss = String(e.t.getSeconds()).padStart(2, '0');
+    return `<li class="${c}"><div class="ic">${XQ.icon(e.ic)}</div>`
+         + `<div class="tx"><b>${XQ.esc(e.b)}</b><p>${XQ.esc(e.p)}</p></div>`
+         + `<time>${hh}:${mm}:${ss}</time></li>`;
+  }).join('');
+}
+
+/* ---------------------------------------------------------------- 渲染 */
+/* 记的是**档位键**（`XQ.LV[s.severity]`），就是 `severity`。 */
+let lastLv = null;
+/* 连接句柄。**必须先声明**：脚本头是 'use strict'，直接 `link = XQ.connect()`
+   会抛 "link is not defined"，而且抛在最后一屏 —— 前面画得好好的，整页看着
+   只是"没数据"，最容易误判成服务端没起来。 */
+let link = null;
+
+function render(s) {
+  const lv = XQ.LV[s.severity] || 'normal';
+  document.body.dataset.sev = lv;                  // 背景跟着档位走，和 01/02/03 一套
+  const L = SEV_LOOK[lv];
+
+  T('linkPill', L.pill);
+
+  /* 三端只亮一盏；链路只热一段。这两个状态是同一件事的两种画法，
+     所以要一起改 —— 分开写迟早会出现"灯亮了但链路停在别处"。 */
+  document.querySelectorAll('.dev').forEach((d) => d.classList.toggle('on', d.id === L.dev));
+  $('chain').querySelectorAll('.st').forEach((st, i) => st.classList.toggle('hot', i === L.chain));
+  L.devTag.forEach((txt, i) => T(['tagCar', 'tagPhone', 'tagCloud'][i], txt));
+
+  /* note 里那半句用 `attention`（支路一判的行为），不用级别的名字 ——
+     这一页的等级词只有一个出处：`severity_name`（kSev 那一格）。 */
+  T('chainNote', `${s.severity_name || ''} · 行为 ${s.attention || '—'}`);
+  /* 轻度及以下都停在座舱内（提醒了但不外推），中度起才外推。
+     判据直接用链路本身走到的步数（`L.chain`），别再抄一份档位表。 */
+  T('chainH', L.chain >= 3 ? '联动链路 · 正在外推' : '联动链路 · 停在座舱内');
+
+  T('kSev', s.severity_name || '—');
+  T('kPc', pct(s.perclos));
+  T('kPFat', num(s.p_fat));
+  /* 安全通道那个 L 编号**只出数字、不带名字**：`level_name` 和 `severity_name`
+     用的是同一套疲劳词，可两者在"PERCLOS 单独超标"时会不一致（级别还是 L0，
+     档位已经中度）。名字留给上面 kSev 那一格，这一格就是管线的 L_fused。 */
+  T('kLevel', `L${s.level}`);
+  T('kBody', L.body(s));
+  T('payNote', s.source ? `数据源 ${s.source}` : '—');
+
+  /* --- 跨档才记一条 --- */
+  if (lastLv === null) {
+    lastLv = lv;
+    /* 打开页面时服务端会补推一拍"当前状态"。那一拍如果是非正常档，
+       它不是历史、是现实 —— 记下来，但文案要说清它从哪来（见 pushEntry 的 first）。 */
+    if (lv !== 'normal') pushEntry(lv, s, true);
+  } else if (lv !== lastLv) {
+    lastLv = lv;
+    pushEntry(lv, s);
+  }
+  renderPushNote();
+}
+
+/* ---------------------------------------------------------------- 起步 */
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${XQ.ICON.chevL}</svg>`;
+$('gCar').innerHTML = XQ.icon('car');
+$('gPhone').innerHTML = XQ.icon('phone');
+$('gCloud').innerHTML = XQ.icon('cloud');
+/* 这是旧作品页（手车互联），不再挂在左导航的五项里 —— `active: ''` 一项都不点亮，
+   比硬点一个不相干的强。文件保留、URL 还能开，只是没有入口了。 */
+XQ.mountChrome({ active: '' });
+
+link = XQ.connect({
+  onHello: (d) => { if (d.source) T('payNote', `数据源 ${d.source}`); },
+  onState: (s) => render(s),
+  onSay: (d) => { if (d.text) XQ.flash('小瑞：' + d.text); },
+  onInfo: (t) => XQ.flash(t),
+  onDown: (down) => {
+    XQ.flash(down ? '未连上服务端，端侧状态显示为「—」（用 run_ui.bat 启动即可）' : '已连上服务端');
+  },
+});
+
+/* 先把空态画出来：第一拍 state 是 normal 的话不会触发任何 pushEntry，
+   不主动画一次，这块就一直是空白 —— 看着像坏了。 */
+renderPush();
+render({ severity: 'normal', severity_name: '清醒', level: 0, level_name: '清醒',
+         attention: '专注', probs: {}, b2_ready: false, pc_ready: false, l1: 0 });
+</script>
+</body>
+</html>

@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<!-- `data-theme="light"` = 12.png 那套亮色调（色板在 style.css 的
+     `html[data-theme="light"]` 段）。2026-09-23 用户拍板「都刷成12.png那种亮的
+     先做两页」，本页是当时那两页之一（另一页 nav.html 已在 09-24 整页删除）；
+     09-24 之后全站 11 页都刷成了这套，本页不再是特例。
+     ⚠️ 封面这一页**特别需要亮色调**：它是要当 PPT 封面投出来的，
+     深色底投到幕布上偏灰、字也发闷；12.png 那套浅蓝正好是投出来最好看的区间。
+     ⚠️ 没写这个属性的页仍是深色，那是 `design.html`，而且**是故意的**不是漏改
+     （它整篇讲的就是深色那套色板），理由见 style.css 亮色块顶上那段注释。 -->
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>展示封面 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* =========================================================================
+   10 展示封面 —— 本页唯一的页面级样式
+   -------------------------------------------------------------------------
+   这一页要当 PPT 的封面用，左导航会把画面切掉一块（左边一列按钮），
+   整页就不像一张"幻灯片"了。所以本页把它**藏掉**，主区收成一列：
+
+     · 左导航只藏不删 —— 元素还留在 DOM 里，chrome.js 照常往里生成内容
+       （十个页面的索引用不着在这一页露脸，别的页都有），检查脚本数元素
+       时也数得到。删掉元素的话 chrome.js 里那个 `if` 会静默跳过，以后想恢复
+       就得想起这里少写过什么。
+     · 气候栏**不用再管了**：它已经整条删掉（`XQ.climateHTML` 不存在了，
+       十二个页面里的 `<footer class="climate">` 也一并去了），所以这里
+       不再需要 `body.cover .climate{ display:none }` 那条。
+     · 顶栏**保留**：灵途智行标志组 + 中间那行项目主题文字是十页共用的一条，
+       封面去掉它就和整个作品集不是一套东西了。
+       ★ 2026-09-24 改：顶栏右边原来那条「天气 / 联网 / 语音状态」整组已经删掉，
+       换成**本页独有**的院徽（logo:true）。所以本页顶栏现在是
+       「左品牌 / 中标题 / 右院徽」—— 座舱那 11 页的右侧是空的。
+
+   另外两条：`.cover-stage` 要吃满剩下的高度（否则封面缩在上半屏），
+   特性胶囊里那三个小图标得给个尺寸（全局没有 svg 兜底尺寸，不写就是 300×150，
+   会把整条胶囊撑爆）。
+   ★ 2026-09-24：原来最后那条给的是**眉标**图标（`.eyebrow svg`），
+   眉标胶囊删掉之后那条就是死规则了；尺寸照旧、选择器换成新的 `.feat .ic svg`
+   （pages.css 里也有一条同值的，留着是因为**没加载 pages.css 时这页也得站得住**）。
+   ★ 2026-09-25：pages.css 那边把三枚图标的字号**各自微调**了（eye 调小、heart
+   调大并上移，视觉重量对齐，见那一处的长注释）。这一条兜底**故意保持统一
+   1.6rem 不动** —— 它管的是"pages.css 没加载"这个极端情况，那时对齐与否没人看，
+   能站住就行；真去同步那三个数，等于同一组常量写两份。
+   ========================================================================= */
+body.cover .main.sub{ grid-template-columns:minmax(0,1fr); padding:1.1rem 2.2rem .9rem; }
+/* ⚠️ 这一条必须写成 `.main.sub` 两层，**不能**图省事写成 `body.cover .sub-body`。
+   `pages.css` 里有一条 `.main.sub .sub-body{ grid-column:2; grid-row:1; }`
+   （那是给对话页的两列网格用的），它的特异度是 **(0,3,0)**；而
+   `body.cover .sub-body` 只有 (0,2,1) —— **输**。于是封面这一格会被塞进
+   **隐式的第 2 列**，而本页的网格只有一列（上面刚覆写成 `minmax(0,1fr)`），
+   隐式列按内容定宽 -> `.sub-body` 塌成 844px（视口 1672），
+   `.cover-l{max-width:58%}` 再按这个窄框算 -> 三个胶囊被压成竖排的圆，
+   标题也被小瑞压住。2026-09-24 就是这么坏掉的，别改回去。
+   `.main.sub .sub-body`（(0,3,0)）**平手但排在后面**，所以这里再带一层
+   `body.cover` 得到 (0,3,1) 才能稳赢 —— 光靠"写在后面"是不够的。 */
+body.cover .main.sub .sub-body{ grid-column:1; }
+body.cover .rail{ display:none; }
+body.cover .cover-stage{ flex:1 1 auto; }
+body.cover .cover-feats .ic svg{ width:1.6rem; height:1.6rem; }
+
+/* ---------------------------------------------------------------------------
+   ★ 2026-09-24：13.png 的顶栏里，标题两侧各有一道把三块东西串起来的装饰：
+   从品牌（或院徽）那头拉一条**细实线**过来，离标题一个身位处换成一小段
+   **点刻线**，再收成一个**椭圆珠节点**，然后才是标题。本站顶栏原来什么都没有。
+
+   位置**不是写死的百分比**，是 `cover.html` 末尾那段 JS 按实测矩形摆的
+   （取 `#tbTitle` / `.lingtu-lockup` / `.collab` 的 rect），所以字号、rem、
+   标题字数怎么变，它都跟着走。这里只管长相。
+   ⚠️ 品牌那一头取的是 `.lingtu-lockup`（那**一张整 lockup**），
+      不是 `.brand` —— `.brand` 里还跟着系统副标题 `.tb-sub`，
+      量它的话这条线会被推到副标题右边去，和参考图里"从品牌拉出来"不是一回事。
+
+   ⚠️ **一开始还照着做了两条"半透明斜切缎带"，是错的、已删**：那是我看 1x 截图
+      时把背景当成了图形。后来把参考图的顶栏按列做差（拿 y=20 那行当基线），
+      左半边除了 y≈55 那一行**根本没有别的差异行** —— 也就是说 13.png 的顶栏里
+      只有**线**，没有面。缎带摆上去就是两条灰方块，比不做还难看
+      （见 `runs/_cover_v7.png`）。教训：**先做差，再照着画**。
+      （`_cmp_traces.png` 是放 4 倍后的参考局部，线、点刻、珠子都看得清。）
+
+   ⚠️ 为什么写在本页的 <style> + 本页的 JS 里，而不是加进 chrome.js：
+      `.topbar` 那三格是 `XQ.clockHTML` 生成的**共用模板**，11 个页面都在用。
+      为封面一道装饰去改它，等于让每页都多出两个只有本页用得上的空元素；
+      而且那是个模板字符串，本项目在反引号上踩过五次
+      （见 chrome.js 里那段警告和 `_scratch/_js_template_scan.py`），能不进就不进。
+      写在 `body.cover` 下面 = **只有本页生效**，chrome.js 一个字节不动。
+   ⚠️ `.topbar` 在 style.css 里是 `display:grid` 且**没有**定位上下文，
+      所以下面补了 `position:relative`，否则这两个绝对定位元素会跑去认
+      `body` 当包含块、贴到整页的角上。
+   ⚠️ `pointer-events:none`：这两条线横穿顶栏，会盖住顶栏上任何可点区域。
+   ⚠️ 只在 ≥1180px 显示：窄屏下顶栏三格会挤/换行，按 rect 摆的东西会飘到字上。
+   --------------------------------------------------------------------------- */
+body.cover .topbar{ position:relative; }
+body.cover .topbar .trace{
+  position:absolute; top:52%; height:0; display:none; pointer-events:none;
+  border-top:1.5px solid rgba(120,170,235,.75);
+}
+/* 点刻线：压在实线**上方**一点（参考图里点刻在 y≈47、实线在 y≈55），
+   位置在珠子的**外侧**（离标题远的那一边） */
+body.cover .topbar .trace::before{
+  content:''; position:absolute; top:-.55rem; width:4.7rem;
+  border-top:2px dotted rgba(120,170,235,.9);
+}
+body.cover .topbar .trace.a::before{ right:1.7rem; }
+body.cover .topbar .trace.b::before{ left:1.7rem; }
+/* 珠子：一个横放的椭圆环，**中心落在实线的内端**（靠标题那头） */
+body.cover .topbar .trace::after{
+  content:''; position:absolute; top:-.65rem; width:2.6rem; height:1.3rem;
+  box-sizing:border-box; border-radius:50%;
+  border:2px solid rgba(110,165,235,.85); background:rgba(255,255,255,.55);
+}
+body.cover .topbar .trace.a::after{ right:-1.3rem; }
+body.cover .topbar .trace.b::after{ left:-1.3rem; }
+@media (min-width:1180px){
+  body.cover .topbar .trace{ display:block; }
+}
+
+/* ---------------------------------------------------------------------------
+   ★ 2026-09-25：品牌片头播放器（`assets/lingtu_intro.mp4`，15.04 s 的标识演绎）。
+
+   **用户 2026-09-25 当天把方案改过两次，这里记的是最后那版**：
+     ① 最初拍板「静音自动播吧」→ 我做成"进封面就自己放、静音"。
+     ② 当天用户实测后推翻，原话：「而且为啥没有重新再看一遍的机会 就是返回不了
+        感觉还是自己点启动不启动吧 自己点播放键 还有声音 然后进入展示页」。
+     所以现在是这样 —— **不是自动播，是封面上一颗播放键**：
+       · 默认一个字节都不下（`preload="none"`、标签上没有 `autoplay`）；
+       · 人点「观看品牌片」→ 全屏、**带声音**、带浏览器自带控制条地放；
+       · 播完（或点「进入展示页」）化掉，露回封面；
+       · **那颗键一直在** ⇒ 想看几遍看几遍，没有"一次会话只播一次"那种锁。
+     ⚠️ 「一次会话只播一次」（sessionStorage）**已经整个删掉**了。用户抱怨的
+        「返回不了」就是它造成的：`?intro=1`/自动播那版播过一次就记上了，
+        从座舱退回封面时它认定"看过了"不再放，而页面上又没有任何地方能重看。
+        **别再把它加回来** —— 那条规矩对"自动弹出来的东西"合理，对"人自己点的
+        按钮"不成立（我自己点的，凭什么不让我再点）。
+     ⚠️ 声音能响不是运气：**"自动播放"才被政策逼着静音**，用户手势触发的
+        播放是可以带声的。所以这一版比上一版**更稳**，不是更冒险。
+        万一还是被拒（比如浏览器设置里关了声），JS 会退回静音并说一声，见页末。
+
+   为什么是**全屏**而不是嵌一小块：那一版片子是**近黑底**的（深色城市路网），
+   而本页是亮色调（用户 09-23 定的「封面要投屏、深底投出来发灰」）。
+   嵌成一个小方块 = 浅蓝展板上的一块黑补丁；**全屏播的这 15 秒里整屏就是那张
+   片子**，黑底反而成立。播完化掉，下面的封面一个字都没动。
+
+   ⚠️ `object-fit:contain` **不是** `cover`。片子是 1920×816 = **2.35:1**，
+      用 cover 会让上下各裁掉约 12%（路网边缘和最后一帧那个标志会被切）。
+      而**黑底下那两条 letterbox 是看不见的** —— 这是这张片子的性质，
+      不是"退而求其次"。换一张亮底的片子这条就要重想。
+
+   ⚠️ `z-index:9999` + `position:fixed`：它在**所有东西之上**，包括左下角
+      那块 CHERY 和右下角那一对按钮（「观看品牌片」和它后面的「进入座舱」）。
+      所以**退出路径必须齐** —— 少了任何一条，人就被关在封面外面，
+      见页末那段 JS 顶上那四条。
+   ⚠️ 顺带一句：正因为这层盖着「进入座舱」，**「进入展示页」那颗按钮是必需的
+      退出口，不是装饰**。别因为"反正播完自己会收"就把它省掉 ——
+      它管的是"人不想看"，而 15 秒在答辩现场是很长的一段时间。
+   ⚠️ 片头**只在本页**。座舱内那 11 页不播 —— 同一个道理让用户改过一次顶栏
+      （同一句话在一屏里出现两遍），片头同理，进座舱之后没有人想再看一遍。
+   --------------------------------------------------------------------------- */
+/* ⚠️⚠️ **默认 `display:none`，由 JS 加 `.on` 才显示** —— 这是这一块能安全存在
+   的前提，别反过来写。三个好处，每一个都是必要的：
+     ① **脚本没跑到（或报了错）时，片头根本不存在** —— 它是纯附加层，
+        最坏的结果只能是"没有片头"，不可能是"黑屏挡住进不去"；
+     ② `?intro=0`（测试/不想看）**一次绘制都不会闪** —— 若是"默认显示、
+        脚本再收掉"，那会先闪一下黑屏，而这层是全屏不透明的；
+     ③ 进门那颗键也**默认 `hidden`**（写在 HTML 里，脚本跑到才摘）——
+        同一个道理：脚本没跑就"没有这颗键"，不会是"有一颗点了不动的键"。
+   `.gone` 只负责淡出（要过渡），**彻底收掉靠 JS 把 `.on` 摘掉** ——
+   摘了 `.on` 就回到这一条的 `display:none`，不用再加一个类去跟 `.on` 比权重。 */
+body.cover .intro{
+  position:fixed; inset:0; z-index:9999; background:#000;
+  display:none; align-items:center; justify-content:center;
+  transition:opacity .55s ease;
+}
+body.cover .intro.on{ display:flex; }
+body.cover .intro.gone{ opacity:0; pointer-events:none; }
+body.cover .intro-v{ width:100%; height:100%; object-fit:contain; display:block; }
+/* 「进入展示页」那颗，摆**右上角**。
+   ⚠️ 原来是右下角（对着「进入座舱」的位置），这次**必须让开**：现在播放器带
+      浏览器自带控制条（`controls`），那一条就贴在画面**下缘**，摆在右下角会
+      和控制条的"全屏/音量"挤在一起，点哪一个是哪一个都说不清。
+   ⚠️ 它是深底上的浅字，不要跟着亮色主题走。 */
+/* ★ 2026-09-25 晚：这颗「进入展示页 ›」**加重了一档**（原来 10% 白底 + 38% 白描边
+   在片子最亮的几帧上几乎看不见）。起因是用户报「全屏后为啥我的展示页面那些都不能
+   点了」—— 一半是"这层盖子本来就该点不动"（他理解成了页面坏了），另一半正是
+   这颗键**太轻**：片子上只有它一条出路，它不该长得像装饰。
+   ⚠️ 改的是"看得见"，**不是**位置和尺寸的量法：right/top 还是原来那两个值，
+      没动布局，只是深底 + 亮边 + 影子把它从画面里拔出来。
+   ⚠️ `z-index:2`：视频是 0 层，它在上面；写出来是为了别被后加的东西盖过去。 */
+body.cover .intro-shut{
+  position:absolute; right:2.2rem; top:2rem; z-index:2;
+  font:inherit; font-size:1.05rem; letter-spacing:.08em;
+  color:#fff; background:rgba(8,14,24,.82);
+  border:1px solid rgba(255,255,255,.72); border-radius:2rem;
+  padding:.6rem 1.5rem; cursor:pointer;
+  box-shadow:0 .25rem 1.2rem rgba(0,0,0,.6);
+  transition:background .2s ease, border-color .2s ease, transform .2s ease;
+}
+body.cover .intro-shut:hover{ background:rgba(20,34,52,.95);
+  border-color:#fff; transform:translateY(-.08rem); }
+/* ★ 跟着它一起加的那行小字。见 HTML 里那段注释：它干的是"解释自己"的活 ——
+   屏幕上必须有一个字告诉人"这是片子、播完会自己回去"，否则被盖住的封面看起来
+   就是"坏了"。`pointer-events:none` **不能省**：它压在视频上，吃掉一次点击
+   就少一个出口。 */
+body.cover .intro-hint{
+  position:absolute; right:2.2rem; top:5.4rem; z-index:2;
+  font-size:.86rem; letter-spacing:.06em; color:rgba(255,255,255,.72);
+  text-shadow:0 .1rem .4rem rgba(0,0,0,.9); pointer-events:none;
+}
+/* ===========================================================================
+   ★★ 2026-09-25 晚：**页脚这两颗键必须画在小瑞上面。**
+   ---------------------------------------------------------------------------
+   这不是美观问题，是"点不动"。 `_scratch/_check_clickable.py` 量出来的事实
+   （视口 1638x843，`_scratch/_probe_cover_click.py` 复现）：
+       `.cover-r`        position:absolute  z-index:1     ← 小瑞那一列
+       `#coverMascot`    position:relative  框 640x669  x[772,1411] y[115,783]
+       `#coverMascotImg` 图片框 648x678     x[767,1416] y[93,771]
+       `#introOpen`      按钮 157x44        x[1196,1353] y[711,755] ← **整个在框里**
+       `#goBtn`          按钮 244x76        x[1368,1612] y[695,771] ← 左边 48px 在框里
+   而 `.cover-foot` 是**静态定位**（没有 position、没有 z-index），所以页脚整个画在
+   `.cover-r`（z-index:1）**下面** —— 命中测试回的是 `img#coverMascotImg`。
+   后果：点「观看品牌片」的中心，浏览器把这一下交给了小瑞，
+   而 `.mascot` 上挂着 `XQ.poseDeck` 那个「点一下换个形象」（live.js）——
+   **按钮一下也不响应，小瑞倒是换了张图。**
+
+   ⚠️ 修法是"把这两颗键提到最上面"，**不是**给小瑞加 `pointer-events:none`：
+      那等于把用户要的"点一下换个形象"整个删掉。要治的是"谁在上面"。
+   ⚠️ `position:relative` **不带任何偏移**，所以原来量好的右下角几何一个像素没动，
+      只是把这两颗键从"静态层"提到了"定位层"（z-index:3 > `.cover-r` 的 1）。
+   ⚠️ 已经在页面里当场试过再写进来的：加之前命中点是 `img#coverMascotImg`，
+      加之后是 `button#introOpen` / `a#goBtn`（连「进入座舱」左边缘那一截也回来了）。 */
+body.cover .cover-foot > .cover-play,
+body.cover .cover-foot > .cover-go{ position:relative; z-index:3; }
+body.cover .intro-shut:focus-visible{ outline:2px solid rgba(255,255,255,.8);
+  outline-offset:2px; }
+/* ★ 这里原来还有一条 `@media (prefers-reduced-motion: reduce){ .intro-v{
+     visibility:hidden } }`（上一版"自动播"时的兜底：怕动的东西糊在人脸上）。
+     **删掉了** —— 现在片子是人**自己点开**的，这种时候还把它藏起来才是失礼：
+     人点了播放，屏幕上一个动的东西都没有，只会以为是坏的。
+     "减弱动态效果"这条系统偏好管的是**自动**播放的动画，不管人主动要看的东西。 */
+
+/* ---------------------------------------------------------------------------
+   ★ 2026-09-25：封面上那颗「▶ 观看品牌片」。
+   它是 `.cover-foot` 的**第三个**孩子，插在「进入座舱」前面。
+   ⚠️ 必须配 `margin-left:auto`：`.cover-foot` 是 `justify-content:space-between`，
+      直接插第三个孩子，画面会变成「CHERY 标在左 / 播放键在正中 / 进入在右」——
+      播放键孤零零戳在页面中央。`margin-left:auto` 把中间那段空白全吃掉，
+      两个按钮就并排落在右下角（`gap:1rem` 中间那道缝由 footer 出）。
+      `space-between` 那段没被改：它管着「左标/右按钮」两句式，
+      `_cmp_geo.py` 量出来的那个"距右 26px"挂在它和上面那条负 margin 上。
+   ⚠️ 视觉上**故意比「进入座舱」轻一档**（1.15rem 对 1.9rem、描边款对渐变实心、
+      没有外发光）。展板上第一眼该看见的是"进系统"，不是"看片"。
+      ⚠️ 但也**不能做成一条文字链** —— 它得一眼认得出是"能按的东西"，
+      所以仍然给了完整的胶囊描边和 hover 抬升，只是把音量调小。
+   ⚠️ `[hidden]` 那条不能省：本规则里的 `display:inline-flex` 出现在**作者样式**里，
+      浏览器自带的 `[hidden]{display:none}` 在 UA 样式里，作者样式一律压过它 ——
+      不写这一条，`?intro=0` 时 `hidden` 属性会**完全不起作用**，脚本又说不过去。
+   --------------------------------------------------------------------------- */
+body.cover .cover-play{
+  display:inline-flex; align-items:center; gap:.55rem; flex:0 0 auto;
+  margin-left:auto;
+  font:inherit; font-size:1.15rem; letter-spacing:.06em;
+  color:var(--ink-2); background:rgba(255,255,255,.5);
+  border:1px solid rgba(var(--rgb),.4); border-radius:99rem;
+  padding:.72rem 1.5rem; cursor:pointer;
+  transition:background .2s ease, border-color .2s ease, transform .2s ease;
+}
+body.cover .cover-play svg{ width:1.05rem; height:1.05rem; flex:0 0 auto; }
+body.cover .cover-play:hover, body.cover .cover-play:focus-visible{
+  background:rgba(255,255,255,.92); border-color:rgba(var(--rgb),.72);
+  transform:translateY(-.1rem);
+}
+body.cover .cover-play:active{ transform:translateY(0); }
+body.cover .cover-play[hidden]{ display:none; }
+</style>
+</head>
+<body class="cover" data-sev="normal">
+
+<!-- ============ 品牌片头播放器（全屏 · 有声 · 由人点开） ============
+     ⚠️ 这一块是**纯附加层**：收掉它的几条路径都在页末 JS 里。
+        下面的封面（含「进入座舱」那个纯 `<a>`）一个字节都没为它改过 ——
+        片头坏掉最坏的结果是"这 15 秒没了"，**不是"进不去座舱"**。 -->
+<!-- ⚠️⚠️ `autoplay` **属性绝对不能写**，`preload` 也故意是 `none`：
+       ① `autoplay` 由**浏览器自己发动**，不受页面 JS 管 —— 写了它，这段片子
+          会在没有任何人点的情况下自己下载、自己解码、自己出声（上一版实测
+          "不播"的那几条路上 `currentTime` 都跑到了 1.4 s，只是被盖住看不见）。
+       ② `preload="none"` ⇒ 没人点就**一个字节都不请求**。
+     于是"要不要播"这件事的**唯一闸门**就是那颗按钮。
+     ⚠️ 这里**故意没有 `muted`** —— 用户要的是「还有声音」。上一版那个 `muted`
+        是"自动播放"逼出来的（政策只放行静音自动播）；现在是**用户点出来的**，
+        带声合法。真被拒了由 JS 退回静音并说一声，见页末。
+     ⚠️ `controls`：给的是浏览器自带的进度/暂停/重看/音量。用户那句
+        「自己点启动不启动」说的就是这个 —— 一颗只负责"开"、开完把手拿开的
+        播放器，在展板上等于把控制权又收了回去。 -->
+<div class="intro" id="intro">
+  <video class="intro-v" id="introV" src="/static/assets/lingtu_intro.mp4"
+         playsinline preload="none" controls
+         controlsList="nodownload nofullscreen"
+         aria-label="灵途智行品牌片"></video>
+  <button class="intro-shut" id="introShut" type="button">进入展示页 ›</button>
+  <!-- ★ 2026-09-25 加的这行小字，是被用户**当场问出来**的。
+      他的原话：「全屏后为啥我的展示页面那些都不能点了」。
+      —— 答案是"本来就该点不动"：这 15 秒里整屏就是那张片子，它是一层
+      不透明的全屏盖子，底下的封面（小瑞、进入座舱）全压在下面，这是**设计**。
+      他没说错，是我**没说**：屏幕上当时没有任何一个字告诉他这件事，
+      也没告诉他"播完会自己回来"。所以他只能理解成"页面坏了"。
+      ⚠️ 别把它删了当成装饰。它干的是这一整块里唯一一件"解释自己"的活，
+         而且答辩现场评委看到的也是这几秒 —— 一个不知道该点哪儿的人，
+         会去点画面正中（那会**暂停**），然后被暂停安全卡住。
+      ⚠️ `pointer-events:none` 不能省：它压在视频上，吃掉一次点击就少一个出口。 -->
+  <div class="intro-hint" aria-hidden="true">播完自动返回 · 也可以点这里</div>
+</div>
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ============ 封面主体 ============ -->
+      <section class="cover-stage">
+        <div class="cover-l">
+          <!-- ★ 2026-09-24（第三次改版，照用户给的 `ui/图片效果/13.png`）：
+               左栏原来的**眉标胶囊**（「灵途智行 · 小瑞情感化驾驶员监测系统」）
+               删掉了 —— 13.png 里左栏第一行就是大标题，没有那颗胶囊；
+               而且胶囊开头四个字和大标题重复。连带 `#eyebrow` 那个 id 和
+               页内 JS 里给它插图标那一行也一起删了（不然 `$('eyebrow')` 会崩
+               在 null 上）。⚠️ `_check_theme2.py` 有一条断言盯的就是这颗胶囊，
+               同批改成盯新加的副标题，见那个文件。
+               ⚠️ 别把左下角那个 CHERY 跟着改了：用户明确说「左上角那个标换掉
+               但是左下角不去除」，那是**车标**（整车厂），和品牌名不是一回事。
+               13.png 左下角写的是 LINGTU ZHIXING，这里**故意不跟**。 -->
+          <!-- ⚠️ 主标题的历史（两次改版都还成立，别当漏改）：
+               原来只有「分心 / 疲劳驾驶 实时检测系统」一行（跟着 docs/技术方案.md
+               的标题走，为的是答辩时 PPT 和交上去的方案对得上）。
+               用户要求「标题写成 灵途智行 与你同行」—— 那是**品牌/方案名**。
+               技术名挪到了下面那行副标题里（现在用的是顶栏同一句
+               「情感化智能座舱驾驶员健康监测预警系统」）。 -->
+          <!-- 这行 <h1> 里的**文字要留着**：显示的已经不是它了 —— 视觉上盖着的是
+               从 9.jpg 抠出来的艺术字（形状当遮罩、配色走 CSS 渐变），字号是 0，
+               所以这串文字只剩两个作用：读屏软件读得出、view-source 看得到标题内容。
+               ⚠️ 别因为「看不见」就把它删掉，删了封面就没有标题语义了。
+               ⚠️ 也别以为它会跟着 --accent 变色：本页 body 的 data-sev 是写死的
+               normal，这条联动用不上（理由写在 pages.css 的 `.cover-l h1` 那段）。 -->
+          <h1>灵途智行 · 与你同行</h1>
+
+          <!-- 副标题（13.png 里大标题下面那一行，两侧各一段细横线）。
+               ⚠️ 13.png 上这行字第一个字是**糊的**（生成模型把「进」吃掉了，
+                  渲染成「入了…」）。当时按语义补成了「进入」+ 系统名。
+               ★ 2026-09-25 用户把这层补丁去掉了：「进入情感化智能座舱驾驶员
+                  健康监测预警系统 **把进入两字去掉**」—— 现在这行字和
+                  **顶栏中间那格（`chrome.js` 的 `XQ_SUB`）**、以及
+                  **首页 `.dash-sub`（index.html:75）完全一致**，三处同一句话，
+                  这也是它本来该有的样子（顶栏挂的就是这句，副标题另起一句才怪）。
+                  要改一起改，别只改这一处。
+               ⚠️ 类名不能叫 `.sub`：`_check_theme2.py` 有一条判据在数
+                  `.cover-l .sub` 的个数（历史遗留），撞上会被判成回归。
+               ⚠️ `_check_theme2.py:570` 那条判据是 `endswith("情感化智能座舱驾驶员
+                  健康监测预警系统")` —— 砍掉「进入」**照样绿**，不用改它。
+               ⚠️ 这里**不许出现数字/技术指标**（用户 09-23 定的规矩，见下）。 -->
+          <div class="cover-sub">
+            <i class="l"></i><span>情感化智能座舱驾驶员健康监测预警系统</span><i class="r"></i>
+          </div>
+
+          <!-- 三个特性胶囊（13.png 那排「实时感知 / 情绪陪伴 / 主动预警」）。
+               图标走全站那一张 `XQ.ICON` 表（eye / heart / shield），
+               **不另画**：shield 那颗本来就带一个勾，和 13.png 那颗一模一样。
+               ⚠️ 三个词是**定性**的说法，塞任何数字进去都违反上面那条规矩。 -->
+          <div class="cover-feats">
+            <div class="feat"><span class="ic" data-ic="eye"></span>实时感知</div>
+            <i class="sep"></i>
+            <div class="feat"><span class="ic" data-ic="heart"></span>情绪陪伴</div>
+            <i class="sep"></i>
+            <div class="feat"><span class="ic" data-ic="shield"></span>主动预警</div>
+          </div>
+
+          <!-- ══════════════════════════════════════════════════════════════
+               ★ 2026-09-23（第二次改版）：这里原来有两样东西，**都删了**。
+
+               1) `.cover-lede`「分心 / 疲劳驾驶实时检测系统」那一行。
+               2) 整个 `.cover-meta` 那一排**四个数字**：
+                  4 类 / 45 帧 / 3.7 → 1.0 s / 121 段。
+
+               为什么删 —— 不是"字多"，是用户点了名的：
+                  「⚠️ 严禁出现帧数、识别类别、延迟等任何技术测试数字」
+               四个数字**逐条命中**：45 帧=帧数、4 类=识别类别、
+               3.7→1.0 s=延迟、121 段=测试段数。上一轮用户说"说明的字都去除"时
+               我判定这四个数是**量出来的实测值**、不是说明文，所以留着了；
+               这一轮用户把话说死了，判定的结论就翻了。
+
+               ⚠️ **别把这些数搬回来**，也别以为"挪到页脚/缩小字号"就行 ——
+                  用户要的是这张展板上没有技术数字，换个位置还是数字。
+               ⚠️ 这些数**没有丢**：docs/技术方案.md 5.3 / 7.1 和
+                  runs/fuse_regress_full.txt 里有原始出处，座舱内的
+                  detail.html 也在显示它们。删的只是封面这一处展示。
+               ⚠️ 那条 6.5rem 的粗强调线（`.rule`）也在第三次改版里删了，
+                  换成了上面的副标题 —— 见 pages.css 里那段说明。 -->
+        </div>
+
+        <div class="cover-r">
+          <div class="halo"></div>
+          <!-- 封面这个槽是全场唯一的**立绘位**（pages.css 里 `.cover-r .mascot`
+               是 44x46rem 的高槽，其余槽都是 6.6rem 上下的方槽），所以用整身立绘
+               `assets/xiaorui_pose_happy.png` 而不是方形头像版 `xiaorui_head.png`。
+               ⚠️ 图不写在这儿、也不写死 src，由下面那段 JS 的 `mascotSlot()` 传
+                  （那样才能做"图没加载出来时先显示内置 SVG"的降级）。
+               整格的机制、为什么是这个姿势、为什么不用 `XQ.mascot.bind()`，
+               都写在下面那段 JS 的长注释里，别在这里重述。 -->
+          <div class="mascot" id="coverMascot">
+            <img class="mascot-img" id="coverMascotImg" alt="小瑞" hidden>
+            <div id="coverMascotSvg"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 页脚 ============ -->
+      <footer class="cover-foot">
+        <!-- ⚠️ 左下角这个 CHERY **是保留的**：用户说的是「左上角那个标换掉
+             但是左下角不去除」。所以顶栏已经换成灵途智行，这里是全站唯一
+             还挂着 CHERY 的地方（`.rail-foot` 里那个也在，那是左导航底，不是本页）。
+             图是 `_scratch/_mk_logo.py` 从 ui/图片效果/8.png 抠的白墨透明底，
+             高度由 `.cover-foot .brand-logo` 定成 1.7rem。 -->
+        <div class="brand">
+          <!-- 白墨 + 深墨两张，CSS 按主题二选一（`.on-dark` / `.on-light`，
+               和顶栏 lingtu 标志同一套机制）。chery_logo 是**白墨透明底**，
+               本页现在是亮色调，压上去等于消失 —— 所以这张深色版是必须的，
+               不是"顺便多做一张"。见 _scratch/_mk_chery_ink.py。 -->
+          <img class="brand-logo on-dark" src="/static/assets/chery_logo.png" alt="CHERY">
+          <img class="brand-logo on-light" src="/static/assets/chery_logo_ink.png" alt="CHERY">
+        </div>
+        <!-- ★ 原来这里还有一排 `.tags`（四个技术标签），2026-09-23 整排删掉，
+             和上面 `.sub` 同一个理由（用户嫌字多）。`.cover-foot` 现在只有
+             「品牌标 + 进入按钮」两样，反而更像一张封面该有的样子。 -->
+
+        <!-- ★ 2026-09-25：片头的**唯一入口**（用户改版后："自己点播放键"）。
+             ⚠️ 必须是 `type="button"` 的 `<button>` —— 它是页面上唯一一个"点了
+                不放行、只在原地开个盖"的东西，用 `<a href="#">` 会往地址栏里
+                塞 history，从座舱退回来时浏览器可能拿它当"上一页"。
+             ⚠️ 它**一直都在**（除了 `?intro=0`），播完不消失 ⇒ 想看几遍点几遍。
+                这是用户那句「为啥没有重新再看一遍的机会」的正解 ——
+                上一版靠 sessionStorage 记"看过了"，而页面上没有任何地方能重看。
+             ⚠️ 它**只负责开**，收尾全在播放器里（播完自己化掉 / 「进入展示页」按钮）。
+                别在这加"再点一次关掉" —— 全屏那层盖着它，够不着，写了也是死代码。 -->
+        <button class="cover-play" id="introOpen" type="button" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7.5 4.6v14.8L20 12z" fill="currentColor"/></svg>
+          观看品牌片
+        </button>
+
+        <!-- 右下角那个「进入」。**必须是纯 <a>，不能靠 JS 跳转** ——
+             封面是纯展示页、不连 WebSocket，跳转挂在 socket 上就等于
+             服务没起来时进不去；href 是相对路径，服务器上和 file:// 直接打开都走得通。
+             （原来 tags 里那条「‹ 返回座舱主界面」文字链被它替掉了：同一个动作
+             放两处，一个显眼一个不显眼，只会让人在答辩现场找那个不显眼的。） -->
+        <a class="cover-go" href="index.html" id="goBtn">进入座舱
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M12.5 6l6 6-6 6"
+            fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </footer>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script>
+/* =========================================================================
+   10 PPT 展示封面
+   -------------------------------------------------------------------------
+   纯展示页，不连 WebSocket，正文全是 HTML 里写死的（封面没有什么要算的东西）。
+   脚本只干三件必须由 JS 干的事：眉标前面那个图标、小瑞那张 SVG、
+   以及小瑞那一格「点一下换形象」。
+   **「进入座舱」那个按钮是纯 <a>，不在这里的 JS 里** —— 它不能依赖 socket。
+
+   小瑞这一格是全场唯一一个**立绘位**（pages.css 里 .cover-r .mascot 是高槽，
+   不是 6.6rem 的方槽），所以吃形象库里 **`l`（730x1000）** 那套；
+   方槽（对话栏、手机页、设置页、聊天气泡）吃 **`h`（192x192）**，
+   座舱里的立绘位吃 **`s`（210x288）**。三套的来历见 live.js 的 XQ.POSES 那段。
+   ⚠️ 小瑞这几张图**已经进仓库了** —— 原来那两张（从 7.png 抠的雪宝二创）因版权被
+      .gitignore 挡着，2026-09-23 换成本项目原创的小瑞之后那两条就删了；
+      见 .gitignore 那段注释。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+/* ★ 2026-09-24：原来这里是 `$('eyebrow').insertAdjacentHTML(...)`，
+   眉标胶囊删掉之后那行会**崩在 null 上**（整段脚本停在这儿，下面的
+   `mascotSlot` 就不会跑，小瑞直接不出来）。改成给三个特性胶囊填图标：
+   `data-ic` 上写名字、这里统一填，HTML 里就不用嵌 SVG。 */
+for (const el of document.querySelectorAll('.cover-feats .ic')) {
+  el.innerHTML = XQ.icon(el.dataset.ic);
+}
+$('coverMascotSvg').innerHTML = XQ.mascotSVG();
+/* ============================ 封面这一格：点一下换形象 ============================
+   ★ 2026-09-24 的口径（用户原话）：「不要这个了 展示页变成 可点击小瑞然后换动作
+     从我图片里换」。追问之后定了两条：**只走好看的几张**、不点的时候**上下浮动就行**。
+   所以这里**不再是循环动图**了 —— 上一版挂的是 `assets/xiaorui_hero.webp`（立绘尺寸的
+   待机动画），这条注释就是替换它留下的。
+
+   ★ 2026-09-25（第十次改版）：用户「小瑞图片能变化的太少了 我不是有 40 多张图片吗
+     把那些出现小瑞的地方都变成可以变化的」。于是这里原来那套 5 张
+     （`assets/xiaorui_pose_*.png`，805x1200，`_mk_cover_poses.py` 出的）**整批删掉**，
+     换成全站共用的 **43 张形象库**；机制也不再是这里自己那十几行，而是
+     `XQ.poseDeck`（live.js）—— 十页的左栏、座舱的立绘位、手机页、设置页、聊天气泡
+     走的是同一个函数。这一格现在只剩"传尺寸、传起始形象"两件事。
+
+   ★ **"上下浮动"不用另写 keyframe**：style.css 的 `xqIdle` 就是它 ——
+     `translateY(-2.2%) scale(1.015)`、4s 一循环、`transform-origin:50% 88%`（贴脚转，
+     所以像站着起伏而不是像飘）。那条规则挂在 `.mascot-img` 上，全站所有小瑞都吃，
+     这一格只要**不挂 `data-act`** 就是浮动状态。
+
+   ★ **换形象那一下的位移**是 `img[data-act="swap"]`（style.css），挂上就盖住 `xqIdle`，
+     由 `poseDeck` 在 620 ms 后摘掉。
+   ⚠️ **摘掉这一步是整套的关键**：那些 `[data-act]` 规则权重一直压着 `.mascot-img`，
+     不摘的话 `xqIdle` **永远回不来**，这一格就变成"点一下之后就再也不浮动了"。
+     `poseDeck` 里那条注释记的是同一个坑。
+
+   ★ **为什么这里不调 `XQ.mascot.bind()`**：这一格是纯展示页，不连 WebSocket、
+     没有档位可跟，而 `bind` 那套的全部价值就在于**跟档位**（`react()` 的 MAP）。
+     所以这一格只要"点一下换形象 + 呼吸"，`bind` 一个字都不动。
+     （早先这里还写了一条"封面只呼吸、不换姿态"的理由 —— 那条 2026-09-25 已经
+      不成立了，用户要求全站都能点着换。）
+
+   ⚠️ **素材是 `l` 那套**（`assets/xq/l/p01..p43.webp`，730x1000）。这一格是
+     **立绘位**（`.cover-r .mascot` 是 44x46rem = 638x667 px），DPR=2 下要 1276 px 高，
+     1000 是**略欠**的（1.5x 而不是 2x）—— 这是已知取舍：再出一套 1400 高的会让
+     43 张的总体积从 9.4 MB 涨到 18 MB，而 `/assets` 是 no-store、点一下就要下一次。
+     要改这个取舍（改成 1400 或改成"封面只留 10 张大的"），改之前先问用户。
+   ⚠️ 那 43 张**逐张对齐过**（脚踩同一张画布底、水平按 alpha 包围盒中心对齐，残差
+     0.55 px；`_mk_xq_poses.py` 里断言过），所以点一下换形象**不会左右跳也不会上下挪**。
+     ⚠️ 例外只有 p43（一张头部特写）：它比别的宽，被按**宽**缩到画布 89% 高，
+       点过去会看见人突然变小一圈。这是脚本里写明的已知例外，不是翻车。
+
+   ⚠️ 没有 `still` 可传：底图是静态 webp，不涉及"CSS 关不掉 <img> 里的动画 WebP"
+     那个老问题；「减弱动态效果」由 style.css 那条媒体查询把 `xqIdle` 和
+     `[data-act]` 的位移**一起**关掉，退化成一张静止立绘（点一下仍然换，只是不浮不弹）。
+
+   ★ 2026-09-25：`coverShow()` / `COVER_POSES` / `COVER_HOLD` 三个名字**一起删了**。
+     它们是"这一格自己一套"的残留，留着会和 `XQ.poseDeck` 变成两套口径 ——
+     这正是用户这轮抱怨的那个毛病（同一件事在几个地方各写一遍，一处改了别处没改）。
+     检查脚本要用名字的话读 `XQ.POSES`。（`_scratch/_check_mascot.py` 的封面那几条
+     按新素材改过了，别照旧名字找。） */
+XQ.mascotSlot('coverMascotImg', 'coverMascotSvg', {
+  /* 底图 = 形象库的 p01（`deck` 传了尺寸就会自己取这张，这里显式写一遍是为了
+     让"封面吃哪一套"在这行上看得见）。 */
+  src: XQ.poseURL('p01', 'l'),
+  onReady: (im) => {
+    /* 手点挂**父节点**上：.mascot-img 只有图片本身大小、且 ::after 那团地台光在
+       .mascot 里，挂父节点面积更大也更好点（和 live.js 里 poseDeck 的 ③ 同一条）。 */
+    const host = $('coverMascot');
+    if (!host) return;
+    XQ.poseDeck(im || $('coverMascotImg'), host,
+                { size: 'l', base: 'p01', title: '点一下换个形象' });
+  },
+});
+
+/* 封面这一页 rail 被 `body.cover` 藏掉了，`active` 谁都不亮 —— 无所谓，
+   留着是为了和别的页同一个调用形状（改起来只改一处）。
+   气候栏已经整条删掉（XQ.climateHTML 不再存在），不用再管它。
+
+   ★ 2026-09-23：顶栏中间那个时钟拿掉了，改成由**页面自己**决定挂什么。
+   封面挂的是项目主题文字（13.png 的版式：左 logo、中标题、右状态）。
+   ⚠️ **只有封面传 title**。座舱内那 10 页每页自己已经有一个页面标题
+      （导航/首页/多媒体/…），顶栏再写一遍同一句话是重复；
+      而这一行有 19 个字，塞进每一页的顶栏会把左右两块压得没地方站。
+      哪一页要挂什么，由那一页自己在 mountChrome 里传 —— 见 chrome.js 里
+      XQ.clockHTML 上面那段。 */
+/* ★ 2026-09-24：多传一个 logo:true —— 顶栏右上角放同济大学汽车与能源学院的
+   院徽（素材 ui/图片效果/14.png，生成脚本 _scratch/_mk_tongji.py）。
+   **只有本页传**：院徽是院校标识，座舱内那 11 页的顶栏右侧保持空着
+   （空着也占位，见 style.css 里 .collab 那段）。
+
+   ★ 2026-09-25：这行标题**缩短了**。用户原话：「顶部标题重复：大字已经写了
+   『情感化智能座舱驾驶员健康监测预警系统』，顶部小字可以精简，避免文字冗余。
+   顶部改成简短一行：情感化智能座舱 | 驾驶员健康监测预警」。
+   他说的**大字**是左栏那行 `.cover-sub`（1.75rem，见上面那段注释里那串字数
+   统计）；顶栏这行只有 1.06rem（style.css 的 `.tbtitle`），是"小字"。
+   同一句话在一屏里出现两遍 —— 一遍大一遍小 —— 就是这里要消掉的那处重复。
+   ⚠️ **`.cover-sub` 一个字都没动**（1.75rem 那行才是"大字"，用户要保留它）。
+      别看着两边字数不一样就"顺手统一"，那正好把用户要的东西改回去了。
+   ⚠️ `_check_theme2.py:594` 那条断言是全等比对（`==`），同批改成新句子；
+      它下面 `:574` 那条 `endswith` 盯的是 `.cover-sub`，**不受影响**。 */
+XQ.mountChrome({ active: 'home', logo: true,
+                 title: '情感化智能座舱 | 驾驶员健康监测预警' });
+
+/* ---------------------------------------------------------------------------
+   ★ 2026-09-24：标题两侧那两道装饰（样式在页面 <style> 里，见上面那段）。
+
+   **必须在 mountChrome 之后再跑** —— 顶栏那一格是它 `innerHTML` 塞进去的，
+   在这之前 `#tbTitle` 根本不存在。
+   （那套模板原来还有个 `setInterval(XQ.tickClock, 10000)` 会每 10 秒重建顶栏、
+   把这里加的两个元素冲掉，2026-09-23 时钟删掉时那个 interval 一并删了，
+   所以现在塞一次就够。哪天顶栏又变回"会被重建"，这段就得跟着重跑。）
+
+   位置按**实测矩形**摆，不写百分比：标题是 19 个字、字号随 rem 走，
+   写死的 `calc(50% ± Nrem)` 一改字号就错位。
+
+   ⚠️ `getBoundingClientRect()` 给的是**边框盒**；绝对定位的包含块是 `.topbar` 的
+      **内边距盒**。`.topbar` 只有 `border-bottom`，左右边框是 0，
+      所以两者的左右边一致，下面直接用 `r.left/r.right` 换算不用补偿。
+      哪天给 `.topbar` 加了左右边框，这里就要减去边框宽。
+   ⚠️⚠️ **这两个数不能只算一次，必须能重算。** 两端的元素里都有 `<img>`
+      （品牌那个标志、院徽），而它们都**没写死宽度**（只有高度，宽度 auto）——
+      图没加载完时 `getBoundingClientRect().width` 是 **0**。在 `mountChrome`
+      刚跑完那一刻量，量到的是"标志宽 0 / 院徽宽 0"的幻影：
+      左边那条会短一截、右边那条直接算成**负宽 = 整个不见**，而且不报任何错。
+      （2026-09-24 踩到：`runs/_cover_v8.png` 左边有右边空。）
+      所以下面 `layout()` 是**幂等**的，创建一次元素、反复摆：
+      立刻一次 → `window.load` → 再补两次定时（图片解码慢的时候兜底）。
+   ⚠️ 院徽是**两张图二选一**（`.collab-logo.on-dark` / `.on-light`，见 chrome.js
+      那段说明），没显的那张 `display:none` ⟹ 它的 rect 恒为 0。
+      所以取的是"宽度 > 0 的那一张"，都量不到就退回整格 `.collab`（那一格的
+      左边在标题右格线上，只能当"实在没辙"的兜底，位置是错的）。
+   ⚠️ 窄屏（<1180px）这两个元素是 `display:none`，但**矩形的计算照样跑** ——
+      无所谓（算出来是坏值也没人看），`layout()` 在 `load` 时还会再跑一次，
+      那时若还是窄屏就还是隐藏的。本页是投屏用的固定尺寸页，不做 resize 监听。 */
+(function () {
+  const tb = document.getElementById('topbar');
+  const ttl = document.getElementById('tbTitle');
+  if (!tb || !ttl) return;
+
+  /* 珠子中心到标题左边 = 45px。这是**量的**：13.png 里标题占 x 630..1044，
+     左珠子中心 x≈585（630−585=45）、右珠子 x≈1092（1092−1044=48），两侧一致。
+     珠子半宽 1.3rem≈19px，所以珠子右缘离标题约 25px。 */
+  const GAP = 45;
+  /* 线离品牌/院徽留的空。13.png 左边 87px、右边 104px；这里两侧都用 80 ——
+     参考那两个数是按**它自己的**标志宽度定的，本站标志宽度不同，
+     照抄反而不对称。 */
+  const PAD = 80;
+
+  const mk = (cls) => {
+    const e = tb.querySelector('.trace.' + cls);
+    if (e) return e;
+    const i = document.createElement('i');
+    i.className = 'trace ' + cls;
+    tb.appendChild(i);
+    return i;
+  };
+  const a = mk('a'), b = mk('b');
+
+  const shown = (sel) => {
+    for (const e of tb.querySelectorAll(sel)) {
+      if (e.getBoundingClientRect().width > 0) return e;
+    }
+    return null;
+  };
+
+  function layout() {
+    const r = tb.getBoundingClientRect();
+    const t = ttl.getBoundingClientRect();
+    /* ⚠️ 必须用 shown()：`.lingtu-lockup` 现在有**两张**（on-dark / on-light），
+       被主题藏起来的那张 rect 宽高是 0，直接 querySelector 在浅色主题下会拿到
+       藏起来的那张（它是 on-dark，排在前面），于是左半边那条线**根本不画**。
+       2026-09-24 晚品牌组从 .lingtu 换成整张 lockup 时同步改的。 */
+    const brand = shown('.lingtu-lockup') || tb.querySelector('.brand');
+    const collab = shown('.collab-logo');
+    /* 哪一个量不出来就**保持上一次的位置**，不要拿 0 去算 ——
+       拿 0 去算正是"右边那条整个不见"的那个 bug。 */
+    const put = (e, left, right) => {
+      e.style.left = (left - r.left).toFixed(1) + 'px';
+      e.style.right = (r.right - right).toFixed(1) + 'px';
+    };
+    if (brand && brand.getBoundingClientRect().right > r.left) {
+      put(a, brand.getBoundingClientRect().right + PAD, t.left - GAP);
+    }
+    if (collab && collab.getBoundingClientRect().left > t.right) {
+      put(b, t.right + GAP, collab.getBoundingClientRect().left - PAD);
+    }
+  }
+
+  layout();
+  window.addEventListener('load', layout);
+  setTimeout(layout, 300);
+  setTimeout(layout, 1200);
+})();
+
+/* ===========================================================================
+   品牌片头播放器（`assets/lingtu_intro.mp4`，15.04 s）。样式在上面那段 <style> 里。
+   ---------------------------------------------------------------------------
+   ★★ 2026-09-25 用户**当天第二次改**，以这次为准。原话：
+      「而且为啥没有重新再看一遍的机会 就是返回不了 感觉还是自己点启动不启动吧
+        自己点播放键 还有声音 然后进入展示页」
+      上一版是「静音自动播吧」（他当天早些时候拍的）+ sessionStorage 记一次，
+      被他实测后否掉了。现在是：**封面右下角一颗「▶ 观看品牌片」**。
+        · 没人点就**一个字节都不下**（`preload="none"`、标签上没有 `autoplay`）；
+        · 点开 → 全屏、**带声**、带浏览器自带控制条地放；
+        · 播完 / 点「进入展示页」→ 化掉，露回封面；
+        · 那颗键**一直在** ⇒ 想看几遍点几遍。
+   ⚠️ sessionStorage 那把锁（`xq.intro.seen`）**整个删掉了**，`?intro=1` 跟着一起没
+      —— 没有"自动播"就无所谓"强制播给你看"。**别再把它加回来**：用户报的
+      「返回不了」就是它造成的（从座舱退回封面时它认定"看过了"不再放，而页面上
+      又没有任何地方能重看）。理由见上面样式那段的长注释。
+
+   ★★ 这一段的全部重点是**退出口**，不是播放。片头是 `position:fixed` +
+      `z-index:9999` 的全屏不透明层，**它盖着「进入座舱」**。所以只要有一条
+      退出路径漏了，人就被关在封面外面 —— 这是这一块唯一真正危险的地方。
+      四条，缺一不可：
+        ① `ended`  —— 正常播完（15.04 s）
+        ② 「进入展示页」按钮 —— 人不想看第二遍
+        ③ `error`  —— 片子 404 / 这个浏览器解不开
+        ④ **看门狗** —— 最容易被"优化"掉，而它恰恰是必须的，见下面那条 🟡。
+      🔴 上一版（HEVC/H.265）这里还有一条更狠的理由：真机解不出 H.265 时
+         **根本不发 `error`** —— 实测 `error.code = 0`、控制台干干净净、
+         `readyState = 4` 连 `duration` 都读得出来，**只是画面全黑**。
+         "等 error 再收掉"在那里会永久卡黑屏，且没有任何报错指向它。
+         片子现在换成 H.264 了，**这一类机器消失了**；看门狗还是留着 ——
+         它同时是"暂停安全"的唯一保障（🟡），不只是给 HEVC 兜底。
+
+   🟡 看门狗为什么是**每秒问一次 `currentTime`**，而不是上一版那种"元数据到了就
+      按 `duration*1000+1400` 一枪打出去"的定时器：
+      ⚠️ **这一版的播放器带 `controls`，人是可以按暂停的。** 固定定时器只知道
+         "从打开到现在过了多久"，不知道"人正停在某一帧上看" —— 暂停一会儿再放
+         到 16 s，那枪早打出去了，画面会在人眼皮底下自己化掉。
+      改成每秒问一次"是不是真播到头了"（`currentTime >= duration - .2`）：
+      暂停时进度不动，看门狗就一直等着 —— 两个毛病一起治。
+      ⚠️ 另外还得有一条**"压根没开起来"**的闸：被拒 / 解不开时 `currentTime`
+         会永远停在 0，上面那个判据就**永远等不到**。所以记一个"动过没有"，
+         `START_GUARD` 毫秒内一次都没动过 ⇒ 认定这 15 秒不会有画面，收掉。
+         （不这么做的话：一台不认这个编码的机器上，人点开得到的是一块**纯黑的
+         盖子永远停在那**，而页面上没有第二个能出去的东西。）
+   =========================================================================== */
+(function () {
+  const box = $('intro'), v = $('introV');
+  const open = $('introOpen'), shut = $('introShut');
+  if (!box || !v) return;                       /* 元素被删了也当没有片头 */
+
+  /* ★ `?intro=0` —— 现在**唯一的**开关，给检查脚本用。
+     （`_check_mascot.py` / `_check_posedecks.py` 要点这一页的小瑞、
+       `_check_bg.py` 要量这一页的亮度、`_check_pages.py` 要点「进入座舱」；
+       一层全屏不透明的盖子会把这些**全部静默压死**，而且报出来的错
+       跟"片头"看不出关系。）
+     ⚠️ 这一版它**顺手把入口键也藏掉**：没有片头却留一颗点不动的按钮，
+        比没有按钮更糟。⚠️ 用 `return` 之前**不加 `.on` 也不改 `hidden`**，
+        元素留在 DOM 里 —— 检查脚本要能数得到它们、也要能证明"默认是藏的"。 */
+  if (/[?&]intro=0(?:&|$)/.test(location.search)) return;
+
+  /* 脚本跑到这儿 = 片头可用。入口键的 `hidden` 是**写在 HTML 里**的（默认藏），
+     这里才摘掉 —— 于是"脚本没跑 / 中途报错"的结果是**没有这颗键**，
+     而不是"有一颗点了不动的键"。和 `.intro` 默认 `display:none` 同一个道理。 */
+  if (open) open.hidden = false;
+
+  let done = true;                              /* 还没开过：任何 finish() 都该被忽略 */
+  let tick = null, started = false, t0 = 0;
+  const START_GUARD = 6000;                     /* 这么久一点没动 = 这 15 秒没画面 */
+
+  const finish = () => {
+    if (done) return;                           /* 四条路可能同时到，只认第一条 */
+    done = true;
+    clearInterval(tick);
+    box.classList.add('gone');                  /* 淡出（.55s） */
+    setTimeout(() => {
+      box.classList.remove('on');               /* 摘掉 .on → 回到 display:none */
+      try { v.pause(); } catch (e) { /* 已经收掉了 */ }
+      /* ⚠️ **不要**在这里 `v.removeAttribute('src')` 或 `v.load()`：那会把片子
+         卸掉，重看要从网络重来（`preload="none"`，等于每次重看都从头下载）。
+         停在末帧就好 —— 下一遍 start() 会把 `currentTime` 拨回 0。 */
+    }, 620);                                    /* 比过渡长一点，别抢在淡出中间 */
+  };
+
+  /* 三条事件退出口**只挂一次**（挂在 setup 上，不挂在 start 里）：
+     `finish` 自己带 `done` 闸，重看时不会因为重复挂而多收一次。
+     ⚠️ 反过来说，`done` 必须由 `start()` 重新打开 —— 否则第二遍的 finish()
+        会**立刻返回**，人就被永久关在全屏黑盖子里。 */
+  v.addEventListener('ended', finish);
+  v.addEventListener('error', finish);
+  if (shut) shut.addEventListener('click', finish);
+
+  /* ★ 2026-09-25 晚加：**Esc 也能出来**。
+     起因是用户报「全屏后为啥我的展示页面那些都不能点了」—— 这一层是一块不透明的
+     全屏盖子，它看起来跟"全屏"一模一样，而人是**按 Esc 出来的**：按了没反应，
+     才更坐实"页面死了"。所以补上这条肌肉记忆的出口。
+     ⚠️ 只在这一层真的开着（`.on`）的时候认它 —— 常驻监听、但闭着的时候什么都不做，
+        免得跟别的东西抢 Esc（这一页也没有别的用 Esc 的东西）。
+     ⚠️ 它走的是同一个 `finish()`，所以"看没看过""有没有 sessionStorage"那套
+        一次性的东西**没有**回来 —— 那是上一版被删掉的 bug（见上面那段）。 */
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && box.classList.contains('on')) finish();
+  });
+
+  function start() {
+    if (box.classList.contains('on')) return;   /* 已经在放了，别重开 */
+    done = false;
+    started = false; t0 = Date.now();
+
+    box.classList.remove('gone');                /* 重看：把上一遍的淡出痕迹抹掉 */
+    box.classList.add('on');                     /* `.on` → display:flex（默认 none） */
+
+    /* ④ 看门狗：见上面 🟡。1 s 一次，暂停时进度不动它就等着。 */
+    clearInterval(tick);
+    tick = setInterval(() => {
+      if (v.currentTime > 0 || !v.paused) started = true;
+      if (!started) { if (Date.now() - t0 > START_GUARD) finish(); return; }
+      const d = v.duration;
+      if (isFinite(d) && d > 0 && v.currentTime >= d - 0.2) finish();
+    }, 1000);
+
+    /* 重看：上一遍结束时停在末帧。规范里 `play()` 对"已播完"的视频会自己回到
+       开头，但那是隐式行为 —— 显式写一句，重看确实从第一帧开始。 */
+    try { v.currentTime = 0; } catch (e) { /* 还没元数据；play() 本来就从 0 起 */ }
+
+    /* ★ 这一句是**唯一的播放触发点**（标签上没有 `autoplay`，见上面 HTML 那段）。
+       是**用户手势**里调用的 ⇒ 可以带声（被政策逼着静音的是"自动播放"）。
+       真被拒（比如浏览器把本站的声禁了）就**退回静音重放一遍并说一声** ——
+       用户要的是「还有声音」，不声不响地变哑巴比变哑巴更糟。
+       ⚠️ 收掉不能靠"等 error 事件"（见上面那条 🔴），所以两段落空都接 `finish`。 */
+    const p = v.play();
+    if (p && p.catch) p.catch(() => {
+      v.muted = true;
+      const p2 = v.play();
+      if (p2 && p2.catch) p2.catch(finish);
+      if (window.XQ && XQ.flash) XQ.flash('浏览器没让放声音，这一遍是静音的');
+    });
+  }
+
+  if (open) open.addEventListener('click', start);
+})();
+</script>
+</body>
+</html>

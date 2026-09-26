@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UI 设计规范 · 灵途智行</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/pages.css">
+<style>
+/* =========================================================================
+   08 设计规范 —— 本页**唯一的**页面级样式
+   -------------------------------------------------------------------------
+   规范页摆的是"样本"，而样本不是现成组件，所以只有两处非写不可：
+
+   1. `.sev-s[data-sev]`：`body[data-sev]` 是给**整页**用的（一个文档只有一个
+      body），而"四态视觉"那一节要在同一屏里并排看四档色，只能把
+      --accent / --rgb 复制到每个样本的容器上。
+      ⚠️ 这四行值必须和 style.css 里 `body[data-sev]` 那四条**一模一样** ——
+      改了一处就得改两处，这是本页最容易腐烂的地方。
+      提醒：本页是**深色**页（没有 `data-theme`），所以照抄的是 style.css
+      `:root` 那一套深色值，**不是** `html[data-theme="light"]` 块里那一套。
+
+   2. 演示用的容器：`.glass-demo`（要有一块彩色的东西垫在卡片后面，才看得见
+      毛玻璃到底糊掉了什么）、`.comp-row`（把组件横着摆一排）、
+      `.type-row .use`（字体那一排右端的用途注）。
+   其余全是 style.css / pages.css 里现成的类，一个都没有另起炉灶。
+   ========================================================================= */
+.spec-sect{ scroll-margin-top:.6rem; }
+
+.glass-demo{
+  position:relative; height:5.8rem; border-radius:var(--r-lg); overflow:hidden;
+  background:linear-gradient(115deg,#18D7C5,#FF9830 52%,#FF4055);
+}
+.glass-demo .card{
+  position:absolute; inset:.75rem; display:grid; place-items:center;
+  font-size:.78rem; color:#c8d8e4;
+}
+
+.comp-row{ display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; }
+.comp-row + .comp-row{ margin-top:.7rem; }
+.type-row .use{ margin-left:auto; font-size:.68rem; color:var(--muted); }
+
+/* 四态那一节的排布。⚠️ **不能直接用 `.three`**（pages.css:66）—— 那个是
+   1.05/1.1/1.15 三条**不等宽**的列，给三张卡配的，塞四列会挤成一小条。
+   这里另起一个等宽四列，只在 design.html 有效；窄屏那份跟着 pages.css
+   的 @media 走同一条规矩（下面 741 行那个断点）。 */
+.sev4{
+  display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:.85rem; align-items:start;
+}
+@media (max-width:1100px){ .sev4{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.sev-s{ display:flex; flex-direction:column; gap:.55rem; }
+.sev-s .pill{ align-self:flex-start; }
+.sev-s .hex{ font-size:.7rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+/* 键名 = 全站那把档位钥匙（normal/mild/moderate/severe，就是 `severity`），
+   和 `body[data-sev]` 同一套；值 = style.css `:root` 里那四条深色值
+   （本页深色，见文件头那段）。 */
+.sev-s[data-sev="normal"]  { --accent:#18D7C5; --rgb:24,215,197; }
+.sev-s[data-sev="mild"]    { --accent:#FFD400; --rgb:255,212,0;   }
+.sev-s[data-sev="moderate"]{ --accent:#FF9830; --rgb:255,152,48;  }
+.sev-s[data-sev="severe"]  { --accent:#FF4055; --rgb:255,64,85;   }
+
+/* #050B14 / #081521 这两个深色块在深色卡片上会看不出边界，补一道内描边 */
+.sw .chipc{ box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); }
+</style>
+</head>
+<body data-sev="normal">
+
+<div class="bg"></div>
+<div class="tint"></div>
+<div class="streaks" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="s3"></i></div>
+
+<div class="app">
+  <header class="topbar" id="topbar"></header>
+
+  <div class="main sub">
+    <nav class="rail" id="rail"></nav>
+
+    <div class="sub-body">
+
+      <!-- ============ 页标题 + 分节锚点 ============ -->
+      <div class="ptitle">
+        <a class="back" href="index.html" title="返回座舱主界面" id="backBtn"></a>
+        <h1>UI 设计规范</h1>
+        <span class="spacer"></span>
+        <!-- 这里的 tab 是**跳转锚点**不是切面板：04 详情页那几个 tab 一按整块换内容，
+             规范页反过来 —— 它就得一页看全，否则"规范"本身被切碎了没法对照。 -->
+        <div class="tabs" id="tabs">
+          <button class="tab on" data-go="color">色板</button>
+          <button class="tab" data-go="type">字体</button>
+          <button class="tab" data-go="radius">圆角与间距</button>
+          <button class="tab" data-go="glass">玻璃拟态</button>
+          <button class="tab" data-go="size">尺寸策略</button>
+          <button class="tab" data-go="comp">组件</button>
+          <button class="tab" data-go="sev">四态</button>
+        </div>
+      </div>
+
+      <!-- ============ 色板 ============ -->
+      <section class="card card-pad spec-sect" id="sec-color">
+        <div class="card-h">
+          <h3>色板</h3>
+          <span class="note">抄的是 style.css 里的现值，不是设计稿上的理想值</span>
+        </div>
+        <div class="sw-grid" id="swGrid"></div>
+        <div class="unwired" style="margin-top:.85rem">
+          <span>**整个主题只有一个变量**：`--accent`（原色）和它的数字分身 `--rgb`
+          —— 后者是给 `rgba()` 用的，因为 CSS 变量不能塞进颜色函数里拆。四档状态只改这两个值，
+          卡片、光带、呼吸光、图表线、药丸、外发光**全部继承**，所以"换档变色"是一处改动，
+          不会出现"红色模式漏改了某个角"。</span>
+        </div>
+      </section>
+
+      <!-- ============ 字体 ============ -->
+      <section class="card card-pad spec-sect" id="sec-type">
+        <div class="card-h">
+          <h3>字体</h3>
+          <span class="note">字号全是 rem，跟着根字号一起缩（见"尺寸策略"）</span>
+        </div>
+
+        <div class="type-row">
+          <span class="spec">2.1rem / 600</span>
+          <span style="font-size:2.1rem;font-weight:600;letter-spacing:.04em">轻度疲劳</span>
+          <span class="use">驾驶员状态主数值 · .drv-big b</span>
+        </div>
+        <div class="type-row">
+          <span class="spec">1.5rem / 600</span>
+          <span style="font-size:1.5rem;font-weight:600;letter-spacing:.04em">驾驶员监测详情</span>
+          <span class="use">页面标题 · .ptitle h1</span>
+        </div>
+        <div class="type-row">
+          <span class="spec">1.3rem / 600</span>
+          <span style="font-size:1.3rem;font-weight:600;font-variant-numeric:tabular-nums">17.5%</span>
+          <span class="use">指标数值 · .mt .v（等宽数字）</span>
+        </div>
+        <div class="type-row">
+          <span class="spec">1.02rem / 600</span>
+          <span style="font-size:1.02rem;font-weight:600">疲劳趋势分析</span>
+          <span class="use">卡片标题 · .card-h h3</span>
+        </div>
+        <div class="type-row">
+          <span class="spec">.86rem / 400</span>
+          <span style="font-size:.86rem;color:#c8d8e4">当前状态：注意力有所下降，建议适当休息。</span>
+          <span class="use">正文 · .drv-say</span>
+        </div>
+        <div class="type-row">
+          <span class="spec">.72rem / 400</span>
+          <span style="font-size:.72rem;color:var(--muted)">PERCLOS（眼睑闭合率）</span>
+          <span class="use">标签 · .mt .k（--muted）</span>
+        </div>
+        <div class="type-row">
+          <span class="spec">1.05rem / 楷体</span>
+          <span style="font-size:1.05rem;font-family:'KaiTi','STKaiti','Segoe Script',cursive">有我在，一路都很安心~</span>
+          <span class="use">小瑞的手写体 · .xq-note</span>
+        </div>
+
+        <ul class="spec-list" style="margin-top:.9rem">
+          <li><span class="k">中文主字体</span><span class="v">"Microsoft YaHei UI" → "Microsoft YaHei" → "PingFang SC" → "Noto Sans SC" → system-ui → sans-serif</span></li>
+          <li><span class="k">小瑞手写体</span><span class="v">"KaiTi" → "STKaiti" → "Segoe Script" → cursive（只有 .xq-note 和 .rec-tip 用）</span></li>
+          <li><span class="k">数字</span><span class="v">**没有引第二款字体**。需求里写"数字用科技感较强的字体"，实现上是用 `font-variant-numeric:tabular-nums` 把数字拉成等宽 —— 省一份字体文件，而且数值每 0.12 秒跳一次时不会左右抖。</span></li>
+        </ul>
+      </section>
+
+      <!-- ============ 圆角 / 玻璃 / 尺寸 ============ -->
+      <div class="three">
+
+        <section class="card card-pad spec-sect" id="sec-radius">
+          <div class="card-h"><h3>圆角与间距</h3><span class="note">三档圆角 + 散装间距</span></div>
+
+          <div class="radius-demo">
+            <div style="border-radius:var(--r-lg)">26px<br>卡片</div>
+            <div style="border-radius:var(--r-md)">18px<br>小格</div>
+            <div style="border-radius:var(--r-sm)">12px<br>没人用</div>
+          </div>
+
+          <ul class="spec-list" style="margin-top:.9rem">
+            <li><span class="k">--r-lg 26px</span><span class="v">.card / .livecard / .rail-card；手机外壳那 2.2rem 是就地写的</span></li>
+            <li><span class="k">--r-md 18px</span><span class="v">.mt / .dim / .adv li / .unwired 这些"卡片里的小块"</span></li>
+            <li><span class="k">--r-sm 12px</span><span class="v">**定义了但全站没有任何一条规则引用它** —— 留着是为了以后有用，不是"已经在用"</span></li>
+            <li><span class="k">药丸 2rem</span><span class="v">.pill / .tab 直接写 2rem：胶囊形的圆角等于半高，写死比变量准</span></li>
+            <li><span class="k">间距</span><span class="v">**没有 token**，就是散的 rem。真正要记住的只有两条：卡片内边距 1.05rem 1.15rem，内容区行距 .85rem</span></li>
+          </ul>
+        </section>
+
+        <section class="card card-pad spec-sect" id="sec-glass">
+          <div class="card-h"><h3>玻璃拟态</h3><span class="note">全站一张 .card 配方</span></div>
+
+          <div class="glass-demo">
+            <div class="card"><span>卡片背后是那块三色渐变 —— 糊得越厉害，底下的颜色越"化开"</span></div>
+          </div>
+
+          <ul class="spec-list" style="margin-top:.9rem">
+            <li><span class="k">background</span><span class="v">rgba(9,24,36,.52)（--glass）—— 半透明是前提，不透明就没什么可糊的了</span></li>
+            <li><span class="k">backdrop</span><span class="v">blur(16px) saturate(1.25) —— 顺带把背后的颜色饱和一点，不然糊完发灰</span></li>
+            <li><span class="k">border</span><span class="v">1px solid rgba(255,255,255,.10)（--line）</span></li>
+            <li><span class="k">shadow</span><span class="v">0 1.2rem 3rem rgba(0,0,0,.42) + inset 0 1px 0 rgba(255,255,255,.05)，外面压暗、上沿留一道高光</span></li>
+            <li><span class="k">圆角</span><span class="v">var(--r-lg)</span></li>
+            <li><span class="k">注意</span><span class="v">卡的描边是**固定白 10%**，不跟 --accent 走 —— 换档时卡片本身不变色，只有嵌在里面的发光元素变色</span></li>
+          </ul>
+        </section>
+
+        <section class="card card-pad spec-sect" id="sec-size">
+          <div class="card-h"><h3>尺寸策略</h3><span class="note">全站只有一个断点：视口</span></div>
+
+          <div class="mtiles">
+            <div class="mt"><div class="k">当前视口</div><div class="v" id="szVp">—</div></div>
+            <div class="mt"><div class="k">min(100vh/58, 100vw/112)</div><div class="v" id="szRaw">—</div></div>
+            <div class="mt wide">
+              <div class="k">根字号（clamp 到 11~22px 之后）</div>
+              <div class="v" id="szRoot">—</div>
+              <div class="bar"><i id="szBar"></i></div>
+            </div>
+          </div>
+
+          <div class="unwired" style="margin-top:.75rem">
+            <span>整套 UI 是 `html{font-size:clamp(11px, min(100vh/58, 100vw/112), 22px)}`
+            —— 所有尺寸都是 rem，所以改这一个数，**全站等比缩放**，投影仪 1024×768 和现场
+            1920×1080 不用各调一套。16:9 屏上 `100vw/112` 那一项更小，**实际生效的一直是它**；
+            112 就是按"1920 宽要凑出 ~17px"定的。上面的数是**当场量的**，换台机器打开它就变。</span>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============ 组件 ============ -->
+      <section class="card card-pad spec-sect" id="sec-comp">
+        <div class="card-h">
+          <h3>组件</h3>
+          <span class="note">下面每一个都是真的，可以点</span>
+        </div>
+
+        <div class="comp-row">
+          <span class="pill">安全驾驶</span>
+          <span class="pill">注意</span>
+          <button class="tab on">综合概览</button>
+          <button class="tab">疲劳分析</button>
+        </div>
+        <div class="comp-row">
+          <button class="xq-btn" id="btnMusic">播放舒缓音乐</button>
+          <button class="xq-btn primary" id="btnNavi">导航至最近服务区</button>
+        </div>
+
+        <ul class="spec-list" style="margin-top:1rem">
+          <li><span class="k">.pill 药丸</span><span class="v">圆角 2rem；描边 accent 55%、底色 accent 12%、文字也走 accent —— 一个状态色，三处深浅</span></li>
+          <li><span class="k">.tab 页签</span><span class="v">未选中是白 5% 底 + --line 描边；`.on` 换成 accent 22% 底 + 60% 描边 + 一圈外发光</span></li>
+          <li><span class="k">.xq-btn 按钮</span><span class="v">hover 时 `translateX(-.15rem)` —— 往**左**推，因为它长在右侧那一栏，往左才是"朝驾驶员靠近"；`.primary` 直接铺满 accent 并把字翻成深色</span></li>
+          <li><span class="k">.mt 指标格</span><span class="v">标签 .72rem / --muted，值 1.3rem 等宽数字，底下那条 .bar 是 accent 渐变 + .45s 缓出</span></li>
+        </ul>
+      </section>
+
+      <!-- ============ 四态 ============ -->
+      <section class="card card-pad spec-sect" id="sec-sev">
+        <div class="card-h">
+          <h3>四态视觉</h3>
+          <span class="note">同一套组件，只换 --accent / --rgb</span>
+        </div>
+
+        <!-- 四个样本条的长度只是排版示意，不代表任何数据。
+             ★ 2026-09-24「只做疲劳」：这一节的三态 → 四态 → **换成疲劳四档**。
+             以前那四格是**类别**轴（正常/分心/看手机/疲劳驾驶），现在全站
+             只剩一条轴，四格就是后端的 `severity` 四档，键名即档位键。
+             每格下面的 `.v` 用的是 pages.css 里 `.mt .v.sev-*` 那四个类
+             （按档位上色），类名和这里的 `data-sev` 是同一个键。 -->
+        <div class="sev4">
+          <div class="sev-s" data-sev="normal">
+            <div class="mt">
+              <div class="k">清醒 · normal</div>
+              <div class="v">状态良好</div>
+              <div class="bar"><i style="width:24%"></i></div>
+            </div>
+            <span class="pill">安全驾驶</span>
+            <span class="hex">#18D7C5 · rgb(24,215,197)</span>
+          </div>
+
+          <div class="sev-s" data-sev="mild">
+            <div class="mt">
+              <div class="k">注意·轻度疲劳 · mild</div>
+              <div class="v sev-mild">打哈欠 / 闭眼变长</div>
+              <div class="bar"><i style="width:46%"></i></div>
+            </div>
+            <span class="pill">注意</span>
+            <span class="hex">#FFD400 · rgb(255,212,0)</span>
+          </div>
+
+          <div class="sev-s" data-sev="moderate">
+            <div class="mt">
+              <div class="k">警告·中度疲劳 · moderate</div>
+              <div class="v sev-moderate">持续闭眼</div>
+              <div class="bar"><i style="width:68%"></i></div>
+            </div>
+            <span class="pill">警告</span>
+            <span class="hex">#FF9830 · rgb(255,152,48)</span>
+          </div>
+
+          <div class="sev-s" data-sev="severe">
+            <div class="mt">
+              <div class="k">紧急·重度疲劳 · severe</div>
+              <div class="v sev-severe">低头 / 点头</div>
+              <div class="bar"><i style="width:88%"></i></div>
+            </div>
+            <span class="pill">紧急</span>
+            <span class="hex">#FF4055 · rgb(255,64,85)</span>
+          </div>
+        </div>
+
+        <div class="unwired" style="margin-top:.85rem">
+          <span>一个页面只有一个 `body`，所以并排看四档不能靠 `body[data-sev]` ——
+          本页是靠页内 `&lt;style&gt;` 里那四条 `.sev-s[data-sev]` 把变量**复制到每个样本容器**上，
+          这四行与 style.css 必须手工保持一致。
+          <strong>2026-09-24 起那 6 处硬编码全部收进变量了</strong>（疲劳概率条的渐变、
+          时间线圆点上的四色 ::after、指标小格的按档着色文字），所以现在四档色一共只有
+          **两个出处**：style.css 的 `:root` 一套（深色）、`html[data-theme="light"]` 一套（浅色）。
+          要改色改那两个块就够，不用再满库找了。<br>
+          <strong>为什么这四格就是 `severity`</strong>：「只做疲劳」之后全站只剩一条轴 ——
+          后端 `ui/state.py` 的 `severity` 只有 normal/mild/moderate/severe 四个值，
+          配色、大标题、小瑞的表情和话、语音语气全跟它走。支路一自己那三个**类别**
+          （normal/phone/fatigue）不再直接决定颜色：它只在概率条和「低头/点头」这行
+          行为说明里露面，`phone` 和 `fatigue` 都落在**重度**这一档。</span>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/chrome.js"></script>
+<script src="/static/live.js"></script>
+<script>
+/* =========================================================================
+   08 UI 设计规范
+   -------------------------------------------------------------------------
+   这一页**不连 WebSocket**：它讲的是别的页面长什么样，自己没有任何实时数据。
+   所以全页除了色板表和"当场量一下根字号"，没有别的逻辑。
+   ========================================================================= */
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+/* 色板：**十六进制只在这张表里写一遍**，下面 swatch 由它渲染。
+   第三列写"这个色在本项目里到底用在哪"，不然过了两周没人分得清
+   #081521 和 #050B14 哪个是背景。 */
+const SW = [
+  ['#050B14', '背景底',     'body 底色 + .bg 打底'],
+  ['#081521', '辅助深蓝',   '需求里给的 · 代码里其实没用到'],
+  ['#18D7C5', '科技青 · 清醒',     '--sev-normal   · severity=normal'],
+  ['#FFD400', '注意黄 · 轻度疲劳', '--sev-mild     · severity=mild'],
+  ['#FF9830', '警告橙 · 中度疲劳', '--sev-moderate · severity=moderate'],
+  ['#FF4055', '紧急红 · 重度疲劳', '--sev-severe   · severity=severe'],
+  ['#F4F8FA', '主文字',     '--ink'],
+  ['#91A5B5', '次文字',     '--muted'],
+  ['#c8d8e4', '正文亮一档', '硬编码 · 未 token 化'],
+];
+
+$('swGrid').innerHTML = SW.map(([hex, name, use]) => `
+  <div class="sw">
+    <div class="chipc" style="background:${hex}"></div>
+    <div class="meta"><b>${name}</b><span>${hex} · ${use}</span></div>
+  </div>`).join('');
+
+/* 分节锚点：滚过去而不是切面板。scrollIntoView 会滚最近的**可滚祖先**
+   （这里是 .sub-body），不用自己去算 offset。 */
+$('tabs').querySelectorAll('.tab').forEach((b) => {
+  b.onclick = () => {
+    $('tabs').querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
+    const s = $('sec-' + b.dataset.go);
+    if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+});
+
+/* 尺寸策略那三个数：**当场量**，不写死。
+   在文档里写一句"设计稿按 1920×1080"谁都会，但这一页可以证明
+   "换哪台机器打开都还是同一套比例" —— 顺手也是个现场自检。
+   条的长度 = 当前根字号在 11~22px 这段 clamp 区间里的位置。 */
+function sizeInfo() {
+  const vw = innerWidth, vh = innerHeight;
+  const raw = Math.min(vh / 58, vw / 112);
+  const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  $('szVp').textContent = `${vw} × ${vh}`;
+  $('szRaw').textContent = raw.toFixed(2) + 'px';
+  $('szRoot').textContent = root.toFixed(2) + 'px';
+  $('szBar').style.width = Math.max(0, Math.min(100, (root - 11) / 11 * 100)) + '%';
+}
+sizeInfo();
+addEventListener('resize', sizeInfo);
+
+/* 组件样本。点了给一句实话，而不是假装这里能连上车机 ——
+   真正会发指令的是 04 / 05 两页（那边有 WebSocket）。 */
+[['btnMusic', 'music', '播放舒缓音乐'], ['btnNavi', 'rest_stop', '导航至最近服务区']]
+  .forEach(([id, ico, label]) => {
+    const b = $(id);
+    b.insertAdjacentHTML('afterbegin', XQ.icon(ico));
+    b.onclick = () => XQ.flash(`规范页的样本：这类动作要 04 / 05 页才真的发得出去`);
+  });
+
+$('backBtn').innerHTML = `<svg viewBox="0 0 24 24">${XQ.ICON.chevL}</svg>`;
+/* 旧作品页（设计规范），不挂在左导航的五项里 —— `active: ''` 一项都不点亮。
+   ⚠️ 别写 `active: 'set'`：'set' 现在是**设置**那一项，会点亮它，明着指错页。 */
+XQ.mountChrome({ active: '' });
+</script>
+</body>
+</html>

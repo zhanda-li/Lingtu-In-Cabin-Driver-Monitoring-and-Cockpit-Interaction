@@ -1,0 +1,189 @@
+WARNING: Logging before InitGoogle() is written to STDERR
+W0000 00:00:1790089857.617656   43996 face_landmarker_graph.cc:180] Sets FaceBlendshapesGraph acceleration to xnnpack by default.
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+W0000 00:00:1790089857.624292   36364 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1790089857.633475   36364 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+
+── normal: 27 段
+   normal_00          帧  378  EAR 0.28~0.46  r(EAR,blink) -0.94
+   normal_01          帧  338  EAR 0.31~0.42  r(EAR,blink) -0.92
+   normal_02          帧  193  EAR 0.23~0.43  r(EAR,blink) -0.98
+   normal_03          帧  205  EAR 0.28~0.39  r(EAR,blink) -0.92
+   normal_04          帧  199  EAR 0.27~0.39  r(EAR,blink) -0.88
+   normal_05          帧  227  EAR 0.27~0.39  r(EAR,blink) -0.94
+   normal_06          帧  229  EAR 0.31~0.40  r(EAR,blink) -0.97
+   normal_07          帧  234  EAR 0.23~0.40  r(EAR,blink) -0.96
+   normal_08          帧  233  EAR 0.28~0.41  r(EAR,blink) -0.93
+   normal_09          帧  233  EAR 0.21~0.40  r(EAR,blink) -0.99
+   normal_10          帧  231  EAR 0.14~0.42  r(EAR,blink) -0.97
+   normal_11          帧  231  EAR 0.14~0.40  r(EAR,blink) -0.98
+   normal_12          帧  233  EAR 0.16~0.41  r(EAR,blink) -0.97
+   normal_13          帧  246  EAR 0.15~0.45  r(EAR,blink) -0.98
+   normal_14          帧  233  EAR 0.15~0.46  r(EAR,blink) -0.98
+   normal_15          帧  233  EAR 0.14~0.41  r(EAR,blink) -0.96
+   normal_16          帧  143  EAR 0.36~0.39  r(EAR,blink) -0.94
+   normal_17          帧  258  EAR 0.19~0.39  r(EAR,blink) -0.94
+   normal_18          帧  335  EAR 0.24~0.40  r(EAR,blink) -0.87
+   normal_19          帧  242  EAR 0.28~0.41  r(EAR,blink) -0.98
+   normal_20          帧  270  EAR 0.32~0.37  r(EAR,blink) -0.83
+   normal_21          帧  315  EAR 0.26~0.39  r(EAR,blink) -0.88
+   normal_22          帧  353  EAR 0.31~0.38  r(EAR,blink) -0.94
+   normal_23          帧  468  EAR 0.20~0.41  r(EAR,blink) -0.98
+   normal_24          帧  304  EAR 0.16~0.40  r(EAR,blink) -0.97
+   normal_25          帧  348  EAR 0.14~0.37  r(EAR,blink) -0.99
+   normal_26          帧  285  EAR 0.14~0.36  r(EAR,blink) -0.99
+
+── fatigue: 26 段
+   fatigue_00         帧  120  EAR 0.26~0.44  r(EAR,blink) -0.90
+   fatigue_01         帧  106  EAR 0.24~0.42  r(EAR,blink) -0.87
+   fatigue_02         帧  137  EAR 0.30~0.43  r(EAR,blink) -0.79
+   fatigue_03         帧  126  EAR 0.28~0.45  r(EAR,blink) -0.87
+   fatigue_04         帧  105  EAR 0.29~0.44  r(EAR,blink) -0.85
+   fatigue_05         帧  117  EAR 0.30~0.43  r(EAR,blink) -0.75
+   fatigue_06         帧  212  EAR 0.24~0.45  r(EAR,blink) -0.92
+   fatigue_07         帧  182  EAR 0.27~0.46  r(EAR,blink) -0.92
+   fatigue_08         帧  189  EAR 0.27~0.45  r(EAR,blink) -0.74
+   fatigue_09         帧  196  EAR 0.25~0.46  r(EAR,blink) -0.91
+   fatigue_10         帧  164  EAR 0.21~0.42  r(EAR,blink) -0.89
+   fatigue_11         帧  166  EAR 0.19~0.45  r(EAR,blink) -0.94
+   fatigue_12         帧  162  EAR 0.21~0.46  r(EAR,blink) -0.94
+   fatigue_13         帧  178  EAR 0.20~0.43  r(EAR,blink) -0.91
+   fatigue_14         帧  157  EAR 0.22~0.45  r(EAR,blink) -0.93
+   fatigue_15         帧  215  EAR 0.15~0.46  r(EAR,blink) -0.97
+   fatigue_16         帧  240  EAR 0.14~0.44  r(EAR,blink) -0.98
+   fatigue_17         帧  326  EAR 0.18~0.44  r(EAR,blink) -0.98
+   fatigue_18         帧  329  EAR 0.19~0.45  r(EAR,blink) -0.98
+   fatigue_19         帧  324  EAR 0.20~0.42  r(EAR,blink) -0.97
+   fatigue_20         帧  355  EAR 0.20~0.45  r(EAR,blink) -0.97
+   fatigue_21         帧  268  EAR 0.17~0.40  r(EAR,blink) -0.98
+   fatigue_22         帧  317  EAR 0.16~0.41  r(EAR,blink) -0.99
+   fatigue_23         帧  306  EAR 0.16~0.41  r(EAR,blink) -0.99
+   fatigue_24         帧  333  EAR 0.18~0.42  r(EAR,blink) -0.99
+   fatigue_25         帧  305  EAR 0.15~0.42  r(EAR,blink) -0.99
+
+── yawn: 5 段
+   yawn_00            帧  262  EAR 0.14~0.40  r(EAR,blink) -0.98
+   yawn_01            帧  238  EAR 0.14~0.41  r(EAR,blink) -0.96
+   yawn_02            帧  303  EAR 0.15~0.44  r(EAR,blink) -0.96
+   yawn_03            帧  246  EAR 0.14~0.71  r(EAR,blink) -0.88
+   yawn_04            帧  367  EAR 0.14~0.37  r(EAR,blink) -0.96
+
+── talking: 5 段
+   talking_00         帧  198  EAR 0.17~0.42  r(EAR,blink) -0.96
+   talking_01         帧  221  EAR 0.18~0.43  r(EAR,blink) -0.94
+   talking_02         帧  207  EAR 0.21~0.44  r(EAR,blink) -0.98
+   talking_03         帧  270  EAR 0.25~0.44  r(EAR,blink) -0.93
+   talking_04         帧  234  EAR 0.26~0.44  r(EAR,blink) -0.95
+
+[缓存] 写入 _ear_raw.npz
+
+共 63 段
+==========================================================================
+
+【Q1】EAR 是不是真的在测眼睛？（与 eyeBlink 的相关性）
+      eyeBlink 是预训练模型输出，EAR 是几何量，来源独立。
+
+片段                      帧  r(EAR,blink)    EAR最低    EAR最高    量程p95-p5    blink最高
+--------------------------------------------------------------------------------
+normal_00             378         -0.94     0.28     0.46       0.045       0.23
+normal_01             338         -0.92     0.31     0.42       0.080       0.21
+normal_02             193         -0.98     0.23     0.43       0.156       0.45
+normal_03             205         -0.92     0.28     0.39       0.062       0.32
+normal_04             199         -0.88     0.27     0.39       0.077       0.33
+normal_05             227         -0.94     0.27     0.39       0.076       0.30
+normal_06             229         -0.97     0.31     0.40       0.036       0.30
+normal_07             234         -0.96     0.23     0.40       0.082       0.45
+normal_08             233         -0.93     0.28     0.41       0.073       0.34
+normal_09             233         -0.99     0.21     0.40       0.144       0.53
+normal_10             231         -0.97     0.14     0.42       0.137       0.69
+normal_11             231         -0.98     0.14     0.40       0.175       0.70
+normal_12             233         -0.97     0.16     0.41       0.183       0.70
+normal_13             246         -0.98     0.15     0.45       0.136       0.71
+normal_14             233         -0.98     0.15     0.46       0.259       0.67
+normal_15             233         -0.96     0.14     0.41       0.168       0.68
+normal_16             143         -0.94     0.36     0.39       0.022       0.13
+normal_17             258         -0.94     0.19     0.39       0.042       0.55
+normal_18             335         -0.87     0.24     0.40       0.048       0.42
+normal_19             242         -0.98     0.28     0.41       0.045       0.33
+normal_20             270         -0.83     0.32     0.37       0.032       0.26
+normal_21             315         -0.88     0.26     0.39       0.053       0.37
+normal_22             353         -0.94     0.31     0.38       0.037       0.24
+normal_23             468         -0.98     0.20     0.41       0.049       0.48
+normal_24             304         -0.97     0.16     0.40       0.045       0.62
+normal_25             348         -0.99     0.14     0.37       0.176       0.72
+normal_26             285         -0.99     0.14     0.36       0.138       0.69
+
+   中位 r = -0.96   中位量程 = 0.076
+   ⚠️ 相关高 + 量程小 = 假的好看。两者必须一起看：量程太小说明这段根本没闭眼，r 是在噪声上算的。
+   →  ⚠️ 量程只有 0.076，看不出闭眼有没有被捕捉到，要看下面的分布
+
+
+【Q1b】EAR 分布（双峰 = 睁眼一簇、闭眼一簇 = 阈值分得开）
+
+   EAR   normal                                    fatigue                                   
+--------------------------------------------------------------------------------------------
+  0.12   |                                        3   |                                        0
+  0.14   |                                       30   |                                       17
+  0.16   |                                       33   |                                       10
+  0.18   |                                       30   |                                       55
+  0.20   |                                       30   |##                                    153
+  0.22   |                                       50   |#######                               474
+  0.24   |                                       40   |###########                           729
+  0.26   |#                                      68   |#####                                 351
+  0.28   |#                                     113   |####                                  264
+  0.30   |###                                   219   |###                                   237
+  0.32   |###############                       997   |#####                                 343
+  0.34   |##################################   2183   |######                                419
+  0.36   |###########################          1768   |############                          778
+  0.38   |###############                       970   |#############                         850
+  0.40   |#####                                 377   |#########                             627
+  0.42   |###                                   244   |###                                   247
+  0.44   |                                       42   |#                                      75
+  0.46   |                                        0   |                                        6
+
+
+【Q2】眨眼阈值定多少？（拿「正常眨眼 15~20 次/分」当标尺）
+
+   正常段 EAR 分位: p1 0.184 | p5 0.295 | p10 0.325 | p25 0.342 | p50 0.358 | p75 0.377 | p95 0.415
+   总时长 8.0 分钟，共 7197 帧
+   生理参考：这段时间里应该出现 120~159 次眨眼
+
+    阈值      眨眼次数      次/分      时长中位(s)    最长(s)      闭眼占比  判定
+----------------------------------------------------------------------------
+  0.20        38      4.8         0.20     0.47      1.3%  ❌ 太少，漏掉真眨眼
+  0.22        50      6.3         0.20     0.53      1.8%  ❌ 太少，漏掉真眨眼
+  0.24        64      8.0         0.20     0.60      2.4%  ❌ 太少，漏掉真眨眼
+  0.26        69      8.7         0.20     0.67      3.0%  ❌ 太少，漏掉真眨眼
+  0.28        80     10.0         0.20     0.87      3.9%  ❌ 太少，漏掉真眨眼
+  0.30        94     11.8         0.27     2.07      5.5%  ✅ 和生理值吻合
+  0.32       128     16.1         0.27     2.80      8.6%  ✅ 和生理值吻合
+  0.34       183     23.0         0.33     4.53     22.4%  ✅ 和生理值吻合
+
+
+【Q3】MAR 能不能替代 jawOpen？
+
+片段                    r(MAR,jaw)    MAR最高    jaw最高      最长张嘴(s)    最长jaw(s)
+----------------------------------------------------------------------------
+talking_00                 +0.99     0.54     0.75         0.20        0.93
+talking_01                 +0.96     0.65     0.75         0.27        0.47
+talking_02                 +0.98     0.62     0.81         0.53        1.13
+talking_03                 +0.95     0.78     0.87         0.87        1.07
+talking_04                 +0.94     0.77     0.88         0.47        0.60
+yawn_00                    +0.99     0.89     0.87         1.00        1.00
+yawn_01                    +0.88     0.43     0.51         0.00        0.07
+yawn_02                    +0.96     0.90     0.90         1.20        1.33
+yawn_03                    +0.98     0.77     0.84         1.00        1.13
+yawn_04                    +0.98     0.77     0.83         2.60        2.53
+
+   MAR  最长张嘴: 哈欠最低 0.00s vs 说话最高 0.87s  →  ❌ 重叠，MAR 和 jawOpen 不等价，要重新想
+   jaw  最长张嘴: 哈欠最低 0.07s vs 说话最高 1.13s  （昨晚的基线，对照用）
+
+
+【Q4】最长闭眼时长（PERCLOS 用）
+
+组             段数      闭眼>0.20最长(s)     中位(s)
+----------------------------------------------
+normal        27              0.47      0.00
+fatigue       26              0.60      0.00
+yawn           5              2.53      2.00
+talking        5              0.27      0.00

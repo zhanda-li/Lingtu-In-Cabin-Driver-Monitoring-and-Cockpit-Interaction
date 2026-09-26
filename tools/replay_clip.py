@@ -1,14 +1,15 @@
 """把一个片段的骨骼 CSV 逐帧过模型，看概率随时间的走势。
 
-为什么需要这个：训练脚本只给一个汇总准确率，看不出"错的都是哪几帧"，
-更看不出模型**靠什么**在做区分。本项目最脆的一处是 `fatigue` 和 `phone`
-都是低头，唯一区别是周期性——如果模型其实是在靠"低头幅度"或别的静态量
-区分，那换个坐姿就崩，而测试集上依然是 100%。
+为什么需要这个：训练脚本只给一个汇总准确率，看不出"错的都是哪几帧"。
 
-判据很直接：
-  - 喂 `fatigue` 片段 -> P(fatigue) 应随点头起伏，argmax 反复横跳；
-  - 喂 `phone`   片段 -> 应该是一条平线，稳定停在 phone。
-两者都平 = 没学到周期性，测试集上的高分是假的。
+读两个数，**别混**：
+  · **合并为两类（清醒 / 疲劳）的段级正确率** —— 这才是产品的判据。
+    `src/live.py` 的 `CLASS_LEVEL` 把 phone / fatigue 都落 L3，档位、闸门
+    （`src/fuse.py` 只看 P(normal)）、配色、语音、推送**都不区分这两类**，
+    所以现场会不会误报/漏报，只能读这个数。
+  · **3 类逐帧正确率 + 混淆对概率** —— 诊断用。`fatigue` 和 `phone` 都是低头，
+    唯一区别是周期性：如果模型其实在靠"低头幅度"这类静态量区分，换个坐姿就崩，
+    而测试集上依然很高。混淆对低才说明它真在用周期性（但对档位无后果）。
 
 窗口预测按**因果**方式落到窗口最后一帧（与实时推理一致），
 所以每个片段前 WINDOW-1 帧没有输出。
@@ -27,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import config as C
-from build_dataset import load_pose_csv, normalize_sequence
+from build_dataset import DIR_CLASS, DIRS, load_pose_csv, normalize_sequence
 from model import PoseTransformer
 
 CHUNK = 512
@@ -82,16 +83,27 @@ def predict_clip(model, csv_path, stat, device="cpu"):
     return probs
 
 
+def trace_chars():
+    """类别首字母当轨迹字符表，从 `config.CLASSES` 推导。
+
+    写死过一次（四类时是 "nGpf"），改类别数就崩在 `IndexError` 上 ——
+    而报错位置在几层函数里，看不出根因。首字母在现在的类别集下唯一
+    （normal/fatigue → n/f），将来加类别也够用。
+    """
+    return "".join(c[0] for c in C.CLASSES)
+
+
 def ascii_trace(trace, per_char=8):
     """一字符约 per_char 帧（15 fps 下 8 帧 ≈ 0.53 s）。"""
     chars = []
+    table = trace_chars()
     for s in range(0, len(trace), per_char):
         seg = [x for x in trace[s:s + per_char] if x >= 0]
         if not seg:
             chars.append(".")
             continue
         vals, cnt = np.unique(seg, return_counts=True)
-        chars.append("nGpf"[int(vals[cnt.argmax()])])
+        chars.append(table[int(vals[cnt.argmax()])])
     return "".join(chars)
 
 
@@ -110,13 +122,25 @@ def main():
         ckpt = runs[-1] / "best.pt"
     model, stat = load_model(ckpt)
     print(f"模型 {ckpt}  参数 {model.n_params():,}")
+    legend = " / ".join(f"{c[0]} {c}" for c in C.CLASSES)
     print(f"每字符 ≈ {8} 帧 ≈ {8 / C.TARGET_FPS:.2f} s   "
-          f"图例 . 无输出 / n normal / p phone / G glance / f fatigue\n")
+          f"图例 . 无输出 / {legend}\n")
 
     if args.clip:
         clips = [Path(args.clip)]
     else:
-        clips = sorted(C.DATA_POSE.glob("*/*.csv"))
+        # 只遍历**映射到某个类别的目录**（`build_dataset.DIR_CLASS` 的键），
+        # **不 glob 整个 data/pose**：`data/pose/glance/` 仍留在盘上（故意的，
+        # 非破坏性），glob 会把它捡进来然后在 `C.CLASSES.index(...)` 上抛
+        # ValueError —— 报的错是"glance is not in list"，看不出根因。
+        #
+        # ⚠️ 这里**不能**遍历 `C.CLASSES`（2026-09-25 二类合并踩过）：
+        # 二类之后 `phone` 不再是类别名而是一个**目录名**，照 CLASSES 遍历会
+        # 整整漏掉那 26 段 —— 而汇总表照样打印"漏报 0/26"，看起来是全绿，
+        # 实际少了近一半样本。遍历目录名才覆盖得全：
+        #   normal(27) + phone(26) + fatigue(26) = 79 段，与三类时代一致。
+        clips = [p for d in DIRS
+                 for p in sorted((C.DATA_POSE / d).glob("*.csv"))]
 
     # 片段落在哪个划分里，读清单；不在清单里的（比如刚录的）标 --
     split_of = {}
@@ -130,7 +154,12 @@ def main():
 
     summary = []
     for clip in clips:
-        true_idx = C.CLASSES.index(clip.parent.name)
+        # 目录 -> 类别（二类之后 `phone` 目录的样本标签是 `fatigue`，见 DIR_CLASS）
+        if clip.parent.name not in DIR_CLASS:
+            print(f"{clip.name}: 目录 {clip.parent.name} 没有映射到任何类别"
+                  f"（`build_dataset.DIR_CLASS`），跳过")
+            continue
+        true_idx = C.CLASSES.index(DIR_CLASS[clip.parent.name])
         probs = predict_clip(model, clip, stat)
         valid = ~np.isnan(probs[:, 0])
         pred = probs[valid].argmax(1)
@@ -140,16 +169,30 @@ def main():
         acc = float((pred == true_idx).mean())
         maj = int(np.bincount(pred, minlength=len(C.CLASSES)).argmax())
         mean_p = probs[valid].mean(0)
-        # 混淆对：fatigue 段看 P(phone)，phone 段看 P(fatigue)
-        other = C.CLASSES.index("phone" if true_idx == C.CLASSES.index("fatigue")
-                                else "fatigue")
-        conf = float(mean_p[other]) if clip.parent.name in ("fatigue", "phone") else None
+        # ---- 合并成两类（清醒 / 疲劳）后的正确率：**这才是产品的判据** ----
+        # `src/live.py` 的 CLASS_LEVEL 把 phone 和 fatigue 都落 L3，于是档位、
+        # 闸门（fuse 只看 P(normal)）、配色、语音、推送**全都不区分这两类**，
+        # 只有 `attention` 那一行文字区分。所以"现场会不会误报/漏报"要读这个数，
+        # 3 类正确率只是诊断（看模型到底在拿什么区分）。
+        norm_i = C.CLASSES.index("normal")
+        side = (pred == norm_i)                    # True = 判成清醒
+        true_side = (true_idx == norm_i)
+        macc = float((side == true_side).mean())
+        mok = bool(macc >= 0.5)                    # 段级：多数帧站在真值那一侧
+        # 混淆对：fatigue 段看 P(phone)，phone 段看 P(fatigue)。
+        # 合并成两类后没有这一对，所以要判在不在、不是一个 `index` 抛出来。
+        conf, other = None, None
+        if "phone" in C.CLASSES and "fatigue" in C.CLASSES \
+                and clip.parent.name in ("fatigue", "phone"):
+            other = C.CLASSES.index("phone" if true_idx == C.CLASSES.index("fatigue")
+                                    else "fatigue")
+            conf = float(mean_p[other])
         sp = split_of.get(f"{clip.parent.name}/{clip.stem}", "--")
         summary.append((clip.parent.name, clip.stem, acc, maj, conf, sp,
-                        float(mean_p[true_idx])))
+                        float(mean_p[true_idx]), macc, mok))
 
         print(f"{clip.parent.name:<8} {clip.stem:<14} [{sp:<5}] 正确率 {acc * 100:5.1f}%  "
-              f"P({C.CLASSES[true_idx]})={mean_p[true_idx]:.3f}"
+              f"合并 {macc * 100:5.1f}%  P({C.CLASSES[true_idx]})={mean_p[true_idx]:.3f}"
               + (f"  P({C.CLASSES[other]})={conf:.3f}" if conf is not None else ""))
         print(f"         {ascii_trace(pred)}")
 
@@ -173,7 +216,7 @@ def main():
         print("\n" + "=" * 78)
         print(f"{'类别':<8}{'片段':<16}{'划分':<7}{'正确率':>9}{'众数':>10}"
               f"{'P(真值)':>9}{'P(易混类)':>11}")
-        for cls, name, acc, maj, conf, sp, pt in summary:
+        for cls, name, acc, maj, conf, sp, pt, macc, mok in summary:
             c = f"{conf:.3f}" if conf is not None else "-"
             print(f"{cls:<8}{name:<16}{sp:<7}{acc * 100:>8.1f}%{C.CLASSES[maj]:>10}"
                   f"{pt:>9.3f}{c:>11}")
@@ -184,10 +227,30 @@ def main():
                 print(f"  [{sp}] {len(sel)} 段，平均逐帧正确率 "
                       f"{np.mean([s[2] for s in sel]) * 100:.1f}%")
 
+        # ---------------- 产品判据：合并成两类（清醒 / 疲劳） ----------------
+        print("\n合并为两类（清醒 / 疲劳）—— 档位、闸门、配色、语音、推送都只看这一层")
+        for sp in ("train", "val", "test", "--"):
+            sel = [s for s in summary if s[5] == sp]
+            if not sel:
+                continue
+            good = [s for s in sel if s[8]]
+            print(f"  [{sp:<5}] {len(good)}/{len(sel)} 段判对，"
+                  f"逐帧平均正确率 {np.mean([s[7] for s in sel]) * 100:.1f}%")
+        norm_i = C.CLASSES.index("normal")
+        false_pos = [s for s in summary if s[0] == "normal" and not s[8]]
+        miss = [s for s in summary if s[0] != "normal" and not s[8]]
+        n_norm = len([s for s in summary if s[0] == "normal"])
+        n_fat = len(summary) - n_norm
+        print(f"  误报（清醒段判成疲劳）{len(false_pos)}/{n_norm} 段"
+              + (": " + ", ".join(s[1] for s in false_pos) if false_pos else ""))
+        print(f"  漏报（疲劳段判成清醒）{len(miss)}/{n_fat} 段"
+              + (": " + ", ".join(s[1] for s in miss) if miss else ""))
+        # 只有"误报/漏报"和 `attention` 那一行文字看得出来；`C.CLASSES[norm_i]`
+        # 之外的类之间怎么混，对产品没有后果 —— 但它是模型在靠什么区分 的低成本探针。
         fat = [s for s in summary if s[0] == "fatigue" and s[4] is not None]
         pho = [s for s in summary if s[0] == "phone" and s[4] is not None]
         if fat and pho:
-            print(f"\n混淆对概率（越低越好）")
+            print(f"\n混淆对概率（诊断用，两类同落 L3，对档位无后果）")
             print(f"  fatigue 段 的平均 P(phone)  = {np.mean([s[4] for s in fat]):.4f}"
                   f"   最大 {max(s[4] for s in fat):.4f}")
             print(f"  phone   段 的平均 P(fatigue)= {np.mean([s[4] for s in pho]):.4f}"
@@ -207,7 +270,7 @@ def _summary_plot(summary, out_dir):
     plt = _mpl()
     # 按 config 里的严重度顺序排（normal/glance/phone/fatigue），不是字母序
     cls_list = [c for c in C.CLASSES if any(s[0] == c for s in summary)]
-    colors = {"normal": "#4a90d9", "glance": "#e8a33d",
+    colors = {"normal": "#4a90d9",
               "phone": "#d9663d", "fatigue": "#c0392b"}
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.6), dpi=150,
                              gridspec_kw={"width_ratios": [2.1, 1]})

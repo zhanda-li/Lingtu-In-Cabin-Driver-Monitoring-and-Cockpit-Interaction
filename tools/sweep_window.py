@@ -146,13 +146,17 @@ def main():
     print(f"片段划分：train {n['train']}  val {n['val']}  test {n['test']}"
           f"   （每个窗口都会重新切一遍）\n")
 
-    fi = C.CLASSES.index("fatigue")
-    pi = C.CLASSES.index("phone")
+    # ★ 2026-09-25 二类之后没有"phone vs fatigue"这一对可看了（两个类已经并成
+    # 一个），改看**两侧读法**的错分率 —— 这也正是产品口径本身：
+    #   误报 = 真值 normal 却被判成任一非正常类（清醒被读成疲劳）
+    #   漏报 = 真值非 normal 却被判成 normal（疲劳被读成清醒）
+    # 用"整行/整列减去对角"算，对**任意类别数**都成立，类别再变一次也不用改这里。
+    ni = C.CLASSES.index("normal")
     windows = [int(x) for x in args.windows.split(",")]
 
     brief = " ".join(c[:3] for c in C.CLASSES)
     print(f"{'窗口':>5}{'秒':>6}{'窗口数(训/测)':>15}{'滞后':>7}{'总准确率':>10}"
-          f"{'各类准确率 ' + brief:>26}{'P(phone|疲劳)':>14}{'P(疲劳|phone)':>14}")
+          f"{'各类准确率 ' + brief:>26}{'误报':>10}{'漏报':>10}")
     rows = []
     for w in windows:
         t0 = time.perf_counter()
@@ -166,18 +170,21 @@ def main():
         model, vloss, bep = train_one(data, w, args.epochs, args.seed)
         acc, prof, per_cls = evaluate(model, data, mean, std)
 
+        fa = float(prof[ni, :].sum() - prof[ni, ni])     # 误报率
+        miss = float(prof[:, ni].sum() - prof[ni, ni])   # 漏报率
+
         # 滞后 ≈ 半个窗口（秒）+ 迟滞。这是理论值，用来横向比较不同窗口。
         lag = w / C.TARGET_FPS / 2 + 0.6
-        rows.append((w, acc, prof[fi, pi], prof[pi, fi], lag))
+        rows.append((w, acc, fa, miss, lag))
         cls_str = " ".join(f"{v * 100:5.1f}" for v in per_cls)
         print(f"{w:>5}{w / C.TARGET_FPS:>6.1f}{n_tr:>8}/{n_te:<6}{lag:>6.1f}s"
               f"{acc * 100:>9.1f}%{cls_str:>26}"
-              f"{prof[fi, pi]:>14.3f}{prof[pi, fi]:>14.3f}"
+              f"{fa:>10.3f}{miss:>10.3f}"
               f"   ({time.perf_counter() - t0:.0f}s, ep {bep})")
 
     print(f"\n{'=' * 78}")
-    print("怎么看：滞后越小越好，但两个混淆概率必须仍然很低。")
-    print("只压窗口不管混淆 = 把疲劳误报成看手机（或反过来），比慢更糟。")
+    print("怎么看：滞后越小越好，但误报/漏报必须仍然很低。")
+    print("只压窗口不管错分 = 把清醒的人误报成疲劳（或反过来），比慢更糟。")
     ok = [r for r in rows if r[2] < 0.10 and r[3] < 0.10 and r[1] > 0.95]
     if ok:
         best = min(ok, key=lambda r: r[0])

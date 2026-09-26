@@ -1,0 +1,2079 @@
+/* =========================================================================
+   04 ~ 10 这七页的样式
+   -------------------------------------------------------------------------
+   `style.css` 管的是**座舱主界面**（四档状态共用一个页面，靠 body[data-sev] 变装）。
+   这个文件管**其余页面**：它们不随状态变装，但共用同一套 --accent / .card / .pill /
+   .topbar / .rail / .climate —— 所以每页要**先链 style.css 再链这个**。
+
+   共用骨架：.main.sub = 左导航 + 内容区（没有底部对话栏，也没有小瑞那一列）。
+   每页只负责往 .sub-body 里塞自己的东西。
+   ========================================================================= */
+
+.main.sub{
+  grid-template-columns:11.5rem minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr);
+  padding:1rem 1.4rem .5rem .6rem;
+}
+.sub-body{
+  grid-column:2; grid-row:1; min-height:0;
+  display:flex; flex-direction:column; gap:.85rem;
+  overflow-y:auto; overflow-x:hidden;
+  padding-right:.3rem;
+  scrollbar-width:thin; scrollbar-color:rgba(var(--rgb),.35) transparent;
+}
+.sub-body::-webkit-scrollbar{ width:.35rem; }
+.sub-body::-webkit-scrollbar-thumb{ background:rgba(var(--rgb),.3); border-radius:2rem; }
+
+/* 页标题行：‹ 返回 + 标题 + 右侧页签 */
+.ptitle{ display:flex; align-items:center; gap:1rem; flex:0 0 auto; flex-wrap:wrap; }
+.ptitle h1{ font-size:1.5rem; font-weight:600; letter-spacing:.04em; }
+.ptitle .back{
+  width:2.1rem; height:2.1rem; flex:0 0 auto; display:grid; place-items:center;
+  color:var(--ink); text-decoration:none; cursor:pointer;
+  background:var(--fill-2); border:1px solid var(--line); border-radius:50%;
+  transition:.25s;
+}
+.ptitle .back:hover{ background:rgba(var(--rgb),.18); border-color:rgba(var(--rgb),.5); }
+.ptitle .back svg{ width:1.1rem; height:1.1rem; }
+.ptitle .spacer{ flex:1 1 auto; }
+
+.tabs{ display:flex; gap:.35rem; flex-wrap:wrap; }
+.tab{
+  padding:.42rem .95rem; border-radius:2rem; cursor:pointer; font:inherit; font-size:.82rem;
+  color:var(--ink-4); background:var(--fill-2); border:1px solid var(--line);
+  transition:.25s; text-decoration:none; white-space:nowrap;
+}
+.tab:hover{ color:var(--ink); border-color:rgba(var(--rgb),.4); }
+.tab.on{
+  color:var(--ink); font-weight:600;
+  background:rgba(var(--rgb),.22); border-color:rgba(var(--rgb),.6);
+  box-shadow:0 0 1.2rem rgba(var(--rgb),.22);
+}
+
+/* 卡片头：标题 + 右侧小字 */
+.card-pad{ padding:1.05rem 1.15rem; }.card-h{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin-bottom:.7rem; }
+.card-h h3{ font-size:1.02rem; font-weight:600; letter-spacing:.03em; display:flex; align-items:center; gap:.45rem; }
+.card-h h3 svg{ width:1.1rem; height:1.1rem; color:var(--accent); }
+.card-h .note{ font-size:.72rem; color:var(--muted); }
+
+/* 小字注解。**这一条原来只写在 chat.html 的页内样式里**，于是 voice.html
+   和 media.html 用了同一个 class 却什么都没套上（不是报错，是"字比旁边大一号"
+   那种看不出来的坏）。挪到这里来，三页共用一份；chat.html 里那条留着不动
+   （值一样，谁覆盖谁都一样）。 */
+.fine-print{ font-size:.72rem; color:var(--muted); line-height:1.55; }
+
+/* ------------------------------------------------- 05 监测详情（monitor.html）
+   ★ 第八次改版：那四块（疲劳分析 / 生理指标 / 行为特征 / 历史记录）从
+   「驾驶监测」搬到了**独立的一页**上，从上往下排 —— 所以这里要的只是
+   "每一块之间分开、每块有个小标题"，`.three` / `.bottom3` / `.card` 全部照旧复用。 */
+.mon-sec{ margin-bottom:1.1rem; }
+.mon-sec:last-child{ margin-bottom:0; }
+.mon-sec-h{ display:flex; align-items:center; gap:.5rem; margin:.15rem 0 .6rem; }
+.mon-sec-h::before{
+  content:''; width:.2rem; height:.95rem; border-radius:2rem;
+  background:var(--accent); flex:0 0 auto;
+}
+.mon-sec-h h2{ font-size:1.06rem; font-weight:600; letter-spacing:.03em; }
+
+/* ★★ 2026-09-25 第十五次改版：重新布局。
+   用户原话：「监测详情部分 各个方框占的位置布局不好 重新布局 不要中间留空白 对齐」。
+   -------------------------------------------------- 改前**实测**的每张卡高（`_scratch/_meas_mon.py`）：
+     疲劳分析  264 / 212 / 212        同行底边差 52
+     生理指标  122 / 212 / 212        差 90 —— 心率那张下面一大块空
+     行为特征  112 / 212 / 309 / 184  四张卡塞进三列格 ⇒ 第二行**中、右两列整块空**
+     历史记录  188 / 242（两列 846 / 564）
+     列宽也不是均分：445 / 466 / 487（`.three` 是 1.05 / 1.1 / 1.15fr）
+   ⇒ 四条改动：
+   ① 列**均分** + `align-items:stretch` —— 同一行上下两条边都对齐；
+   ② 图表卡加 `.grow`：卡被撑高时**让图跟着长**，不是卡变高图不动、底下留白。
+      `.plot` 是 `viewBox="0 0 100 100"` + `preserveAspectRatio="none"` + `inset:0`
+      撑满盒子的，撑高只会把曲线纵向拉开、不会失真；`XQ.plot` 里**没有一处读
+      `clientWidth/clientHeight`**，所以撑高不需要重画（§live.js:1201 起）。
+   ③ 撑高后内容填不满的统计卡（心率 / 二类行为概率 / 点头哈欠）把内容**垂直居中**
+      —— 否则就是"上面两行字、下面一片空"，那正是用户说的"留空白"。
+   ④ 行为特征从 4 张重排成 5 张（原「点头 / 哈欠」那张把趋势图分出去单列），
+      按 3 + 2 铺满两行，第二行不再是"左边一张、右边两个空洞"。
+   ⚠️ 全部挂在 `.mon-sec` 下面 —— `.three` / `.bottom3` 是 design.html、detail.html、
+      link.html 共用的公共格，直接改那两条会把它们一起动。
+   ⚠️ `.p4` / `.mtiles` 里那些 `justify-content` **只在 `.card.grow` 里生效**：
+      没被撑高的卡（比如"支路二·面部路"那种自己就是行内最高的）用不到它们，
+      写上也不会变 —— 但别把这几条提到 `.p4` / `.mt` 上，那会改到 detail.html。 */
+.mon-sec .three{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  align-items:stretch;
+}
+.mon-sec .three > .span-all{ grid-column:1 / -1; }
+.mon-sec .three > .span2  { grid-column:span 2; }
+
+.mon-sec .card.grow{ display:flex; flex-direction:column; }
+.mon-sec .card.grow > *{ flex:0 0 auto; }             /* 默认都不许被压扁 */
+.mon-sec .card.grow > .chart,
+.mon-sec .card.grow > .mtiles,
+.mon-sec .card.grow > .dims,
+.mon-sec .card.grow > .p4{ flex:1 1 auto; min-height:0; }
+.mon-sec .card.grow > .chart{ display:flex; flex-direction:column; }
+.mon-sec .card.grow > .chart > .plot{
+  flex:1 1 auto; height:auto; min-height:9.5rem;      /* 9.5rem = .plot 的本高 */
+}
+.mon-sec .card.grow .mt{ display:flex; flex-direction:column; justify-content:center; }
+.mon-sec .card.grow > .p4{ display:flex; flex-direction:column; justify-content:space-evenly; }
+
+/* ---------------------------------------------------------- 04 用的格 */
+.three{
+  display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1.1fr) minmax(0,1.15fr);
+  gap:.85rem; align-items:start;
+}
+/* 底部那一排：3 张不等宽 */
+.bottom3{
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr) minmax(0,.85fr);
+  gap:.85rem; align-items:start;
+}
+
+/* 驾驶员实时画面：这张卡自己撑满列高 */
+.livecard{ position:relative; overflow:hidden; border-radius:var(--r-lg); min-height:20rem; }
+.livecard .cam-media{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; }
+.livecard .stage-svg{ position:absolute; inset:0; width:100%; height:100%; }
+
+/* ★ 2026-09-25 第十二次改版：用户给了「驾驶检测 未接入摄像头时背景图.png」，
+   原话「换到对应地方」。这一格原来"没接摄像头"看到的是 `XQ.headSVG()` 自己画的
+   暗色座舱（车窗 + 远山 + 空座椅），现在换成这张照片。
+   ⚠️ 挂 `#stageHost`，**不是 `.livecard`**：有摄像头时 `#stageHost` 整个被
+      `hidden`（detail.html:779），照片跟着一起走 —— 挂到卡上它会留在真画面底下，
+      哪天 `#camStream` 加载慢半拍就能从缝里看见一眼。
+   ⚠️ 光挂这一条**看不见照片**：`#stageHost` 里面那张 `.stage-svg` 是
+      `inset:0` 的一块不透明画布，会把它整个盖住。整层淡出那一条在
+      `style.css`（`#stageHost[data-face="none"] .stage-svg`），两处是一件事。
+   ⚠️ `center/cover` 是照源图定的：源图 2848x1600 是横的，这一格是竖的，
+      `cover` 会把左右各裁掉一半、只留中间那圈同心弧。**别改成 `contain`** ——
+      那会在上下留两条与卡片底色不同的带子。
+   ⚠️ 白纱**这里不加**（media.html 那两张加了）。这一格上的浮层
+      （`#noFace` / `.cam-chip` / `.mon-recog` / `.cam-toggle`）**各自都带
+      深色玻璃底**、文字是写死的浅色，压在这张 p05 只有 126 的亮照片上照样读得出；
+      再加一层白纱反而把同心弧洗没了。
+   🔴 `background-color:#B1D1EA` **不是装饰，是补那一段"图还没解码出来"的空档**。
+      `server.py` 的 `no_store` 给静态资源也加了 `no-store`（那一轮为了治
+      HTTP 缓存下的旧页面），**所以每次切页这张 76 KB 的 JPEG 都要重新取一遍**。
+      取回来之前 `background-image` 是空的，底下露出来的是 `.card` 的
+      `--glass`（浅色下 `rgba(255,255,255,.80)` 叠在洗白过的城市底图上）
+      —— 那是一片**灰白**，用户看到的"从灰变成我的背景图"里也有它一份。
+      这个色值就是照片自己的**整幅均值**（量出来的，不是挑的）：
+      取整幅而不是取顶部，是因为这一格是**竖框 + `cover`**，整幅的竖向
+      全都在画面里，均值就是最接近"一眼看上去的底色"的那个数。
+      ⚠️ **换图必须连这个色值一起重量**（`_scratch/_mk_bg.py` 出图之后跑一遍
+         亮度统计），不然空档期会闪出一块和照片对不上的蓝。 */
+.livecard #stageHost{
+  background:#B1D1EA url("assets/cam_off.jpg") center/cover no-repeat;
+}
+
+/* ===== 「未检测到人脸」那块浮层（2026-09-25） =====
+   用户报「驾驶监测部分 没人脸的时候 那个画面太丑了」。丑的是**没人脸时的画面本身**：
+   那时候兜底 SVG 在演一张睁着眼、画着定位点的假脸，等于在没有任何输入的情况下
+   表演"正在识别人脸"。所以这块浮层压上去，同时把那层假脸淡出。
+   ★ 同一天用户又补了一句：「只要接入摄像头后 就不要再出现 没人像的那个了」。
+   于是这一块**只剩一种出场条件：这台机器没接摄像头** —— 有摄像头时那一格里
+   就是真实视频，空镜也是真实视频，不该拿一块"未检测到人脸"盖住它。
+   ⚠️ 所以它挂在 `.livecard` 上、**不在 `#stageHost` 里**：`#stageHost` 是那张
+      兜底 SVG 的容器，挂进去等于把浮层的生死和 SVG 绑在一起，而这一块要在
+      SVG 整个 `hidden` 掉的时候也能独立存在。
+   ⚠️ 显示/隐藏**不在这里判**，由 `XQ.headMode()` 一处写 `hidden`（页面在
+      `onHello` 里按 `d.source` 调它）。默认就是**显示**：页面刚打开、还没收到
+      hello 时，"没摄像头"是诚实的默认态。
+   ⚠️ `z-index:2` 是**故意的**：压在画面（`cam-media` / `stage-svg` 是 1）之上，
+      但在左上那颗「驾驶员实时画面」、右上「识别中」和底边那条（都是 3）之下 ——
+      那三样是"画面从哪来 / 推理在不在跑 / 在算什么"，没人脸时它们照样得能读。
+   配色写死浅色字（`#EAF4FF`）而不是 `var(--ink)`：浅色主题里 `--ink` 是深墨蓝，
+   压在这块深色玻璃上读不出来 —— 底边那条 `.cam-bar` 用的是同一套写死的值。 */
+.livecard .noface{
+  position:absolute; left:50%; top:46%; transform:translate(-50%,-50%);
+  z-index:2; pointer-events:none;
+  display:flex; flex-direction:column; align-items:center; gap:.3rem;
+  padding:.95rem 1.7rem 1.05rem; border-radius:var(--r-md);
+  /* ⚠️ `width:max-content` **不能省**：绝对定位盒子在 `left:50%; right:auto` 下的
+     可用宽度只有**从 50% 到右边**那一半（实测 259px），于是那句副标题会被挤成两行、
+     "内"字单独掉到第三行。`max-width` 的百分比按**包含块**算（这里是整张卡），
+     所以 80% 仍然能兜住窄卡。 */
+  width:max-content; max-width:80%; text-align:center;
+  background:rgba(8,22,32,.58); backdrop-filter:blur(4px);
+  border:1px dashed rgba(255,255,255,.34);
+}
+.livecard .noface svg{
+  width:2.2rem; height:2.2rem; margin-bottom:.15rem;
+  fill:none; stroke:rgba(234,244,255,.62);
+  stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+}
+.livecard .noface b{ font-size:.95rem; font-weight:600; color:#EAF4FF; letter-spacing:.02em; }
+.livecard .noface .nf-sub{
+  font-size:var(--fs-note); color:rgba(234,244,255,.76); line-height:1.5;
+}
+
+/* ❌ 已删 · 等待卡里那颗 `.nf-btn`（= `#camOn`「接入摄像头」，2026-09-25 深夜）。
+   它只活在等待卡露面的时候，一接上摄像头就跟着 `#noFace.hidden` 一起没了；
+   右上角那颗 `#camOff` 反过来只在接上时才有。用户报「想断的时候找不到能按的」，
+   两颗并成一颗常驻的 `.cam-toggle`（见下面「画面卡的两颗浮层」那一段）。
+   ⚠️ `pointer-events` 那条教训没消失：`.noface` 整块仍是
+      `pointer-events:none`，将来谁再往等待卡里塞按钮，必须自己把它收回来。 */
+
+/* 驾驶员卡里那张脸 */
+.drv-head{ display:flex; align-items:center; gap:.8rem; margin-bottom:.75rem; }
+.drv-ava{
+  width:3.4rem; height:3.4rem; flex:0 0 auto; border-radius:50%; overflow:hidden;
+  display:grid; place-items:center;
+  background:radial-gradient(circle at 50% 40%, rgba(var(--rgb),.35), var(--panel-4));
+  border:1px solid rgba(var(--rgb),.45);
+}
+.drv-ava svg,.drv-ava img{ width:100%; height:100%; object-fit:contain; }
+.drv-head .who b{ display:block; font-size:1.02rem; font-weight:600; }
+.drv-head .who span{ font-size:.74rem; color:var(--muted); }
+.drv-big{ display:flex; align-items:baseline; gap:.6rem; margin-bottom:.45rem; flex-wrap:wrap; }
+.drv-big b{ font-size:2.1rem; font-weight:600; letter-spacing:.04em; }
+.drv-say{ font-size:.84rem; color:var(--ink-3); line-height:1.5; margin-bottom:.8rem; }
+
+/* 指标小格：值 + 单位 + 一条小线 */
+.mtiles{ display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+.mt{
+  padding:.6rem .7rem; border-radius:var(--r-md);
+  background:var(--fill-2); border:1px solid var(--fill-3);
+}
+.mt .k{ font-size:.72rem; color:var(--muted); margin-bottom:.25rem; }
+.mt .v{ font-size:1.3rem; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.15; }
+.mt .v u{ text-decoration:none; font-size:.72rem; font-weight:400; color:var(--muted); margin-left:.15rem; }
+/* 「未接入」那一档。★ 2026-09-26 补：这一条**原来不存在** —— 别的卡片
+   （`.mr` / `.st` / `.nt` / `.dnum`）都有各自的 `.v.na`，只有 `.mt` 漏了。
+   漏掉的后果不是报错，是**那一格看起来量到了**：`.mt .v` 是 1.3rem/600，
+   比 `.mr .v` 还大一档，四个字照样按数值的样子排。monitor.html 的心率那一格
+   要能出数了（串口进来的真数），所以这一档必须有。
+   ⚠️ `.mt` 是 **design.html / link.html / monitor.html 三页共用**的，改这条
+      会一起动到它们 —— 但只影响同时挂 `.na` 的元素，现在只有 monitor.html
+      那两格挂（心率、血氧）。 */
+.mt .v.na{ font-size:.9rem; font-weight:500; color:var(--muted); }
+.mt .spark{ width:100%; height:1.5rem; margin-top:.3rem; color:var(--accent); opacity:.75; }
+.mt .spark path{ fill:none; stroke:currentColor; stroke-width:1.6; }
+.mt .bar{ height:.4rem; border-radius:2rem; background:var(--track); overflow:hidden; margin-top:.4rem; }
+.mt .bar i{
+  display:block; height:100%; width:0; border-radius:2rem;
+  background:linear-gradient(90deg, rgba(var(--rgb),.55), var(--accent));
+  transition:width .45s ease-out, background .6s;
+}
+.mt.wide{ grid-column:1 / -1; }
+/* 指标小格上那个数字的"按档位着色"。
+   ★ 2026-09-24 收敛：以前这里有**两条轴** —— 类名说"疲劳程度"（mild/severe），
+   变量却指向**类别**色（--sev-phone/--sev-fatigue），名字对不上、颜色靠人肉记。
+   只做疲劳之后全站只剩一条轴：档位键 = 类名 = 变量名 = 全站配色轴，
+   所以下面四条一一对应，`severity` 是几就填 `--sev-几`。
+   （旧值是"借 L2/L3 的琥珀/红"，其中 `sev-mild` 由琥珀 #FF9830 变成
+   它本该有的黄 #FFD400 —— 只有 design.html 那一个样本的观感变了。）
+   使用者：`design.html` 色板页里那两个样本。 */
+.mt .v.sev-normal  { color:var(--sev-normal);   }
+.mt .v.sev-mild    { color:var(--sev-mild);     }
+.mt .v.sev-moderate{ color:var(--sev-moderate); }
+.mt .v.sev-severe  { color:var(--sev-severe);   }
+
+/* 趋势图 */
+.chart{ margin-top:.2rem; }
+.chart + .chart{ margin-top:.9rem; padding-top:.8rem; border-top:1px solid var(--line); }
+.chart-h{ display:flex; align-items:center; justify-content:space-between; font-size:.8rem; margin-bottom:.4rem; gap:.5rem; }
+.chart-h b{ font-weight:600; }
+.chart-h .cur{ font-size:.72rem; color:var(--muted); }
+.chart-h .cur i{ font-style:normal; color:var(--accent); font-weight:600; font-size:.9rem; }
+.chart svg{ width:100%; height:9.5rem; display:block; overflow:visible; }
+.chart .axis{ stroke:var(--line-3); stroke-width:1; }
+.chart .grid{ stroke:var(--fill-3); stroke-width:1; stroke-dasharray:2 4; }
+.chart .lbl{ fill:var(--muted); font-size:.6rem; }
+.chart .area{ fill:rgba(var(--rgb),.16); }
+.chart .line{
+  fill:none; stroke:var(--accent); stroke-width:2;
+  stroke-linejoin:round; stroke-linecap:round;
+  filter:drop-shadow(0 0 4px rgba(var(--rgb),.7));
+}
+.chart .line.dim{ stroke:rgba(var(--rgb),.4); filter:none; }
+.chart .pt{ fill:var(--accent); }
+.chart .pt-ring{ fill:none; stroke:var(--accent); stroke-width:1.4; opacity:.6; }
+.chart .bubble{ fill:rgba(var(--rgb),.92); }
+.chart .bubble-txt{ fill:var(--on-accent); font-size:.6rem; font-weight:600; }
+.chart .now-line{ stroke:rgba(var(--rgb),.45); stroke-width:1; stroke-dasharray:3 3; }
+
+/* ---- 折线图：SVG 只画线，刻度字用 HTML 铺 ----
+   为什么不用 <text> 画刻度：SVG 要 `preserveAspectRatio="none"` 才能填满这个
+   非等比的框，可那样**文字会被横向拉扁**。所以线和网格留在 SVG 里（配
+   `vector-effect="non-scaling-stroke"` 让线宽不被拉），刻度字放到 HTML 层。 */
+.plot{ position:relative; height:9.5rem; margin-left:2.1rem; margin-bottom:1.25rem; }
+.plot svg{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+.plot .ylab{
+  position:absolute; right:100%; margin-right:.35rem; transform:translateY(-50%);
+  font-size:.6rem; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.plot .xlab{
+  position:absolute; top:100%; margin-top:.3rem; transform:translateX(-50%);
+  font-size:.6rem; color:var(--muted); white-space:nowrap;
+}
+.plot .bub{
+  position:absolute; transform:translate(-50%,-140%);
+  padding:.16rem .5rem; border-radius:2rem; white-space:nowrap;
+  font-size:.6rem; font-weight:600; color:var(--on-accent);
+  background:var(--accent); box-shadow:0 0 .6rem rgba(var(--rgb),.5);
+}
+.plot .bub::after{
+  content:''; position:absolute; left:50%; top:100%; transform:translateX(-50%);
+  border:.28rem solid transparent; border-top-color:var(--accent);
+}
+/* 空图：没数据时别画一条假的零线 */
+.plot-empty{
+  position:absolute; inset:0; display:grid; place-items:center;
+  font-size:.74rem; color:var(--muted); text-align:center; line-height:1.5;
+}
+
+/* 历史记录时间线 */
+.tl{ list-style:none; display:flex; flex-direction:column; gap:.1rem; }
+.tl li{ position:relative; padding:.42rem 0 .42rem 1.5rem; }
+.tl li::before{
+  content:''; position:absolute; left:.34rem; top:1.05rem; bottom:-.15rem;
+  width:1px; background:var(--line-3);
+}
+.tl li:last-child::before{ display:none; }
+.tl li::after{
+  content:''; position:absolute; left:0; top:.78rem;
+  width:.75rem; height:.75rem; border-radius:50%;
+  background:rgba(var(--rgb),.9); box-shadow:0 0 .6rem rgba(var(--rgb),.8);
+}
+/* 圆点按**档位**上色（2026-09-24 晚：原来是 ok/warn/bad 三档，跟着 `severity`
+   那条疲劳轴；只做疲劳之后四个类名直接就是档位键，和时间线画的东西
+   ——"这一段时间驾驶员处在哪一档"——是同一套词汇）。
+   ⚠️ 这四个类名是**成对**的：`detail.html` 的 `renderTimeline()` 和
+      `link.html` 的 `renderPush()` 都按档位键拼类名，改这里就得改那两处
+      （`_check_pages.py` 会 goto 这两页，漏掉的话圆点会退成 `li::after`
+      那条默认的 `rgba(var(--rgb),.9)` ——**不报错、只是颜色不对**）。 */
+.tl li.normal::after  { background:var(--sev-normal);   box-shadow:0 0 .6rem var(--sev-normal);   }
+.tl li.mild::after    { background:var(--sev-mild);     box-shadow:0 0 .6rem var(--sev-mild);     }
+.tl li.moderate::after{ background:var(--sev-moderate); box-shadow:0 0 .6rem var(--sev-moderate); }
+.tl li.severe::after  { background:var(--sev-severe);   box-shadow:0 0 .6rem var(--sev-severe);   }
+.tl time{ font-size:.7rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.tl b{ display:block; font-size:.84rem; font-weight:600; margin:.05rem 0; }
+.tl p{ font-size:.72rem; color:var(--muted); line-height:1.4; }
+
+/* 建议与提示 */
+.adv{ list-style:none; display:flex; flex-direction:column; gap:.45rem; }
+.adv li{
+  display:flex; align-items:center; gap:.7rem; cursor:pointer;
+  padding:.65rem .8rem; border-radius:var(--r-md);
+  background:var(--fill-2); border:1px solid var(--line);
+  transition:.25s;
+}
+.adv li:hover{ background:rgba(var(--rgb),.14); border-color:rgba(var(--rgb),.45); transform:translateX(.15rem); }
+.adv li > svg:first-child{ width:1.3rem; height:1.3rem; color:var(--accent); flex:0 0 auto; }
+.adv li .tx{ flex:1 1 auto; min-width:0; }
+.adv li .tx b{ display:block; font-size:.86rem; font-weight:600; }
+.adv li .tx span{ font-size:.7rem; color:var(--muted); }
+.adv li .chev{ width:1rem; height:1rem; color:var(--muted); flex:0 0 auto; }
+
+/* 多维度的四个小格 */
+.dims{ display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+.dim{
+  padding:.6rem .7rem; border-radius:var(--r-md);
+  background:var(--fill-2); border:1px solid var(--fill-3);
+}
+.dim .k{ font-size:.72rem; color:var(--muted); }
+.dim .v{ font-size:.92rem; font-weight:600; margin:.2rem 0 .3rem; }
+.dim .spark{ width:100%; height:1.7rem; color:var(--accent); opacity:.7; }
+.dim .spark path{ fill:none; stroke:currentColor; stroke-width:1.5; }
+
+/* 未接入时的实话说 */
+.unwired{
+  display:flex; align-items:center; gap:.5rem;
+  padding:.55rem .8rem; border-radius:var(--r-md);
+  font-size:.76rem; color:var(--muted); line-height:1.45;
+  background:var(--fill-1); border:1px dashed var(--line-3);
+}
+.unwired svg{ width:1rem; height:1rem; flex:0 0 auto; }
+
+/* ---------------------------------------------------------- 05 对话页 */
+.chat-wrap{ display:grid; grid-template-columns:minmax(0,1fr) 22rem; gap:.85rem; align-items:start; }
+.chat-box{ display:flex; flex-direction:column; }
+.chat-head{ display:flex; align-items:center; gap:.75rem; padding-bottom:.8rem; border-bottom:1px solid var(--line); }
+.chat-head .ava{
+  width:3.2rem; height:3.2rem; flex:0 0 auto; border-radius:50%; overflow:hidden;
+  display:grid; place-items:center;
+  background:radial-gradient(circle at 50% 40%, rgba(var(--rgb),.4), var(--panel-4));
+  border:1px solid rgba(var(--rgb),.45);
+}
+.chat-head .ava img,.chat-head .ava svg{ width:100%; height:100%; object-fit:contain; }
+.chat-head b{ display:block; font-size:1.05rem; font-weight:600; }
+.chat-head span{ font-size:.74rem; color:var(--muted); }
+
+/* 大号对话气泡：比主界面底部那条宽，能放下整段话 */
+.msgs{
+  flex:1 1 auto; display:flex; flex-direction:column; gap:.8rem;
+  padding:1rem 0; overflow-y:auto; max-height:28rem;
+  scrollbar-width:thin; scrollbar-color:rgba(var(--rgb),.3) transparent;
+}
+.msgs::-webkit-scrollbar{ width:.35rem; }
+.msgs::-webkit-scrollbar-thumb{ background:rgba(var(--rgb),.3); border-radius:2rem; }
+.msg{ display:flex; gap:.6rem; align-items:flex-start; max-width:82%; }
+.msg .ava{
+  width:2.3rem; height:2.3rem; flex:0 0 auto; border-radius:50%; overflow:hidden;
+  display:grid; place-items:center;
+  background:radial-gradient(circle at 50% 40%, rgba(var(--rgb),.35), var(--panel-4));
+  border:1px solid rgba(var(--rgb),.4);
+}
+.msg .ava img,.msg .ava svg{ width:100%; height:100%; object-fit:contain; }
+.msg .bub{
+  padding:.75rem .95rem; border-radius:1.1rem 1.1rem 1.1rem .35rem;
+  font-size:.9rem; line-height:1.62; color:var(--ink-2);
+  background:rgba(var(--rgb),.16); border:1px solid rgba(var(--rgb),.36);
+}
+.msg .bub .tm{ display:block; margin-top:.35rem; font-size:.66rem; color:var(--muted); text-align:right; }
+.msg.me{ align-self:flex-end; flex-direction:row-reverse; }
+.msg.me .bub{
+  border-radius:1.1rem 1.1rem .35rem 1.1rem;
+  background:var(--fill-3); border-color:var(--line); color:var(--ink-2);
+}
+.msg.me .ava{ background:var(--fill-3); border-color:var(--line); color:var(--muted); }
+/* ★ 2026-09-25：小瑞这两处头像**是可点的** —— 点一下全场小瑞一起换一张形象
+   （43 张方形头像库，见 chat.html 的 `avaSwap`）。
+   ⚠️ 只给"能换"的那两处 `pointer`：统写 `.msg .ava` 会把驾驶员那个也变成手型，
+      那是在承诺一个点下去没有反应的点击。`:not(.me)` 这一串和 chat.html 里
+      JS 那个 `AVA_SEL` 是**同一件事的两种写法**，改一处就得改另一处。 */
+.chat-head .ava,
+.msg:not(.me) .ava{ cursor:pointer; }
+
+/* 气泡里的语音条 */
+.voice{
+  display:flex; align-items:center; gap:.55rem; margin-top:.55rem;
+  padding:.45rem .7rem; border-radius:2rem; width:fit-content;
+  background:var(--panel-2); border:1px solid rgba(var(--rgb),.3);
+}
+.voice .pl{
+  width:1.7rem; height:1.7rem; flex:0 0 auto; display:grid; place-items:center; cursor:pointer;
+  color:var(--accent); background:rgba(var(--rgb),.2); border-radius:50%; border:none;
+}
+.voice .pl svg{ width:.85rem; height:.85rem; }
+/* 正在念的那一句。**只有浏览器真开口了才会亮**（live.js 的 XQ.speak 里那个
+   started 回调），走服务端兜底时它不亮 —— 那条路看不到进度，
+   与其让它假装在动，不如不动。 */
+.voice .pl.speaking{ background:rgba(var(--rgb),.55); color:#06111a; }
+.voice .wave{ display:flex; align-items:center; gap:2px; height:1.1rem; }
+.voice .wave i{ display:block; width:2px; border-radius:1px; background:rgba(var(--rgb),.75); }
+.voice .len{ font-size:.68rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.voice .spk{ width:1.2rem; height:1.2rem; color:var(--muted); cursor:pointer; }
+
+/* 右侧「为你推荐」那一列 */
+.rec{ display:flex; flex-direction:column; gap:.5rem; list-style:none; }
+.rec li{
+  display:flex; align-items:center; gap:.7rem; cursor:pointer; list-style:none;
+  padding:.7rem .85rem; border-radius:var(--r-md);
+  background:var(--fill-2); border:1px solid var(--line); transition:.25s;
+}
+.rec li:hover{ background:rgba(var(--rgb),.15); border-color:rgba(var(--rgb),.45); }
+.rec li > svg:first-child{ width:1.35rem; height:1.35rem; color:var(--accent); flex:0 0 auto; }
+.rec li .tx{ flex:1 1 auto; min-width:0; }
+.rec li .tx b{ display:block; font-size:.86rem; font-weight:600; }
+.rec li .tx span{ font-size:.7rem; color:var(--muted); }
+.rec li .chev{ width:1rem; height:1rem; color:var(--muted); flex:0 0 auto; }
+.rec-tip{
+  margin-top:.2rem; padding:.7rem .85rem; border-radius:var(--r-md);
+  font-size:.8rem; line-height:1.6; color:var(--ink-2);
+  background:rgba(var(--rgb),.12); border:1px solid rgba(var(--rgb),.32);
+  font-family:"KaiTi","STKaiti",cursive;
+}
+
+/* 「情感化陪伴」常用语 */
+.chips{ display:flex; flex-wrap:wrap; gap:.45rem; }
+.chip{
+  padding:.5rem .9rem; border-radius:2rem; cursor:pointer; font:inherit; font-size:.8rem;
+  color:var(--ink); background:var(--fill-2); border:1px solid var(--line);
+  transition:.25s; text-align:left;
+}
+.chip:hover{ background:rgba(var(--rgb),.2); border-color:rgba(var(--rgb),.5); }
+
+/* 2026-09-25：这里原来是一整块 `.player` —— chat.html 底部那条"示意"音乐条
+   （`.cover` / `.meta` / `.ctl` / `.big-wave` / `.heart` 全是它的子规则）。
+   用户说不需要，HTML 和 JS 一起删了，样式跟着摘。
+   ⚠️ 全站只有 chat.html 用过这个类名（media.html 特意避开了它，见那边的注释），
+      所以摘掉之后**没有任何页面会掉样式**。真播放器是 player.js 那条悬浮条，
+      它用的是 `.xq-mini` 那一套，和这里无关。 */
+
+/* ---------------------------------------------------------- 06 多端联动 */
+.link-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.85rem; align-items:start; }
+.dev{
+  display:flex; flex-direction:column; align-items:center; gap:.6rem;
+  padding:1rem .8rem; border-radius:var(--r-lg);
+  background:var(--fill-1); border:1px solid var(--line); transition:.35s;
+}
+.dev.on{ background:rgba(var(--rgb),.12); border-color:rgba(var(--rgb),.5); box-shadow:0 0 1.6rem rgba(var(--rgb),.2); }
+.dev .glyph{ width:4.4rem; height:4.4rem; color:var(--ink-icon); transition:.35s; }
+.dev.on .glyph{ color:var(--accent); }
+.dev .glyph svg{ width:100%; height:100%; }
+.dev b{ font-size:.95rem; font-weight:600; }
+.dev span{ font-size:.72rem; color:var(--muted); text-align:center; line-height:1.45; }
+.dev .tag{
+  font-size:.68rem; padding:.18rem .6rem; border-radius:2rem;
+  color:var(--muted); border:1px solid var(--line);
+}
+.dev.on .tag{ color:var(--accent); border-color:rgba(var(--rgb),.5); background:rgba(var(--rgb),.12); }
+
+/* 联动链路图 */
+.chain{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.chain .st{
+  padding:.5rem .85rem; border-radius:2rem; font-size:.78rem;
+  background:var(--fill-2); border:1px solid var(--line); color:var(--ink-3);
+}
+.chain .st.hot{ color:var(--ink); background:rgba(var(--rgb),.2); border-color:rgba(var(--rgb),.55); font-weight:600; }
+.chain .ar{ color:var(--muted); font-size:.9rem; }
+
+/* 消息推送记录 */
+.push{ list-style:none; display:flex; flex-direction:column; gap:.45rem; }
+.push li{
+  display:flex; gap:.7rem; align-items:flex-start;
+  padding:.6rem .8rem; border-radius:var(--r-md);
+  background:var(--fill-1); border:1px solid var(--fill-3);
+}
+.push li .ic{
+  width:1.9rem; height:1.9rem; flex:0 0 auto; border-radius:.6rem; display:grid; place-items:center;
+  background:rgba(var(--rgb),.16); color:var(--accent);
+}
+.push li .ic svg{ width:1rem; height:1rem; }
+.push li .tx{ flex:1 1 auto; min-width:0; }
+.push li .tx b{ display:block; font-size:.82rem; font-weight:600; }
+.push li .tx p{ font-size:.72rem; color:var(--muted); line-height:1.45; }
+.push li time{ font-size:.68rem; color:var(--muted); flex:0 0 auto; font-variant-numeric:tabular-nums; }
+
+/* ---------------------------------------------------------- 07 交互流程 */
+.flow{ display:flex; flex-direction:column; gap:1.1rem; }
+.flow-row{ display:flex; align-items:stretch; gap:.55rem; flex-wrap:wrap; }
+.fn{
+  flex:1 1 9rem; min-width:8.5rem;
+  display:flex; flex-direction:column; gap:.3rem;
+  padding:.75rem .85rem; border-radius:var(--r-md);
+  background:var(--fill-2); border:1px solid var(--line);
+}
+.fn.hot{ background:rgba(var(--rgb),.16); border-color:rgba(var(--rgb),.5); }
+.fn .no{ font-size:.62rem; color:var(--accent); letter-spacing:.12em; font-weight:600; }
+.fn b{ font-size:.84rem; font-weight:600; }
+.fn span{ font-size:.7rem; color:var(--muted); line-height:1.45; }
+.fa{ align-self:center; color:var(--muted); flex:0 0 auto; }
+.fa svg{ width:1.1rem; height:1.1rem; display:block; }
+.flow-band{
+  display:flex; align-items:center; gap:.7rem; flex-wrap:wrap;
+  padding:.55rem .9rem; border-radius:2rem; font-size:.76rem;
+  background:rgba(var(--rgb),.1); border:1px dashed rgba(var(--rgb),.4); color:var(--ink-3);
+}
+.flow-band b{ color:var(--accent); font-weight:600; }
+
+/* ---------------------------------------------------------- 08 设计规范 */
+.sw-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(7.5rem,1fr)); gap:.6rem; }
+.sw{ border-radius:var(--r-md); overflow:hidden; border:1px solid var(--line); }
+.sw .chipc{ height:4.2rem; }
+.sw .meta{ padding:.45rem .6rem; background:var(--fill-1); }
+.sw .meta b{ display:block; font-size:.76rem; font-weight:600; }
+.sw .meta span{ font-size:.66rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+
+.type-row{ display:flex; align-items:baseline; gap:.9rem; padding:.5rem 0; border-bottom:1px solid var(--fill-2); }
+.type-row:last-child{ border-bottom:none; }
+.type-row .spec{ font-size:.68rem; color:var(--muted); flex:0 0 7rem; font-variant-numeric:tabular-nums; }
+.radius-demo{ display:flex; gap:.7rem; flex-wrap:wrap; }
+.radius-demo div{
+  width:5.4rem; height:3.4rem; display:grid; place-items:center;
+  font-size:.7rem; color:var(--muted);
+  background:rgba(var(--rgb),.1); border:1px solid rgba(var(--rgb),.4);
+}
+.spec-list{ list-style:none; display:flex; flex-direction:column; gap:.5rem; }
+.spec-list li{ display:flex; gap:.7rem; font-size:.8rem; line-height:1.5; }
+.spec-list li .k{ flex:0 0 6.5rem; color:var(--accent); font-weight:600; font-size:.76rem; }
+.spec-list li .v{ color:var(--ink-3); }
+
+/* ---------------------------------------------------------- 09 手机端 */
+.phones{ display:flex; gap:1.4rem; flex-wrap:wrap; justify-content:center; }
+.phone{
+  width:15.5rem; flex:0 0 auto; padding:.6rem;
+  border-radius:2.2rem; background:linear-gradient(160deg,var(--bezel-1),var(--bezel-2));
+  border:1px solid var(--line-3);
+  box-shadow:0 1.4rem 3rem var(--scrim), inset 0 0 0 1px var(--fill-1);
+}
+/* ⚠️ 手机屏**不跟主题走，钉死成深色**（2026-09-24 全量推广时定的）。
+   原来这里是 `background:var(--page-bg) var(--bg-img) ...`，于是浅色主题一开：
+   `--bg-img` 变成 `none`（那张夜景图在浅色下被撤掉了），`--page-bg` 变成
+   `#E4F0FB`，底下那层 `.screen::after` 的深色罩再压上来 —— 屏就成了一块**脏灰**。
+   顺带把里面那一整套配色全带坏了：四档强调色是照着深屏挑的（`phone.html` 里
+   那四条 `.phone[data-sev]`），`正常` 那档的青色压在灰绿上基本读不出来。
+
+   为什么不反过来"让手机屏也变浅"：屏里的东西是一整套（深色罩、四档强调色、
+   浅色版车标 `chery_mark.png`）照深底配的，翻过来要动四处且互相关联。
+   而且**手机模型本来就是"设备自己的界面"**，一块深色 App 界面摆在浅色页面上
+   是正常设计，不是穿帮。钉死之后 `phone.html` 那四条 `.phone[data-sev]`
+   也就不用再跟着 `style.css` 改了。 */
+.phone .screen{
+  border-radius:1.7rem; overflow:hidden; height:31rem;
+  display:flex; flex-direction:column; position:relative;
+  background:#050B14 url("assets/bg.jpg") center/cover no-repeat;
+  /* ⚠️ 这行**必须有**，不是多余的。屏内那几条 `.ph-*` 规则里，
+     `.ph-hero b` / `.ph-card .tx b` 这些**根本没写 color**，靠继承拿字色 ——
+     而继承的是**计算值**：`body{ color:var(--ink) }` 在 body 那一层就把
+     浅色版的 `--ink`（深蓝 #0E2A4A）解出来了，往下传的已经是那个颜色。
+     所以下面 `html[data-theme="light"] .phone .screen` 就算把 `--ink`
+     重新钉回深色，**也没有任何规则会再取用它一次**，屏里该看不见的还是看不见
+     （表现就是 hero 那个标题"状态良好"糊在深底上）。
+     在这里写一句 `color:var(--ink)` 就是"在这层重新解析一次"。
+     ⚠️ 深色主题下这句是恒等的（:root 的 --ink 本来就是它），不影响深色渲染。 */
+  color:var(--ink);
+}
+/* 屏内是**深色孤岛**：上面把屏的底图钉死了，但那还不够 ——
+   `.ph-card` / `.ph-status` 这些用的是 `var(--fill-2)` / `var(--ink-3)`，
+   浅色主题一开它们照样变浅（**卡片变白、字变深蓝**），于是屏里就成了
+   "深色底 + 浅色卡片"的混搭，而 hero 那个标题是 `--accent`，
+   青字压在按 `--rgb` 染过的深底上**基本看不见**。
+
+   所以把这 5 个变量在屏内重新钉回深色那套。**只列屏内真的用到的** ——
+   `--bezel*` / `--scrim` / `--fill-1` / `--line-3` 是外壳的，留着跟主题走
+   （浅色下外壳变浅蓝，那是对的）。
+   ⚠️ 值必须和 style.css `:root` 里同名的那几条**逐字一致**；
+      这两处一旦分叉，表现是"手机屏里只有某一小块颜色不对"，很难找。 */
+html[data-theme="light"] .phone .screen{
+  --ink:#F4F8FA;
+  --ink-3:#C8D8E4;
+  --muted:#91A5B5;
+  --line:rgba(255,255,255,.10);
+  --fill-2:rgba(255,255,255,.05);
+}
+
+.phone .screen::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg, rgba(5,11,20,.72), rgba(5,11,20,.88));
+}
+.phone .ph-body{ position:relative; z-index:1; display:flex; flex-direction:column; height:100%; padding:.8rem .75rem; gap:.6rem; }
+.ph-status{ display:flex; justify-content:space-between; font-size:.62rem; color:var(--ink-3); }
+.ph-brand{ display:flex; align-items:center; gap:.4rem; }
+.ph-brand img{ height:1.15rem; width:auto; }
+.ph-brand span{ font-size:.62rem; color:var(--muted); }
+.ph-hero{
+  display:flex; flex-direction:column; align-items:center; gap:.35rem;
+  padding:.85rem .6rem; border-radius:1.3rem; text-align:center;
+  background:rgba(var(--rgb),.14); border:1px solid rgba(var(--rgb),.38);
+}
+.ph-hero .mascot{ width:4.6rem; height:4.6rem; }
+.ph-hero b{ font-size:1rem; font-weight:600; }
+.ph-hero span{ font-size:.66rem; color:var(--muted); line-height:1.45; }
+.ph-cards{ display:flex; flex-direction:column; gap:.45rem; }
+.ph-card{
+  display:flex; align-items:center; gap:.6rem;
+  padding:.6rem .7rem; border-radius:1rem;
+  background:var(--fill-2); border:1px solid var(--line);
+}
+.ph-card > svg:first-child{ width:1.1rem; height:1.1rem; color:var(--accent); flex:0 0 auto; }
+.ph-card .tx{ flex:1 1 auto; min-width:0; }
+.ph-card .tx b{ display:block; font-size:.76rem; font-weight:600; }
+.ph-card .tx span{ font-size:.62rem; color:var(--muted); }
+.ph-card .v{ font-size:.86rem; font-weight:600; color:var(--accent); font-variant-numeric:tabular-nums; }
+.ph-bar{
+  margin-top:auto; display:flex; justify-content:space-around; align-items:center;
+  padding-top:.55rem; border-top:1px solid var(--line);
+}
+.ph-bar svg{ width:1.15rem; height:1.15rem; color:var(--muted); }
+.ph-bar svg.on{ color:var(--accent); }
+.phone-cap{ text-align:center; font-size:.8rem; color:var(--muted); margin-top:.7rem; }
+.phone-cap b{ display:block; color:var(--ink); font-size:.92rem; font-weight:600; margin-bottom:.2rem; }
+
+/* ---------------------------------------------------------- 10 展示封面 */
+/* ★ 2026-09-24：整块封面**按 1.3 倍等比放大**（用户原话「中间那些灵途智行
+   与你同行等字 等比例放大 小瑞形象也方大」）。
+   ⚠️ **是"整块一起放大"，不是各自调** —— 眉标芯片、书法标题、分隔线、
+      光晕、小瑞立绘、以及这里的间距和最小高度，全部乘同一个 1.3。
+      只放大其中几项的话，原来量出来的构图比例（比如"小瑞站在光晕里"那个
+      椭圆关系）当场就不成立了，而这件事在截图上是"看着有点不对"那种级别的
+      问题，说不出具体哪儿错。系数改一次就得整块跟着改。
+   ⚠️ 每个数后面都跟着它原来的值（用 → 标出），下次要调照着一行行乘就行。
+   ⚠️ 为什么不写成一个 CSS 变量（比如 --cover-k）再 var() 乘：
+      这几条规则里**有 px 有 rem 有比例**，CSS 的 calc 乘法在
+      `min-height` / `border-radius:50%` 这些地方并不通用；而且乘出来的
+      是一串小数，改一次要盯着八个地方，比直接写死更难维护。 */
+/* ★ 2026-09-24（第三次改版，按用户给的 `ui/图片效果/13.png` 重排）：
+   版式从**两列网格**改成**左文右立绘的叠压构图** —— 13.png 里小瑞的左缘
+   （约 41% 处）压在左栏文字区右边，月亮飘带擦着「主动预警」那个胶囊，
+   两个列是**叠起来**的，不是并排的。所以 `.cover-stage` 改成
+   `position:relative` + 单块，立绘那一格 `.cover-r` 用 absolute 拉满右侧
+   （`inset:0 0 0 20%` 让它的**中心**落在 60% 左右，和 13.png 量出来的
+   小瑞中心（x≈1010/1671）对得上；纯靠 grid 分列是挪不到那个位置的）。
+   ⚠️ 叠压之后**层次要显式写死**：文字必须压在小瑞之上（`.cover-l` z-index:2），
+      否则飘带和耳朵会盖到标题上。13.png 那张图里文字也是压在最上面的。
+   ⚠️ 上一版（往上是「整块封面 x1.3」那次）的那套网格数字**已经不算数了**，
+      别再拿 1.15fr/.85fr 去推位置 —— 现在只有这一处 absolute 定位置。
+
+   `.cover-l .eyebrow` 那条**已删除**：13.png 的左栏第一行就是大标题，
+   没有眉标胶囊。而且那颗胶囊写的是「灵途智行 · 小瑞情感化驾驶员监测系统」，
+   和下面的大标题「灵途智行 · 与你同行」**开头四个字重复**，本来就该收。
+   连带 `_check_theme2.py` 里「眉标是灵途智行」那条断言也跟着改（见那个文件）。 */
+.cover-stage{
+  position:relative; display:flex; align-items:flex-start;
+  min-height:39rem; padding:5.5rem 2.6rem 1.95rem 3.6rem;   /* 1.95rem 2.6rem */
+}
+/* `padding-top` 是按 13.png **量出来的**，不是目测：跑
+   `python _scratch/_cmp_geo.py`，它按「深墨像素行密度」把两张图的
+   大标题带 / 副标题带 / 胶囊带的 y 区间各打一行，逐带对齐。
+
+   2026-09-24 量到（截图 `runs/_cover_v6.png`，两者都是 1672x940 量级）：
+       带         13.png              改之前        现在
+       大标题   258..369(112)     221..341(121)   对齐
+       副标题   395.. 419( 25)    369.. 392( 24)   对齐
+       胶囊     496.. 537( 42)    474.. 507( 34)   对齐
+   三带**整体高了 26~28 px**（≈3% 图高），不是某一条的间距错了，所以改的是
+   stage 的 padding-top（3.6rem → 5.5rem，+28px @ 14.93px root），
+   三条相对间距一个都没动。
+   ⚠️ `_cmp_geo.py` 里算亮度必须先转 int32：int16 下 `*587` 会**溢出**，
+      全图会被判成"处处是墨"，一张带都分不出来（第一版就是这么写的，
+      两张图都打印 `0..940` 一整条）。
+   ⚠️ 大标题那条带的**高度**对不上（121 vs 112）是**遮罩美术本身**的差别，
+      不是排版错：13.png 那行艺术字比 9.jpg 抠出来的这张更扁更宽
+      （墨迹宽高比 7.10 vs 6.08）。两边的**墨迹面积几乎相同**
+      （89040 vs 89056 px²），所以视觉分量是一致的，**不要去拉伸它** ——
+      用 transform:scaleX 凑宽度会把字形压变形。
+   ⚠️ 别改成 `align-items:center` —— 试过（`runs/_cover_v2.png`）：左栏上下的
+      空档本来就不对称（标题顶 26%、胶囊底 58%），居中会把整块往下推 60px，
+      标题跑到 32%、胶囊跑到 63%，**比原来还偏**。 */
+.cover-l{ position:relative; z-index:2; max-width:58%; }
+/* 封面大标题：现在是**艺术字图**（和顶栏同一张 9.jpg 抠出来的），不是文字。
+   这里当「遮罩」用、顶栏直接贴 PNG，理由只有一条：
+   遮罩能**一字不差地复用原来那条渐变**（100deg、20% 处起白、收在 var(--accent)），
+   和旁边的 eyebrow 胶囊、那条 rule 的青色是同一个色源；烘焙成 PNG 就得多出一张图，
+   还得盯着两处手动对齐。
+
+   ⚠️ **别照抄「切重度时标题会跟着变红」这种话**（我第一版注释就是这么写的，是错的）。
+   实测：封面是 <body class="cover" data-sev="normal">（cover.html:37，**写死**的），
+   这页不连 WebSocket，`?sev=` 在封面**不生效** —— 和 chat.html 那条「这一页不换装」
+   同一个道理。所以 --accent 在封面恒为 #18D7C5，这条联动**今天根本用不上**；
+   留着只因为它零成本，封面哪天变成有状态页就自动跟上。
+
+   ⚠️ 两条必须这么写，不然标题会**整个消失**：
+   ① `font-size:0` 之后没有字形可裁，所以 background-clip 必须显式改回 border-box，
+      否则背景被裁成全透明；
+   ② 下面窄屏那条 media 里原来写的是 `font-size:2.4rem` —— 不改的话窄屏下字号不是 0，
+      那行**真文字会原样显示出来**（颜色也变回默认），跟艺术字叠在一起。改成缩放高度。
+
+   ⚠️ 一条已知取舍：遮罩**加载失败的话标题是静默空白**，不像顶栏那个 <img> 还有 alt 兜底。
+      接受的理由是这张图和其它资产走同一条 /static 路由，真缺了整站都打不开；
+      要是哪天想要兜底，就得换成 <img> + 烘焙好的 PNG（那时记得挑青色的那张）。 */
+.cover-l h1{
+  /* height 按**字身**定，不按整幅：这张图上下各有一截是稀疏的装饰（上面星芒、
+     下面飘带）。目标是字身 ≈ 40px（= 原来那句 3.4rem 汉字的墨迹高 39.8px）。
+     ⚠️ **2026-09-23 重抠过一次**：源图 9.jpg 被用户换掉了（旧的是天空渐变底、
+     新的是精确纯白底），字身占比 48% -> **58%**（`_logo_cut.py` 量的），所以
+     6.4rem 要按 6.4 x 0.48/0.58 = **5.31rem** 缩，否则标题会比原来**大一圈**。
+     ⚠️ **2026-09-23 起这个系数只剩本处和下面那条 media 两处**：顶栏原来的
+     `.brand .brand-wordmark` 已经换成「标志图 + HTML 文字」，不再吃这个系数了
+     （艺术字图只剩封面这一处，见 chrome.js 里那段说明）。
+     ⚠️ **2026-09-24：5.31rem -> 6.9rem（x1.3）**，用户要求"等比例放大"。
+     这一改把上面那个 40px 的目标抬到了**字身 ≈ 4.0rem**（6.9 x 0.58），
+     根字号 14.93px 时约 60px。**遮罩图不变、只改高度** —— 图是矢量化前抠好的
+     位图（927x216，宽高比 4.2917），contain 会把宽度按比例带出来，所以
+     6.9rem 高对应 **29.6rem 宽**，左边那一列（1920x1080 下约 70rem）装得下，
+     不会撑破。
+     ★ **2026-09-24 第三次改版：6.9 -> 12.4rem（x1.80）**，照 13.png 量的 ——
+     那张图里标题墨迹宽 **795px / 1672px 视口**（x 95~890），而当时屏上是 442px，
+     差 1.80 倍。**只改高度**：遮罩图没换，contain 会把宽度按比例带出来，
+     于是字身从 60px 抬到约 **107px**、整幅 12.4 x 4.2917 = **53.2rem（794px）**。
+     根字号 14.93px 那台（1672 宽）刚好装得下；1920x1080 下是 913px，
+     `.cover-l` 的 max-width:58%（约 1070px）也装得下，两档都不会把标题挤小。
+     ⚠️ 窄屏那条 media 里的高度**跟着这条走**（0.706 倍），别只改大屏。 */
+  font-size:0; height:12.4rem;       /* 6.9rem（2026-09-24 第二次 x1.3） */
+  margin:1.2rem 0 0;                 /* 1.56rem 0 1.04rem */
+  /* ★ 2026-09-25 用户报「**智行两字有点模糊 与背景图颜色有点一致**」——
+     量了再改，不是把这两个字单独调深。屏上分三段量「笔画亮度 vs 紧邻背景亮度」
+     （`_scratch/_cov_contrast.py`，判据是 WCAG 对比度）：
+         段          改前       改后
+         灵途        4.79:1     4.93:1
+         智行        **1.71:1** **3.21:1**   ← 就是这一段塌了
+         与你同行     3.97:1     3.97:1
+     塌的原因**不是新底图**：是 **46% 那个 `#8FD0FF` 亮带正好落在「智行」上**。
+     这页底色是亮天空（L≈0.59），而 `#8FD0FF` 自己的 L≈0.58 —— 两者几乎同亮度，
+     所以才会「看着和背景一个色」。用户当场补的一句「**并不是新底图的错误
+     以前也有这个问题**」和量出来的一致：渐变与底图无关，换底图前三段就是 4.8/1.7/4.0。
+     ⚠️ 这条亮带**只能压深，靠底图救不了**：亮天空上要留高光，亮带得暗到
+        `#1E6BE0` 这一档（L≈0.16）才够 —— 所以 48% 处用的就是它，
+        **复用了 30% 那一档的同一个颜色**，没有引入新色。
+        试过更亮的 `#4E9FE6`（智行 2.53:1，不够）；`#2470DC`（3.20:1）和现在持平
+        但要多一个色，所以没选。
+     ⚠️ 也试过「保留亮带 + 加粗深蓝描边」（`drop-shadow(0 0 2px rgba(8,38,110,.9))`）：
+        **一个数都没变**（3.20 -> 3.20），所以下面那条 `filter` 保持原样不动。
+     角度保持 100deg（那道光是斜的）。 */
+  background:linear-gradient(100deg,#0B3EA8 6%,#1A5FD4 30%,#1E6BE0 48%,#1A5FD4 66%,#0A3790 100%);
+  /* 13.png 那行字外面有一圈**深蓝勾边**，遮罩做不出来（遮罩只有形状没有描边），
+     用一圈极紧的 drop-shadow 近似：只落在字形轮廓上，不像"投影"。
+     ⚠️ 半径别加大 —— 超过 1px 就散成阴影，"描边"那个意思就没了。 */
+  filter:drop-shadow(0 0 1px rgba(8,38,110,.85));
+  -webkit-background-clip:border-box; background-clip:border-box;
+  -webkit-mask-image:url(/static/assets/lingtu_wordmark_mask.png);
+  -webkit-mask-repeat:no-repeat;
+  -webkit-mask-position:left center;
+  -webkit-mask-size:contain;
+  mask-image:url(/static/assets/lingtu_wordmark_mask.png);
+  mask-repeat:no-repeat;
+  mask-position:left center;
+  mask-size:contain;
+}
+/* ★ 2026-09-23（第二次改版）：**三条规则全删**，`.cover-l` 现在只剩
+   眉标芯片 + 书法大标题 + 这条分隔线。
+     · `.cover-l .cover-lede`  —— 那行技术名「分心 / 疲劳驾驶实时检测系统」
+     · `.cover-meta` 及它那两条子规则 —— 四个数字（4 类 / 45 帧 / 3.7→1.0 s / 121 段）
+   理由是用户点了名的：「严禁出现帧数、识别类别、延迟等任何技术测试数字」，
+   以及「下方无多余文字」。逐条命中，不是"看着字多"。
+   ⚠️ 这三条删掉之后**没有任何东西再引用它们**（cover.html 里那两处也删了），
+      所以是干净的删除；要恢复的话 h1 的遮罩和 `.rule` 都还在，样式照抄回来即可。
+   ⚠️ 别只删 HTML 不删这里 —— 那种"半边删除"最容易被后来的截图检查
+      误当成"还在展示"，也最容易被下一个人照着重加回去。 */
+/* ★ 2026-09-24 第三次改版：`.cover-l .rule` **已删除**（那条 6.5rem 的粗强调线），
+   13.png 的标题底下没有这条线 —— 换成下面那行**副标题**（两侧带细横线），
+   再下面是三个特性胶囊。原来那条 `.rule` 的规则和 HTML 一起删了，
+   别只删一处（`cover.html` 里也删了）。
+   ⚠️ 那三行历史注释（`.cover-lede` / `.cover-meta` 那两条整块删除）**仍然有效**：
+      「严禁出现帧数、识别类别、延迟等任何技术测试数字」这条用户规矩没变，
+      新加的副标题和三个胶囊里**一个数字都没有**，是定性的一句话 + 三个词。
+      ⚠️ 以后往这三个胶囊里塞数字（比如"识别 4 类"）就是踩同一条线。 */
+.cover-l .cover-sub{
+  display:flex; align-items:center; gap:1.3rem; margin-top:-.6rem;
+  font-size:1.75rem; font-weight:600; letter-spacing:.05em; color:#1B56A8;
+  white-space:nowrap;
+}
+/* ⚠️ `margin-top` 是**负数**，不是笔误：标题那行是**遮罩图**，图的上下各有
+   约 21% 是空的（9.jpg 那幅艺术字本身带的星芒和飘带），12.4rem 的框里
+   墨迹只占中间 —— 也就是说 h1 的框底比字底**低约 39px**。
+   13.png 里副标题顶离标题底只有 15px，所以这里必须把那段空档抵掉。
+   改 h1 高度的话这个负数要跟着重算（≈ 0.21 × 新高度）。 */
+.cover-l .cover-sub i{ flex:0 0 auto; height:1px; }
+.cover-l .cover-sub i.l{ width:6.5rem; background:linear-gradient(90deg,transparent,rgba(27,86,168,.6)); }
+.cover-l .cover-sub i.r{ width:4.2rem; background:linear-gradient(90deg,rgba(27,86,168,.6),transparent); }
+/* 三个特性胶囊（13.png 那排「实时感知 / 情绪陪伴 / 主动预警」）。
+   尺寸照 13.png 量的：胶囊高约 70px（= 4.7rem）、蓝圆徽章直径约 40px（= 2.7rem）、
+   标签约 24px（= 1.6rem）、胶囊之间只隔十几像素（不是宽松排开）。
+   ⚠️ 徽章外那圈**白环**（box-shadow 0 0 0 .38rem）是 13.png 的样式，别当阴影删掉 ——
+     没有它，蓝圆直接压在浅色胶囊上会"陷进去"，那个浮起来的质感就是靠这圈白。 */
+.cover-l .cover-feats{ display:flex; align-items:center; gap:.8rem; margin-top:3.4rem; }
+.cover-l .cover-feats .sep{ width:1px; height:2.6rem; background:rgba(27,86,168,.5); flex:0 0 auto; }
+.cover-l .cover-feats .feat{
+  display:inline-flex; align-items:center; gap:1.15rem;
+  padding:.9rem 2.4rem .9rem 1.05rem; border-radius:99rem;
+  font-size:1.68rem; font-weight:600; letter-spacing:.04em; color:#1B54A4;
+  /* ★ 2026-09-25 轻量化（用户：「圆角卡片可以再轻量化，减少阴影，和车规 UI
+     简洁感对齐」）。三处一起收，别只收影子 —— 只收影子会把卡片变成
+     "一块白玻璃浮在照片上"，反而更假：
+       · 底色  .97/.88 → **.90/.74**（下半截露出一点底图，卡片不再是一块实心白）
+       · 白边  .95 → **.82**（原来那圈白描边本身就在勾"卡片"的轮廓）
+       · 影子  `0 .55rem 1.4rem α.18` + `inset 0 1px 0 #fff` → **一条**
+         `0 .18rem .5rem α.10`，顶部那条 inset 白高光**去掉了**
+     ⚠️ 车规 HMI 的做法是"极浅的底 + 极短的距离"，不是"没有影子"：
+        这张卡底下是**照片**（城市天际线，明暗不均），完全去掉影子的话
+        下半部分会糊进背景里。所以留的是 0.18rem 的短距柔和影，
+        不是把它归零。 */
+  background:linear-gradient(180deg, rgba(255,255,255,.90), rgba(233,243,255,.74));
+  border:1px solid rgba(255,255,255,.82);
+  box-shadow:0 .18rem .5rem rgba(30,127,216,.10);
+}
+.cover-l .cover-feats .feat .ic{
+  width:3.1rem; height:3.1rem; border-radius:50%; flex:0 0 auto;
+  display:grid; place-items:center; color:#fff;
+  background:linear-gradient(180deg,#4FA9FA,#1155C6);
+  /* ⚠️ 外圈那圈白环**没有删**（它是 13.png 的"徽章浮在胶囊上"那个质感，
+     上面那条 09-24 的注释点了名不许当阴影删）—— 只是和卡片一起收了一档：
+     白环 .62 → .55、外发光 .35/.9rem → .22/.5rem。
+     没有白环的话蓝圆会"陷"进浅色胶囊里，那又是另一次改版的结论。 */
+  box-shadow:0 0 0 .38rem rgba(255,255,255,.55), 0 .18rem .5rem rgba(17,85,198,.22);
+}
+.cover-l .cover-feats .feat .ic svg{ width:1.7rem; height:1.7rem; }
+/* ★ 2026-09-25：三枚图标的**视觉重量**对齐（用户：「图标可以微调，视觉重量更
+   均衡」）。**这是量出来的，不是眼估** —— 屏上截 `runs/_cov_final_cover.png`
+   （1672x940，圆徽章直径 47px），把蓝圆里的白墨挑出来量墨迹框：
+     图标     墨迹宽x高   墨迹像素   墨迹中心相对圆心
+     eye      21 x 15     86        居中
+     heart    17 x 16     61        **偏下 1.5px**
+     shield   17 x 19     73        居中
+   两头的问题正好相反：`eye` 的镜片横贯 19/24 个视框（在同一个字号下最宽最重），
+   而 `heart` 又小又轻、并且它图形本身在视框里就偏低（路径 y 7.7~20，中心 13.85，
+   视框中心是 12）。所以一个调小、一个调大并上移，`shield` 只微收一点。
+   字号是照"墨迹像素对齐到 ~70"反推的（墨迹 ≈ 正比于字号²）：
+     1.55² ×86/1.7² ≈ 71 ｜ 1.82² ×61/1.7² ≈ 70 ｜ 1.64² ×73/1.7² ≈ 68
+   `heart` 那个 `translateY(-6%)` = 在它自己的高度（1.82rem≈27px）上移 1.6px，
+   正好抵掉量到的 1.5px。用百分比不用 px，是为了跟着根字号走。
+   ⚠️ 选择器里**必须带 `.feat`**：不带的话它和上面那条
+      `.cover-l .cover-feats .feat .ic svg` 是**同一个权重 (0,4,1)**，
+      胜负只由书写顺序决定 —— 本项目在"同权重靠顺序"上栽过两次
+      （见 style.css 里那段 .on-dark/.on-light 的说明）。带上 `.feat` 是 (0,5,1)，
+      稳压，和写在哪儿无关。
+   ⚠️ **只改这一页这三个胶囊里的显示尺寸，`XQ.ICON`（live.js）那张表一个字不动**
+      —— 它是全站唯一一份，动它的路径会连带 11 个页面里所有 eye/heart/shield。
+   ⚠️ 这三个数是量出来的：**换图标、或改 `.ic` 的 3.1rem 直径，都要重新量**。 */
+.cover-l .cover-feats .feat .ic[data-ic="eye"] svg{ width:1.55rem; height:1.55rem; }
+.cover-l .cover-feats .feat .ic[data-ic="heart"] svg{
+  width:1.82rem; height:1.82rem; transform:translateY(-6%);
+}
+.cover-l .cover-feats .feat .ic[data-ic="shield"] svg{ width:1.64rem; height:1.64rem; }
+/* ══════════════════════════════════════════════════════════════════════════
+   ★★ 2026-09-24（第四次改版）：这一段**整块删掉了**。
+   --------------------------------------------------------------------------
+   原来这里是**手搭的**浅色封面背景：`.bg` 一条四色竖向渐变当天空、
+   `.bg::before` 用 `skyline.svg` + 几个扁椭圆拼出"中景城市带 + 玻璃地面"、
+   `.bg::after` 再拼一层"远景天际线 + 空气雾"，另外 `.tint` 里还叠了五道
+   横向光带当玻璃反光。三层都带 blur，是照着 13.png 一点点对出来的
+   （那三版之间的差异记在上面被删掉的那段注释里）。
+
+   现在**不需要了**：用户给了真素材 `ui/图片效果/背景.png`
+   （「把刚打开浏览器 没进入座舱前的背景变成背景.png图」），
+   13.png 那张背景本来就是这张照片。于是：
+     · 封面的 `.bg`   → `style.css` 里一句 `body.cover .bg`（原色照片，cover 定位）
+     · 座舱那几页的底 → 同一张照片洗白（`bg_wash.jpg` + `.bg::after` 的白蒙版）
+     · 两个伪元素层 + `.tint` 那五道光带 → **全删**
+   手画的城市压在真照片上就是"两座城市打架"，留着只会更难看。
+
+   ⚠️ **不是"藏起来"**：三条规则（`.bg` / `::before` / `::after`）和 `.tint`
+      那条覆盖都在这里删掉了，`skyline.svg` 这个资产**没有别的使用者**
+      （grep 过：全库只剩这几行引用它），但**文件先留着不删** ——
+      它是个 1.5 KB 的和弦，删了万一要回退还得重新对一遍那三版。
+      真要回退，`_scratch/_light_before_20260924.zip` 里有本文件的原件。
+   ⚠️ 连带失效的判据：`_check_theme2.py` 里那个 `skylineLayer` 探针原来读的是
+      封面 `.bg::after` 的 `content` / `backgroundImage`（天际线那一层）。
+      ★ 2026-09-24 晚**真的改掉了**（那句"已改成读 `.bg` 本体"当时只是写在这里，
+      代码没跟上 —— 探针一直还在读 `.bg::after`，于是恒读到一个 `"none"`
+      然后静默判红）：探针改名 `bgLayer`，J 段改成验**洗白层的分布**——
+      封面 `.bg::after` 必须没有（封面要的就是照片本身），座舱页必须有
+      （白卡片压在照片上要靠它）。两个方向都咬，改这里要同步改那个探针。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ★ 2026-09-24 第三次改版：这一格从"网格里的右列"改成**叠在版面上的绝对层**，
+   照着 13.png 把立绘放大约 2.4 倍（18.2 -> **44rem**，即 272 -> 657px）。
+   左边这个数**唯一的作用就是横向挪人**：这一格左边缘 = 舞台左 + 舞台宽 x 该数，
+   而人是**在格子里居中**的（`place-items:center`），
+   所以**调大它 = 把人往右挪**，每 1% 挪 8.0px（1672 宽实测），别反向调。
+   ⚠️ 别改成 `right:0; width:52%` —— 那样中心跳到 74%，小瑞会整个挤到右边，
+      和左栏文字脱开，13.png 那种"人和字咬在一起"的构图就没了。
+      但"咬在一起"要的是**光晕**咬上去，不是**人**踩在字上（见下面 2026-09-25 那段）。
+   ⚠️ z-index:1 让它**压在背景之上、文字之下**（`.cover-l` 是 2）：
+      飘带扫过「主动预警」胶囊那一下是叠压关系，不是盖住。
+      上边取 2% 是为了让脚落在 13.png 那个位置（≈91% 高）。
+
+   ★ **2026-09-25：19% -> 35%。** 用户原话「整体有点偏左 靠右一点 因为挡到字了」。
+   量出来的（`_scratch/_probe_cover_geom.py`，1672x940）：
+       文字块右边缘 834  |  立绘**画面**左边缘 751  ->  **压了 83px**
+   ⚠️ 必须拿 `containBox()` 量**画面**：`.mascot` 那个 657px 的盒子里，
+      420x613 的图按 contain 只画 471x687，左右各留一段空白，
+      拿盒子去算重叠会把"只是空白"也算成"压住了"。
+   19% 这个数是**给 18.2rem 那个小槽量的**，2026-09-24 槽 x2.4 那次**没跟着重算**，
+   人就这么长到字上去了 —— 35% 是把画面左边缘顶到 879（留 45px 余量）倒推的。
+   光晕（56rem 正圆）左边缘落在 696，仍然压着文字右边缘 138px，**这是故意的**：
+   「咬在一起」由光晕那层软的来体现，人本身不许盖住字。
+   ⚠️ 换立绘图、改槽宽、或改根字号，都要**重量一次**，别照抄这个 35%。 */
+.cover-r{ position:absolute; inset:2% 0 0 35%; display:grid; place-items:center; z-index:1; }
+/* 光晕是**竖椭圆**，立绘槽也刻意给高（14x22rem），为的是"一整身站在光里"那个
+   构图。⚠️ 2026-09-23 换成小瑞之后图的比例变了，这条**重新量过**：
+   原来那张雪宝立绘是 1:2.6 的窄竖图，正好填满 22rem 的高槽；现在的
+   `assets/xiaorui_hero.png` 是 **612x613（1:1.002，基本是方的）**，所以
+   `object-fit:contain` 卡的是**宽度 14rem**，画出来的内容只有 14 x 14.02rem，
+   槽高 22rem —— **底下空出 7.98rem**（根字号 14.93px 时实测 120.7px；
+   在 12.86px 那台机器上约 103px）。
+   量法（可复现）：`_scratch/_shot_pages.py` 截图 + 在里面用 getBoundingClientRect
+   算 contain 的内容框，图在 `_scratch/_shots/cover_right.png`。
+   ⚠️ 不要照抄旧注释里的「87px / 1:1.09」—— 那个 1.09 是笔误（613/612 = 1.002），
+   87px 是拿它推出来的错数。
+   **留高槽不改**：背后那个椭圆 .halo（22x30rem，比槽还大）把人眼里的空档读成
+   "站在光晕里"而不是"图没填满"，截图上成立。真要改成更方的比例，改这一行
+   下面 `.mascot` 的 height 就够，一行的事。
+   ★ **2026-09-24：槽和光晕一起 x1.3**（用户「小瑞形象也方大」）——
+   14x22 -> **18.2x28.6rem**，光晕 22x30 -> **28.6x39rem**。
+   ⚠️ 上面那段"底下空 7.98rem"的账**跟着变大**：contain 现在卡的是宽度
+      18.2rem，内容 18.2 x 18.23rem，槽高 28.6 → **底下空 10.37rem**
+      （x1.3 之后本来就该是这个数）。**这是等比放大的正常结果，不是又算错了** ——
+      构图关系一个字没动。真要压掉这段空档，那是"改比例"，得单独提出来做。 */
+   /* ★ **2026-09-24 第三次改版（照 13.png）**：上面的账**又变了一次**，
+   新数是「槽 44x46rem、光晕 56x56」。13.png 里小瑞是**接近正方**的构图
+   （含飘带约 660x770px，脚被画面裁到 860/941 那个位置），所以槽不用再给
+   "一整身站着"那么高；光晕也跟着从竖椭圆放成**正圆**（13.png 里那团辉光
+   是圆形的扩散，不是竖椭圆）。
+   ⚠️ 上面那段「底下空 7.98rem / 10.37rem」的算式说的是 18.2x28.6 那版，
+      **现在是历史**，别照着它去推新槽的留白：44x46 的槽配 612x613 的方图，
+      contain 卡宽度，画出来 44 x 44.07rem，上下各空约 **0.96rem**（很小）。 */
+.cover-r .halo{
+  position:absolute; width:56rem; height:56rem;        /* 28.6rem / 39rem */
+  border-radius:50%;
+  background:radial-gradient(ellipse at center, rgba(var(--rgb),.30), transparent 62%);
+  animation:pulse 5s ease-in-out infinite;
+}
+.cover-r .mascot{ width:44rem; height:46rem; position:relative; }   /* 18.2x28.6rem */
+.cover-r .mascot .mascot-img{ object-fit:contain; }
+/* 脚下那团**发光地台**（13.png 里小瑞站在一圈亮椭圆上）。
+   ⚠️ 用 `::after` 而不是新加 DOM：`#coverMascot` 里那个 `<div id="coverMascotSvg">`
+      是 live.js 的 `mascotSlot()` 要用的，别往那儿塞东西。
+
+   ★ **2026-09-24 换素材时重新量过一遍**（`_scratch/_probe_cover_geom.py`，视口 1672x940、
+     根字号 14.93）：立绘画面 `x 884..1344  y 119..806`（461x687）。两条要紧的：
+       · 画面**底边 806 就是脚底** —— 新素材（`xiaorui_pose_*.png` 805x1200）角色占满
+         99.6%~99.9% 画幅、脚底落在 0.998 处，所以只要槽是**高度受限**的（宽高比 0.67
+         < 槽的 0.957，成立），**脚底恒等于槽底**。旧素材是 612x613 的方图，脚**不在**
+         图底边上，那时这条公式不成立 —— 下面那几个数跟着换过一次，别再照旧数抄。
+       · 文字块右边缘 834，画面左边缘 884 -> **留 50px，不压字**。
+     ★ 2026-09-25 用户报「**小瑞的腿部分好像也有点和背后背景虚化的感觉**」。
+       用**开关法**定位（`_scratch/_cov_variants.py` 逐个关掉再截屏、`_cov_measure.py` 量）：
+       拿小瑞自己的 alpha 轮廓圈出腿那一带，量**轮廓边上的 |∇L| 均值**（"糊"就塌下去）：
+           关掉这条 `::after`     0.533    ← 天花板（这层完全不碰腿时能到多少）
+           关掉 `.halo` 那条       0.311    ← 和 base 的 0.303 几乎没差，**不是它**
+           base（`bottom:-6%`）    0.303    ← 就是这条在糊
+           现在（`bottom:-10%`）   0.501    ← 拿回天花板的 94%
+       ⚠️ 判据必须用**边缘梯度**，不能用「腿 vs 紧邻背景的平均亮度差」：那个数
+          base 0.028、现在 0.034，**几乎不动** —— 因为这层光不改变平均亮度，
+          它糊掉的是**轮廓**。第一版判据就是拿平均亮度写的，差点得出"不是发光层的错"。
+       ⚠️ `.halo`（那圈 56rem 的青光）根本到不了腿上：它圆心在画面正中（y≈462）、
+          62% 处就透明了，而腿在 y≈750（离圆心 288px > 0.62x418）—— 所以别去调它。
+     ★ `bottom` 是一路跟着脚底挪过来的（脚底 = 画面底边 = 槽底 = 806）：
+         4%    -> 白心 y≈755（小腿上）             换素材前用的就是这档
+         -6%   -> 白心 y≈792（脚踝上，还差 14px）  上一轮改的，用户仍然说糊
+         -10%  -> 元件 y 799..875、白心 y≈837（**脚底以下 31px**）
+       高度 `16% -> 11%`：16% 时元件顶边在 737，正好横穿腿那一带；现在顶边 799，
+       压在脚底下（`blur(7px)` 再往上漫 14px，刚到脚踝，量出来已经拿回 94%，
+       **别再加高** —— 再往上这团光就又不贴在脚边了）。
+     ⚠️ 让它可以探出槽底是**故意**的，但**可见范围**（径向渐变到 74% 就透明了）
+     算下来是 x 862..1366 —— 右下角那个「进入座舱」按钮左边缘在 1397，
+     **留 31px**，没被糊到（宽和渐变的百分比这次都没动，所以这个数没变）。
+     改槽宽/槽高/按钮位置都要**重新量这条**，别只看 `bottom` 那个百分数。 */
+.cover-r .mascot::after{
+  content:''; position:absolute; left:50%; bottom:-10%; transform:translateX(-50%);
+  width:104%; height:11%; border-radius:50%; pointer-events:none;
+  background:radial-gradient(ellipse at center, rgba(255,255,255,.96) 0%,
+              rgba(150,206,255,.55) 42%, transparent 74%);
+  filter:blur(7px);
+}
+/* ★ 2026-09-24 第三次改版：那条 `border-top` **去掉了**。
+   13.png 的底部没有横贯全屏的分隔线 —— 底下的"玻璃地面"是背景自己画的，
+   再来一条实线就把它切成两半。左边 CHERY 标、右边按钮靠 flex 各自落地。
+   （CHERY 标**留着**：用户明确说过「左下角不去除」，13.png 那个位置写的是
+    LINGTU ZHIXING，这里按用户的规矩不跟着改。） */
+.cover-foot{
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  /* ★ 2026-09-24：三个数都是按 13.png 量的（`_probe_cover_rects.py` 读实时矩形、
+     `_cmp_geo.py` 量参考图的墨迹带），不是目测：
+       参考里按钮 245x80，**右边缘距图右 26px、下边缘距图底 66px**；
+       改之前屏上是 240x78、距右 58px、距底 34px —— 尺寸对，**位置偏左偏下各约 31px**。
+     所以：`padding-bottom:1.4rem → 3.45rem`（把按钮抬 31px），
+     再给整条 footer 一个 `margin-right:-2.1rem` 把它推到距右 26px。
+     ⚠️ 为什么用负 margin 而**不改** `body.cover .main.sub` 的右边距：
+        那个 padding 左右是**同一个值**，改它会把左栏（现在 x=86.6，和参考的
+        95 已经对得很准）一起往左推 24px。要动的只有右下角这一个东西。
+     ⚠️ 负 margin 让 footer 的盒子溢出 sub-body 的 padding 框 —— 本页 footer
+        既没有底色也没有边框（那条 `border-top` 第三次改版删了），所以看不见。
+        哪天给 `.cover-foot` 加了底色/描边，这条负 margin 就会露出来，届时要重做。 */
+  padding:.9rem 1.4rem 3.45rem; margin-right:-2.1rem; flex-wrap:wrap;
+}
+.cover-foot .brand{ gap:.6rem; }
+.cover-foot .brand-logo{ height:1.7rem; }
+/* ⚠️ 2026-09-23：`.cover-foot .tags` / `.cover-foot .tags span` 两条**已删除** ——
+   页脚那排技术标签被用户按「说明的字都去除」去掉了，规则跟着走，不留死规则。
+   （media.html 里也有个 `.tags`，那是**它自己的** `.now .meta .tags`，
+    和这两条无关，别看到同名就去改。）
+   现在 `.cover-foot` 只有「CHERY 标 + 进入按钮」，靠 flex 的
+   `justify-content:space-between` 一左一右，正好。 */
+/* 封面的「进入座舱」。放在 .cover-foot 的**最后一个子元素**上，
+   于是它就是整页的右下角 —— 气候栏在封面上是 display:none，
+   不存在被它压住的问题（这一条答辩前还是要人眼看一眼，见计划里那条风险）。 */
+/* ★ 2026-09-24 第三次改版：「进入座舱」按 13.png 放大约 1.9 倍 ——
+   那张图里按钮是 **245x80px**（x 1400~1645 / y 795~875），原来屏上约 40px 高。
+   80px = 5.36rem，所以纵向内边距给到 1.4rem（1.9rem 的字 × 1.2 行高 ≈ 2.3rem）。
+   ★ 2026-09-24 晚（第二次对图）：实测参考按钮**内部**的横切色是
+       左 x1402 #4B8BFD  →  右 x1612 #4EABFE
+     也就是**左深右亮**（G 通道 139→171，B 基本顶在 254）。
+     而屏上原来是 `linear-gradient(100deg, --cta-a, --accent)`
+     = 左 #3E9BF0 → 右 #1E7FD8，**方向正好反过来，越往右越暗**。
+     所以下面把两个端点**对调**。改完屏上是左 #1E7FD8 → 右 #3E9BF0。
+   ⚠️ 残余（如实记着，没解决）：参考那个蓝比本站色板更亮更饱和 ——
+      它的中段约 #4589FD，本站色板给到的是 #2E8DE4（R 差 23、B 差 25）。
+      这**不是**这条规则的错，是 `--accent`/`--cta-a` 本身的事，而那对变量
+      11 个页面的进度条、级别条、按钮全在用，为一个封面去动它是因小失大。
+      真要贴到那个亮度，得在**这一页**单开一组封面专用的蓝 —— 那是加色板外的
+      颜色，**先问用户再动**，不擅自加。
+   ⚠️ `--on-accent` 是文字色，别拿 `--ink-2` 顶 —— 它在浅色主题里是深墨蓝，
+      当渐变端会把按钮压成一块深色砖。 */
+.cover-go{
+  display:inline-flex; align-items:center; gap:1.5rem; flex:0 0 auto;
+  padding:1.4rem 2.6rem; border-radius:99rem;
+  font-size:1.9rem; font-weight:500; letter-spacing:.08em; text-decoration:none;
+  color:var(--on-accent); background:linear-gradient(100deg, var(--accent), var(--cta-a));
+  /* 三条影子都是照 13.png 那圈的观感配的（上一条注释里那些采样点的相邻像素）：
+     ① 内圈 1px 亮边 —— 参考按钮的边缘比内部亮，是"玻璃壳"的意思；
+     ② 顶部内高光；
+     ③ 外发光（参考按钮外侧 5px 处还能读到 #A2D9FD 的浅蓝晕）。
+     ⚠️ 别把 ③ 删了只留 ①②：那样按钮会变成一块**硬边贴纸**，和立绘那边
+        那团光地台不在一个世界里。 */
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.5),
+    inset 0 1px 0 rgba(255,255,255,.85),
+    0 0 2.4rem rgba(120,186,255,.7),
+    0 .5rem 1.6rem rgba(var(--rgb),.4);
+  /* ★ 2026-09-25：原来这里只有一句 `transition:.25s`（全属性），现在**分开写** ——
+     因为下面新加的箭头滑动挂在 svg 上，全属性 transition 里 `transform` 那一段
+     是给**盒子自己**用的，箭头得自己有过渡（它是个子元素，不继承）。
+     写成 `transform, box-shadow` 两条而不是 all，是为了别把以后加的颜色/背景
+     变化也拖进这 0.25s。 */
+  transition:transform .25s ease, box-shadow .25s ease;
+}
+.cover-go svg{ width:1.9rem; height:1.9rem; transition:transform .25s ease; }
+/* ★ 2026-09-25：hover 动效（用户：「右下角『进入座舱』可以加轻微 hover 动效提示，
+   引导用户点击进入系统」）。
+   改之前这里**已经有一条** hover（`transform:translateX(3px)` + 加强外发光）——
+   用户还是提出来了，说明 3px 的横向平移在 1672 宽的展板上**看不出来**
+   （答辩现场更看不出来）。所以这次换成**两处一起动**、幅度仍然克制：
+     · 按钮本体**抬起来** .18rem（≈2.7px）—— 纵向位移比横向更容易被读到，
+       而且"抬起来"这个语汇在这页本来就是现成的：小瑞和那三个胶囊徽章
+       都在用"浮起来"表达可交互；
+     · 箭头**向右推** .4rem（≈6px）—— 它才是"往里走"这个动作的字面提示，
+       和按钮自己的位移分开动，比整块平移更像"门开着"。
+   ⚠️ 幅度**刻意压着**：这一页是要投在幕布上的，按钮 245x80px，
+      位移再大一档就会像"抖"，和车规 UI 要的稳不是一回事。
+   ⚠️ 顺带补了 `:focus-visible`（键盘 Tab 上来时给同一套反馈）和 `:active`
+      （按下去回弹一点点）。**没有**动 outline —— 浏览器默认那圈焦点框留着，
+      它是键盘用户唯一的"我在哪"提示，不该被这条视觉动效顶掉。
+   ⚠️ 别把它改成 `animation`（循环的那种）：这个按钮是"引导点击"不是"报警",
+      一直闪会喧宾夺主，而且小瑞那边已经有一处循环动效在抢注意力了。 */
+.cover-go:hover, .cover-go:focus-visible{
+  transform:translateY(-.18rem);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.75),
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 0 3rem rgba(140,198,255,.9),
+    0 .5rem 1.6rem rgba(var(--rgb),.5);
+}
+.cover-go:hover svg, .cover-go:focus-visible svg{ transform:translateX(.4rem); }
+.cover-go:active{ transform:translateY(0); }
+
+/* 小屏兜底：这些页面都是给 1920x1080 投影设计的，窄屏时允许换列 */
+@media (max-width:1180px){
+  .three,.bottom3{ grid-template-columns:minmax(0,1fr); }
+  .chat-wrap{ grid-template-columns:minmax(0,1fr); }
+  .link-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  /* 窄屏兜底：`.cover-r` 的 absolute 层在窄屏下会压到文字上，所以这一档
+     把它**取消定位**（回到"跟在文字下面的一块"）、立绘缩小、左栏放开宽度。 */
+  .cover-r{ position:static; inset:auto; margin:2rem auto 0; }
+  .cover-r .halo{ width:34rem; height:34rem; }
+  .cover-r .mascot{ width:26rem; height:27rem; }
+  .cover-l{ max-width:100%; }
+  .cover-l .cover-sub{ font-size:1.35rem; white-space:normal; }
+  .cover-l .cover-feats{ flex-wrap:wrap; }
+  /* 标题现在是遮罩图，缩的是高度不是字号（原来这里是 font-size:2.4rem，
+     不改的话窄屏下那行真文字会显出来）。8.76rem = 12.4rem × 0.706，等比，
+     和上面那条大屏值同出自 0.48/0.58 这一次重标（见 .cover-l h1 的注释）。
+     ★ 2026-09-24 第三次改版：4.88 -> **8.76rem**，跟着大屏那条的 x1.80 一起走
+     （窄屏不能只放大屏、窄屏不动 —— 那样两档的比例关系就断了）。 */
+  .cover-l h1{ height:8.76rem; }
+}
+
+
+/* =========================================================================
+   ★ 第五次改版：座舱总览页（index.html = 参考图 首页.png）
+   -------------------------------------------------------------------------
+   上行 = 主视觉 + 驾驶员状态 + 小瑞；下行 = 快捷功能 + 行驶数据 + 系统公告。
+   ★ 2026-09-25：下行第三栏那张「系统公告」整卡删了（开发日志，见 `.dash-row2`
+   上面那段），下行现在是**两张卡、两列**。
+   左导航（`.rail`）和顶栏仍旧是共用骨架，一个字没改。
+
+   栅格的三个比例**都是照 首页.png 量出来的**（参考图 1649 宽，和屏上 CSS px
+   基本 1:1）：
+     上行   825 : 350 : 217  -> 3.8fr : 1.6fr : 1fr
+     下行   485 : 470 : 430  -> 1.13fr : 1.09fr : 1fr
+     两行   519 : 260        -> 2fr : 1fr
+   ⚠️ 两行是**定比例**、不是 `auto`：`.status` 是 `overflow:hidden` 的定高卡，
+      交给 `auto` 的话它会按内容把自己撑开、把下行挤出去（挤出去的表现是
+      "下行那一整行不见了"，不报错）。定比例 + `min-height:0` 让每张卡
+      都知道自己有多高，装不下的由 `_check_grade.py` 那条自然高度判据去抓。
+   ========================================================================= */
+.main.dash{
+  grid-template-columns:11.5rem minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr);
+  padding:1rem 1.4rem .5rem .6rem;
+}
+.dash-body{
+  grid-column:2; grid-row:1; min-height:0;
+  display:grid; grid-template-rows:minmax(0,2fr) minmax(0,1fr);
+  gap:.9rem;
+}
+.dash-row1{
+  display:grid; grid-template-columns:minmax(0,3.8fr) minmax(0,1.6fr) minmax(0,1fr);
+  gap:.9rem; min-height:0;
+}
+/* ★ 2026-09-25：第三栏原来是一张「系统公告」卡（开发日志，用户要求整卡删掉，
+   见 `index.html` 里那段墓碑）。栅格跟着从**三列改两列** —— 只删卡不改这里，
+   右侧会空出一整格，看起来就是右下角缺一块（用户同一天刚嫌过监测详情页
+   「中间留空白」）。
+   两个比例是原来前两栏的比值，一个字没改（485 : 470 ≈ 1.13 : 1.09），
+   所以两张卡只是各自变宽，版式语言没动。 */
+.dash-row2{
+  display:grid; grid-template-columns:minmax(0,1.13fr) minmax(0,1.09fr);
+  gap:.9rem; min-height:0;
+}
+/* ⚠️ `.status` 和 `.xq` 在 `style.css` 里带着 `grid-column:3` / `4` 和
+   `grid-row:1 / 3`（那是给四列的老骨架写的）。这一页换成了"两行、每行各自三列"，
+   那两个值会**把卡片塞进错误的格子**（`.status` 会被顶到第 3 列，也就是小瑞那一格）。
+   覆盖成 `auto`，让它们在 `.dash-row1` 里按书写顺序自然落位。
+   ⚠️ 权重够（0,2,1 > 0,1,0），不靠先后。 */
+.main.dash .status{ grid-column:auto; grid-row:auto; }
+.main.dash .xq{ grid-column:auto; grid-row:auto; }
+
+/* ★★ 2026-09-25：**左栏在这一页只许占第 1 行。**
+   基类 `.rail` 写的是 `grid-row:1 / 3`（左栏跨两行，别的页面的骨架是那样），
+   而这一页的 `.main.dash` 把 rows 覆盖成**只有一行** —— 那个 "3" 于是凭空造出
+   一行**隐式行**，还要付 `.95rem` 的行距。两笔账：
+     · 右列 `.dash-body` 只拿到 814px，比内容区（828.5）少 14px；
+     · 下行两张卡因此比**左栏的底边**（左下角品牌那一行的底）多伸出去一截，
+       整页还多出 63px 滚动 —— 用户原话：「有的模块太长了 首页下边俩模块与
+       左栏底部齐平把」。
+   收进第 1 行，隐式行和那 14px 一起消失：右列自己就落到左栏（含品牌那一行）
+   的底边上 —— **两边齐平是算出来的，不是垫像素垫出来的**，任何窗口尺寸都成立。
+   ⚠️ 别改回 `1 / 3`：右列会立刻矮回 14px 并再次伸出左栏。
+   ⚠️ 这一页的左栏底部 = **品牌那一行的底**（`.rail-foot`），不是玻璃面板的底
+      （面板底还要往上 3.5rem，那一带正是品牌和 `.rail-xr` 立绘）。 */
+.main.dash .rail{ grid-row:1; }
+
+/* 下行两张卡：不许撑破自己那一行。
+   栅格项的 `min-height` 默认是 `auto` = min-content —— 行高被 `1fr` 定死时，
+   卡**不会**缩到行高以内，而是按自己的内容长出去：实测两张卡各 351px 落在一个
+   267px 的行里，底边伸到左栏以下 123px，**不报错、控制台一个字都没有**。
+   `overflow:hidden` 是对着"溢出会让人以为那是另一张卡"那条老账来的（见上面
+   `.xq` 那段）；但裁没裁到东西不能靠肉眼，`_check_dash_align.py` 逐项量
+   `scrollHeight` vs `clientHeight`。 */
+.dash-row2 > .card{ min-height:0; overflow:hidden; }
+
+/* ⚠️ `overflow:hidden` **不能省**。`.xq` 是栅格里的单列，高度由 `minmax(0,1fr)`
+   定死，里面的卡装不下时**不会报错** —— 第一版就是"快捷操作"那张卡静静地
+   溢出到下行、压在下面那张卡上面（当时压的是「系统公告」，那张卡 2026-09-25 删了）。
+   裁掉比溢出去好：溢出会让人以为那是另一张卡。
+   （那张卡现在搬去驾驶监测页了，但这条防线留着 —— 小瑞的按钮数量是数据驱动的。） */
+.main.dash .xq{ overflow:hidden; }
+
+/* 小瑞在这张卡里要小一号。参考图 首页.png 的小瑞卡只有 217px 宽，头像约占
+   四分之一；按 `style.css` 的 6.6rem 放进来，右边留给 `.xq-meta` 只剩 63px，
+   「紧急提醒」那个胶囊（4 字 + 左右各 .8rem 内边距 ≈ 72px）当场折成两行
+   （第一版截图里是「紧急提」/「醒」）。缩到 4.6rem 之后右边有 93px，够放。 */
+.main.dash .mascot{ width:4.6rem; height:4.6rem; }
+/* 再加一道保险：胶囊里是短状态词，**永远不该折行**。 */
+.main.dash .xq-meta{ min-width:0; }
+.main.dash .xq-meta .pill{ white-space:nowrap; }
+
+/* ------------------------------------------------- 给 `#statusFoot` 腾出高度 */
+/* ⭐ 这一段是**量出来的**，不是看着截图估的。用 `_scratch/_probe_status_h.py`
+   在 `?sev=severe` 下量的账（CSS px，root=14.93px）：
+
+     卡片 .status     h=533.6   clientH=532   scrollH=540   —— 溢出 8px
+       #alarms       h= 33.5   （重度档才挂出来；正常档 `display:none`）
+       .hero         h= 72.2
+       .rows         h=246.9   （5 行，每行 49.4）
+       .ntiles       h= 51.8
+       .ntiles-note  h= 13.4
+       #statusFoot   h=  8.5   ← **只剩内边距了，字一个都没画出来**
+
+   ⚠️ 最后那一行是这次真正的病：`.status-foot` 是列向 flex 的子项，
+      默认 `flex:0 1 auto`，**能缩**。总高超出时浏览器缩的就是它，
+      于是它被压成 8.5px（= padding-top 7.46 + 1px）—— 看起来像"元素不见了"，
+      不报错、也没有任何迹象指向它。所以第一件事是 `flex:0 0 auto` 钉住它。
+
+   ⚠️ 为什么非留住这一行不可：钉档演示时「演示锁定 05 … 演示数据（非真人）」
+      **也写在它里面**。看不见它 = 把锁定的稿当成实时判决看，这不是版式问题。
+      （第一版把它挂在画面左上角那颗 chip 上，画面搬走之后 chip 没地方挂了。）
+
+   下面四行是"每样都收一点"凑出来的高度，逐条都有量： */
+.main.dash .status{ gap:.3rem; padding:.85rem 1.15rem .78rem; }  /* 7 个子项 6 个缝：.45→.30rem，省 13.4；内边距再省 7.5 */
+.main.dash .status .row{ padding:.22rem 0 .1rem; }    /* 5 行 × 0.20rem，省 14.9 */
+.main.dash .status .hero{ padding-top:.28rem; }       /* 8.96 → 4.18，省 4.8 */
+.main.dash .ntiles .nt{ padding:.42rem .36rem; }      /* 省 2.4 */
+.main.dash .ntiles .k{ margin-bottom:.2rem; }         /* 省 0.9 */
+/* ⚠️ 谁让路、谁不动。列向 flex 里子项默认**都能缩**，谁被缩是浏览器按
+   flex-shrink×basis 算的 —— 实测它缩的偏偏是**最不该缩的那一行**（脚注）。
+   所以这里明确排优先级：`#alarms` / `.ntiles` / 脚注一律 `flex:0 0 auto`（钉死），
+   要缩就缩 `.rows`（它是五行明细，缺的那部分本来就还有别处能看）。
+   ⚠️ 窗口变矮时卡片跟着变矮（两行是定比例 `2fr:1fr`），所以这条**不是**
+      "只在大窗口成立"的补丁 —— 它是"矮窗口下也不出错"的那一半。 */
+.main.dash .status #alarms,
+.main.dash .ntiles,
+.main.dash .ntiles-note,
+.main.dash .status-foot{ flex:0 0 auto; }
+.main.dash .status .rows{ flex:0 1 auto; min-height:0; overflow:hidden; }
+/* 钉住 + 两行夹。夹的是**显示**，全文仍在 `title` 里（app.js 写的）。 */
+.main.dash .status-foot{
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+
+/* ---------------------------------------------------------- 主视觉那张大卡 */
+.dash-hero{
+  display:flex; flex-direction:column; min-height:0; overflow:hidden;
+  padding:.62rem;
+}
+/* 里面那层圆角面板：**就是 `ui/图片效果/首页背景.png` 那张场景图**
+   （`assets/home_scene.jpg`，见 `_scratch/_mk_bg.py` —— 走和封面同一套水印裁切）。
+   ★ 2026-09-25 用户原话「把**背景图换成** …图片效果中的**首页背景.png**」：
+     这一格**不再复用封面那张 `bg_scene.jpg`**，两张源图分开出。
+     ⚠️ 旧注释里那句「和封面是同一幅画 —— 所以直接复用」现在**不成立**了。 */
+.dash-visual{
+  position:relative; flex:1 1 auto; min-height:0; overflow:hidden;
+  border-radius:.95rem;
+  background:url("assets/home_scene.jpg") center/cover no-repeat;
+  display:flex; align-items:center;
+}
+/* 左边压一层由白到透明的渐变 —— 那是给「灵途智行 与您同行」那行字让位。
+   参考图上那行字是压在天上的，天空本来就亮，但**左上角那块有云有楼**，
+   不压一层的话字的边缘会和楼咬在一起。
+   ⚠️ 2026-09-24 收弱（.76/.44/.06@34/58 → .56/.26/.04@26/46）：
+      原来那一档把**左下角那辆车**一起洗白了 —— 车在横向 4%~18%，正好落在
+      0.7~0.5 的白里，第一版截图上它是"几乎看不见"。字和车不在一条水平线上
+      （字在 50% 高、车在 68~79% 高，见 _mid 裁切），所以只要压住**天空**
+      那一条就够了，不需要把整个左半边都压住。
+   ⚠️ 2026-09-25 **换了底图之后这段理由的前提变了**：上面那个"车在 4%~18%"说的是
+      **旧图**（`背景.png`），新图（`首页背景.png`）里没有那辆车。这三档白
+      **暂时按原值留着**，因为判据是"字读不读得出来"，而字本身还叠着自己的
+      `drop-shadow(0 0 .38rem 白)` + `text-shadow`（见 `.dash-copy h1`），
+      换图后截图上四个字仍然压得住天空 —— **这次没动它，不是漏了**。 */
+.dash-visual::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(100deg,
+    rgba(255,255,255,.56) 0%, rgba(255,255,255,.26) 26%,
+    rgba(255,255,255,.04) 46%, rgba(255,255,255,0) 60%);
+}
+/* 小瑞那张欢迎立绘。★ 2026-09-25：素材从 `assets/xiaorui_welcome.png`（601x900）
+   换成 **`assets/xq/l/p02.webp`**（730x1000）—— 后者就是前者的同一个姿势，
+   换过去是为了让它接上 43 张形象库（`XQ.poseDeck`，点一下换一张）。
+   ★ 2026-09-25 用户原话：「首页中间那部分展示的地方 灵途智行 与您图片那一部分
+     把小瑞其中一个**欢迎人的照片**放上去」。
+   ⚠️ 为什么是**绝对定位**而不是让 `.dash-copy` 旁边多一个 flex 兄弟项：
+      `.dash-copy` 是 `max-width:60%`，做兄弟项时两个都是 `flex` 子项，
+      文字那一块会被挤到 60% 以下、几行字全挤成窄条。绝对定位不参与那条分配。
+   ⚠️ `z-index:1`：和 `.dash-copy` 同级、都**在 `::after` 那层白之上**
+      （`::after` 是 z-index:auto，落在 1 下面）—— 小瑞不会被洗白层糊掉。
+      ⚠️ 这条**不只是观感**：`pointer-events` 开了之后，命中测试也按同一个顺序，
+      所以"小瑞在 ::after 之上"同时意味着"点在它身上拿到的是它、不是那层白"。
+   ⚠️ 底部锚定（`bottom:0`）而不是垂直居中：让它**站在面板底边上**，
+      和左边那几行字各自的基线无关。高 78% 是照着面板高算的（1080p 上屏约 330px），
+      上边留 22% 是为了给 `.dash-say` 那朵气泡让位（那个在右上角）。
+
+   ★ 2026-09-25（第十二次改版）：**这一格放开了点击**（`pointer-events` 由
+     index.html 的脚本在挂上 `XQ.poseDeck` 之后开，不在这条规则里写死 ——
+     理由见那个文件里的注释）。原来写 `pointer-events:none` 是怕它吃掉
+     左栏/按钮的点击，所以放开之前**量过一遍**（`_scratch/_probe_dash_rects.py`，
+     1672x940）：
+       · 它和 `.dash-copy` / 标题 / 副标题 / `.dash-say` / `.dash-strip` / `.rail`
+         的相交面积**全是 0.0 px²**；
+       · 在它的矩形上打 9x9 网格逐点 `elementFromPoint`，**81 个采样点里落在
+         可点元素（a/button/input/[role=button]）里的有 0 个** —— 72 个点到
+         `div.dash-visual`、9 个点在底边那一行上点到 `div.dash-strip`（那是它
+         自己那条边界，`.dash-strip` 本身不是可点元素，里面那几颗 `.dash-entry`
+         在它下面一整条里）。
+       · 结构上也不会越界：`.dash-visual` 是 `overflow:hidden`，而 `.dash-strip`
+         是这一格**下面**的另一块 —— 人不可能盖到那四颗入口上。
+     ⚠️ 那 9 个"边界点"是被 `height:78%` 的底边正好压在面板底边上造成的，
+        改高度/改 `bottom` 都会挪动这条边界，**改完要重跑那次测量**，别凭这条注释
+        当成永久结论。
+
+   ★ 2026-09-25 用户：「**小瑞靠中间一点**」（同一句里还说了"里边那个灵途的标
+     不用放了"，所以左边文字块变矮了，人也该往中间走）。
+     `right` 是**量出来**的，不是目测：面板 x 205.8..1033.6、文字块右边缘 487.7
+     （`_scratch/_probe_dash_rects.py`），中间那块**空档** = 487.7..1033.6（宽 545.9），
+     人宽 235.4，**在空档里居中** -> 人左边缘 487.7 + (545.9-235.4)/2 = 642.9，
+     右边缘 878.3，于是 `right = 1033.6 - 878.3 = 155.3px = 10.4rem`。
+     ⚠️ 这就是"往中间"的**上限**：再往左人就开始压到「灵途智行」那两行字上了。
+       要再往中间走就得先动 `.dash-copy` 的 `max-width`，那是另一件事。
+     ⚠️ 改这个数要连 `.dash-say` 的 `right` 一起看（它跟着人走，见那条注释）。 */
+.dash-mascot{
+  position:absolute; right:10.4rem; bottom:0; height:78%; width:auto;
+  z-index:1;
+  /* ⚠️ 这里**故意不写 `pointer-events`**。它原来写的是 `none`（怕吃掉左栏/按钮
+     的点击）。现在这一格要能点（点一下换一张形象，见上面那段），而"能点"和
+     "点得动"必须是同一件事 —— 所以 `pointer-events:auto` 由 index.html 的脚本
+     在 `XQ.poseDeck` **挂上之后**开。写在这里的话，JS 万一没跑，这一格就会
+     变成一个"看着能点、点了没反应"的白块。 */
+}
+.dash-copy{ position:relative; z-index:1; padding:1.1rem 0 1.1rem 1.5rem; max-width:60%; }
+/* ★ 2026-09-25 用户：「**里边那个灵途的标不用放了**」——
+   `.dash-copy .dash-brand`（整张 `lingtu_lockup_ink.png`）连同它的两条规则
+   （`display:block; margin-bottom:.9rem` 和 `img{height:2.1rem}`）**一起删了**。
+   ⚠️ 顶栏那个 lockup **没动**（用户说的是"里边那个"）。
+   ⚠️ 删掉的是 h1 上面那 2.1rem + .9rem 的占位 —— `.dash-copy` 在
+      `align-items:center` 的面板里是**垂直居中**的，所以块变矮之后整块字会
+      跟着**往下挪一点**，不是"上面腾空了"。这不是排版错。
+   ⚠️ `_check_theme2.py` 里盯 `.dash-brand img` 那条判据**已同步改成"必须不存在"**
+      （原来带 `missing` 护栏，留着会变成一个静默的空判）。 */
+/* ★ 2026-09-25 晚 用户：「**首页 展示部分 灵途智行 与你同行这个字改成我给你的
+   艺术字**」。原来这块是两行 HTML 文字（`h1 b` 两行、第二行缩进一格），现在换成
+   **用户给的那张艺术字**（`ui/图片效果/9.jpg`）—— 遮罩走
+   `assets/lingtu_wordmark_mask.png`（那张图的 alpha）。
+   做法和封面 `h1`（上面 `.cover-l h1` 那条，12.4rem）**是同一套**：
+   **遮罩只取形状、颜色由这里的 `background` 给**，所以两页是同一张字、同一族蓝。
+   ⚠️ **为什么不用仓里那张现成的 `assets/lingtu_wordmark.png` 当 <img>**：
+      那张是**淡蓝**的。量过：铺在白底/亮天空上几乎看不见 —— 就是 09-25 删掉
+      `.dash-brand` 时记的那笔账（1.67:1）。遮罩这条路绕开了它：颜色归 CSS，
+      深蓝压在亮天空上才读得出来，也不受那张图的淡色拖累。
+   ⚠️ **宽高必须写死，只写 height 不行**（封面那边只写 height 是安全的，这边不是）：
+      `.dash-copy` 是 `.dash-visual`（`display:flex`）里**唯一**的子项，宽度是
+      **shrink-to-fit** —— 而 `font-size:0` 之后 h1 的 max-content 就是 **0**，
+      只写 height 的话 `mask-size:contain` 会把艺术字缩成**零宽**：
+      字整个消失，**控制台一声不响**（遮罩不参与 intrinsic size，没有任何报错）。
+      5.8rem × 4.2917（遮罩图 927x216）= 24.887rem ≈ 24.9rem 宽，
+      正好是左边那块空档（h1 左沿 228.2，小瑞的盒子从 621 起，中间 ≈ 370px）
+      装得下的最大一档 —— **这不是随手定的数**，见下面那条 ⚠️。
+   ⚠️ 尺寸一改就要**重跑** `_scratch/_probe_dash_rects.py`：那条「小瑞 × 文字块
+      相交面积 = 0」是**量出来**的，艺术字是横着铺的一整条，变宽就会顶到人身上
+      （旧的两行字只占 259px 宽，这一条现在是它的一倍多）。
+   ⚠️ 不分深浅主题：主视觉那张底图两档是同一张（`.dash-visual` 的注释里有）。 */
+.dash-copy h1{
+  font-size:0;                        /* 真文字藏形，留的只是遮罩的形状 */
+  width:24.9rem; height:5.8rem;       /* 比例 = 遮罩图 927:216 = 4.2917 */
+  /* 蓝渐变：**沿用这块原来那条**（178deg 哑光宝蓝），不抄封面那条 100deg ——
+     这条要和下面副标题的 #1B4E8A 同一族色。 */
+  background:linear-gradient(178deg,#2F86EA 6%,#1B4FC0 96%);
+  color:transparent;
+  /* ⚠️ 必须显式改回 `border-box`：`background-clip` 默认是 `border-box`，
+     但这条原来写的是 `text`（渐变字）。字号归零之后没有字形可裁，
+     不改回来这块就是**全透明**（背景被裁成一无所有），字同样会消失。 */
+  -webkit-background-clip:border-box; background-clip:border-box;
+  -webkit-mask-image:url("assets/lingtu_wordmark_mask.png");
+  -webkit-mask-repeat:no-repeat;
+  -webkit-mask-position:left center;
+  -webkit-mask-size:contain;
+  mask-image:url("assets/lingtu_wordmark_mask.png");
+  mask-repeat:no-repeat;
+  mask-position:left center;
+  mask-size:contain;
+  /* ⚠️ 渐变/遮罩字**不能**用 `text-shadow`（`color` 是 transparent，影子画不出来）——
+     只能 `drop-shadow`，它作用在**遮罩裁完之后**的字形轮廓上。
+     ⚠️ 只留这一条柔光：原来还有一条 `0 .1rem 0` 的硬白边（给两行粗体字做
+        "贴纸"感），艺术字的笔画细、还带飘带，那条会变成一圈错位的白影。 */
+  filter:drop-shadow(0 0 .38rem rgba(255,255,255,.75));
+}
+.dash-copy .dash-sub{
+  margin-top:.7rem; font-size:.92rem; letter-spacing:.05em; color:#1B4E8A;
+  text-shadow:0 1px 0 rgba(255,255,255,.7);
+}
+/* 右上角那朵"手写"气泡。**纯装饰的问候语**，不是数据 ——
+   `#xqBubble`（`look.bubble`）才是跟着档位变的那一句，两者别混。
+   ⚠️ 旋转 -4deg：参考图上它是手画的、略微歪的。文字不加引号不加边框，
+      因为那朵气泡的"画"本身就在图里（手绘感靠歪 + 下划线的弧度）。
+   ★ 2026-09-25 用户：「**你好我是小瑞那几个字 放的离小瑞近一点**」。
+     它原来是钉在**面板右上角**的（`right:1.2rem; top:1.05rem`），
+     离人一大截。那次把它挪到人的头顶上方（`right:9rem; top:2.6rem`，
+     下边缘离头顶 ~15px）。
+   ★ 2026-09-25 晚 用户又说：「**你好！我是小瑞那几个字下调 布局好一点
+     感觉不太好现在**」—— 说明"贴着头顶"那一档还是太高：它悬在面板右上角的
+     半空里，离人的**眼睛**还有七八十像素，读起来不像小瑞在说话。
+     ⚠️ 这一轮**先把三档候选各截一张再挑**（`_scratch/_hero_say_variants.py`，
+        截图在 `_shots/say_A_头顶上方.png` / `say_B_眼睛右侧.png` /
+        `say_C_左上天空.png`）—— 因为"往下"和上一轮的"离小瑞近一点"是**打架**的：
+        人的头顶就在原位置下面 15px，想再往下就得从"头顶上方"挪到"脑袋旁边"。
+        三档的实测（1638x843，root 14.53px）：
+          A 头顶上方  `top:4.2rem`   —— 只降 23px，**压在头发上**（相交 540.6 px²），挤
+          B 眼睛右侧  `top:9.2rem`   —— 降得最多，但落在那片**闹市塔楼**上，字发糊
+          C 左上天空  `top:5.4rem`   —— 落在**干净的亮天空**里，也降了 ~37px  ← 选这档
+     现在这组数就是 C 再往右让了一点：`right` 9rem -> 28.6rem、`top` 2.6rem
+     -> 5.4rem，气泡落在**人头左上方那片空天**里 —— 左边紧挨着艺术字的右上角、
+     右边离人的盒子还有十几到四十像素（两个视口都量过，见下），像小瑞侧头说的
+     一句话，而不是天上飘着的一句。
+   ⚠️ 这两个数**必须和人一起改**：人再往哪边走，气泡不跟就会"脱开"或者压上去。
+      量法 `_scratch/_probe_dash_rects.py`（把"小瑞 x 问候气泡"的相交面积直接
+      打出来，> 0 就是压上了）。⚠️ 它和`_shot_index.py` **不是同一个视口**
+      （那个脚本用 1672x940 的覆盖值，这两个用 --window-size=1672,940 的实际
+      1638x843）—— 两个都要量：这里取 28.6rem 就是**为了两边都不相交**
+      （1638 下离人 41px、1672 下离人 14px；用 C 原来的 27.4rem 在 1672 下会
+      压上 3.6px）。
+   ⚠️ 这条**天生是脆的**：人的宽度是从**面板高度**算出来的（`height:78%`），
+      而气泡是从右边缘按 **rem** 量的 —— 换一个长宽比的视口，两者会错开。
+      改窗口尺寸、改 `.dash-mascot` 的 `right`/`height`、改面板栅格，都要重跑上面
+      那个探针；别把今天这两个数当成永久结论。
+   ⚠️ 也别一个劲往下（B 那个方向）：再低就进到**肩/手**那一带了，而右下方紧挨着
+      `.dash-strip` 那条入口，气泡会开始压住底边那条。 */
+.dash-say{
+  position:absolute; right:28.6rem; top:5.4rem; z-index:2;
+  transform:rotate(-4deg); text-align:center;
+  font-size:1.02rem; line-height:1.34; color:#1B4E8A;
+  text-shadow:0 1px 0 rgba(255,255,255,.8);
+}
+/* 底部那一条：三个入口 + 一颗主按钮 */
+.dash-strip{
+  flex:0 0 auto; display:flex; align-items:center; gap:.3rem;
+  padding:.7rem .25rem .25rem;
+}
+.dash-entry{
+  flex:1 1 0; min-width:0; display:flex; align-items:center; gap:.55rem;
+  padding:.45rem .5rem; border-radius:.85rem; text-decoration:none;
+  color:var(--ink); transition:.25s;
+}
+/* ★ 2026-09-25（第十四次改版）：补上 hover「选中感」的**描边**那一半。
+   这一格静止时**没有描边**（`border` 一条都没有），所以描边走内阴影 ——
+   别回头去 base 里补 `border:1px solid transparent`，会挤掉 2px 内容宽。
+   语汇和"hover 必须低于选中态"那条铁律见 `style.css` 里 `.ri` 上面那段。 */
+.dash-entry:hover{
+  background:rgba(var(--rgb),.10);
+  box-shadow:inset 0 0 0 1px rgba(var(--rgb),.42);
+}
+.dash-ico{
+  width:2.25rem; height:2.25rem; flex:0 0 auto; display:grid; place-items:center;
+  border-radius:.72rem; color:var(--on-accent);
+  background:linear-gradient(160deg,#4AA3F5,#2E7BE0);
+  box-shadow:0 .28rem .7rem rgba(46,123,224,.32);
+}
+.dash-ico svg{ width:1.22rem; height:1.22rem; }
+/* ⚠️ 文字那两行**必须挂在 `.dash-entry-t` 这个包一层的 span 上**，
+   不能写成 `.dash-entry span` —— 那个选择器会**同时命中外层的
+   `.dash-entry-t` 和内层的副标题**：于是外层被压成 .68rem 的块级元素、
+   还带上 `nowrap + ellipsis`，副标题那行的溢出裁切会从外层先裁一刀。
+   包一层是为了让"文字那两行"整体 `flex:1 1 auto` 吃掉图标和按钮之间的空档。 */
+.dash-entry-t{ flex:1 1 auto; min-width:0; }
+.dash-entry-t b{ display:block; font-size:.9rem; font-weight:600; }
+.dash-entry-t span{ display:block; font-size:.68rem; color:var(--muted);
+                    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dash-cta{
+  flex:0 0 auto; display:flex; align-items:center; gap:.4rem;
+  padding:.72rem 1.45rem; border-radius:2.2rem;
+  font-size:.98rem; font-weight:600; color:#fff; text-decoration:none;
+  background:linear-gradient(135deg,#4AA3F5,#2468D6);
+  box-shadow:0 .5rem 1.2rem rgba(36,104,214,.34);
+  transition:.25s;
+}
+.dash-cta:hover{ transform:translateY(-.1rem); box-shadow:0 .7rem 1.5rem rgba(36,104,214,.42); }
+.dash-cta svg{ width:1rem; height:1rem; }
+
+/* ---------------------------------------------------------- 状态卡里那三格 */
+/* 「安全驾驶时长 / 当前车速 / 行驶里程」——照 首页.png 摆在明细行下面。
+   ⚠️ 三个数**全部未接入**（车辆总线没接）。这是用户拍过的口径：
+      「有真数据用真数据，没有的标「未接入」」。所以 `.v.na` 那一档是
+      小一号的灰字，和真数**一眼分得开**，别为了好看把它写成"0 km/h"。 */
+.ntiles{ display:grid; grid-template-columns:repeat(3,1fr); gap:.45rem; margin-top:auto; }
+.nt{
+  background:var(--fill-2); border:1px solid var(--line);
+  border-radius:.78rem; padding:.5rem .4rem; text-align:center; min-width:0;
+}
+.nt .k{
+  display:flex; align-items:center; justify-content:center; gap:.22rem;
+  font-size:.64rem; color:var(--muted); margin-bottom:.26rem;
+  white-space:nowrap; overflow:hidden;
+}
+.nt .k svg{ width:.78rem; height:.78rem; flex:0 0 auto; }
+.nt .v{ font-size:1.02rem; font-weight:600; font-variant-numeric:tabular-nums; }
+.nt .v u{ text-decoration:none; font-size:.64rem; font-weight:400;
+          color:var(--muted); margin-left:.12rem; }
+.nt .v.na{ font-size:.78rem; font-weight:400; color:var(--muted); }
+/* 「数据详情」那一格是**入口不是数**：它跟旁边两格共用 `.nt` 的白底小格，
+   只是把值换成一个箭头、整格可点（首页 index.html 的 `.ntiles`）。
+   ⚠️ `.nt` 是照 `div` 写的，换成 `<a>` 之后必须自己摘掉浏览器默认那套
+      链接样式（蓝字 + 下划线 + `:visited` 变紫）—— 不摘的话这一格会和
+      旁边两格一眼分家，而且点过一次之后还会变色。 */
+a.nt{ text-decoration:none; color:inherit; display:block; }
+a.nt:hover{ border-color:var(--accent); }
+a.nt:active{ transform:translateY(1px); }
+/* PI 偏低那一行小字。**文案整句是服务端给的**（`serial_hr.PI_HINT`）——
+   这个文件里、以及三个 .html/.js 里都不许出现那句中文，否则"界面只留标签
+   和数字"那条红线的审计口径就破了（用户点名它是**唯一**一处例外）。
+   ⚠️ 颜色用 `--sev-mild`（浅色主题下是 #A87B00）：它是"请调一下"的提示，
+      演示时要让评委看得见；`.64rem` 的 `--muted` 灰字在浅底上太淡。
+   ⚠️ `hidden` 时是 `display:none` ⟹ **不占高度**。这一条不是装饰：
+      `.status` 卡的高度是量出来的（见上面 `.status` 那一段），
+      这一行多出来的 13.4px 是在那 66px 空档里的。 */
+.ntiles-note{ font-size:.64rem; color:var(--sev-mild); line-height:1.4; margin-top:.3rem; }
+/* 「数据详情」的另一个入口（驾驶监测页 detail.html，在免责小字下面一行）。
+   ⚠️ detail.html 本来没有这一类按钮，所以整条是新加的；样式照 `.nt` 那一档
+      的小胶囊来（`.md-rows` 里没有可以复用的按钮档）。 */
+.md-more{
+  display:inline-flex; align-items:center; gap:.24rem;
+  margin-top:.6rem; padding:.34rem .82rem;
+  border:1px solid var(--line); border-radius:.72rem;
+  background:var(--fill-2); color:var(--ink);
+  font-size:.7rem; text-decoration:none;
+  /* ⚠️ `align-self` 这一行是**量出来的**：只写 `inline-flex` 不够 ——
+     外面那层是列向 flex，默认 `align-items:stretch` 会把这一格**拉满整行**
+     （实测 512.7px 宽的一条横带，看着像分隔条不像按钮）。
+     放在块级父元素里也安全（`align-self` 在那儿被忽略，`inline-flex`
+     自己就收缩到内容宽）。 */
+  align-self:flex-start;
+}
+.md-more:hover{ border-color:var(--accent); }
+.md-more:active{ transform:translateY(1px); }
+
+/* ---------------------------------------------------------- 快捷功能 */
+.qk-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+/* ★★ 2026-09-25（第十六次改版）：这条是给「帮助 & 关于」**跨满整行**用的。
+   当时只有 5 格 —— 4 格正好 2×2，第 5 格不跨列就会**在右下角留一个洞**，
+   那正是用户同一天在监测详情页说的「不要中间留空白」。
+
+   ⚠️ 2026-09-25 晚（第十七次改版）**它已经没人用了**：用户点名要「导航」和
+      「帮助 & 关于」同一行（导航在左），`index.html` 那一格于是摘掉了 `qk-full`，
+      而现在正好 6 格 = 3 行 × 2 列，怎么排都不留洞。
+      规则**留着**是给下一次加格子用的（那时若又落成奇数格，跨满还是正解）。
+   ⚠️ `.qk-grid` 只有 `index.html` 用（全站 grep 只有这一处，
+      另一处是 `_bak_20260924_prose/` 里那份旧备份），所以这条不会外溢。 */
+.qk-grid > .qk-full{ grid-column:1 / -1; }
+.qk{
+  display:flex; align-items:center; gap:.55rem;
+  padding:.55rem .6rem; border-radius:.85rem; text-decoration:none;
+  color:var(--ink); background:var(--fill-2); border:1px solid var(--line);
+  transition:.25s; min-width:0;
+}
+.qk:hover{ background:rgba(var(--rgb),.12); border-color:rgba(var(--rgb),.42);
+           transform:translateY(-.1rem); }
+.qk > svg{ width:.85rem; height:.85rem; flex:0 0 auto; color:var(--muted); }
+.qk-txt{ flex:1 1 auto; min-width:0; }
+.qk-txt b{ display:block; font-size:.86rem; font-weight:600; }
+.qk-txt span{ display:block; font-size:.66rem; color:var(--muted);
+              white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ---------------------------------------------------------- 行驶数据 */
+.dnums{ display:grid; grid-template-columns:repeat(3,1fr); gap:.45rem; margin-bottom:.55rem; }
+.dnum{ min-width:0; }
+.dnum .k{ font-size:.68rem; color:var(--muted); margin-bottom:.18rem; white-space:nowrap; }
+.dnum .v{ font-size:1.3rem; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.1; }
+.dnum .v u{ text-decoration:none; font-size:.68rem; font-weight:400;
+            color:var(--muted); margin-left:.12rem; }
+.dnum .v.na{ font-size:.84rem; font-weight:400; color:var(--muted); }
+/* 那张折线图**只画坐标轴，不画线** —— 车没有数据总线，画一条假曲线就是编数据。
+   轴上留的那几个刻度（0/50/100、00:00~24:00）是它将来要接的量纲，不是测到的。
+   ★ 2026-09-25：这张卡改成列向 flex，**图是唯一会长的那一项** —— 它吃剩下的
+   高度。原来的写法 `width:100%; height:auto` 是"宽度决定高度"（viewBox 300:112），
+   卡一宽图就跟着变高，而卡高是栅格定死的：实测 708px 宽的卡里图要 253px 高，
+   把卡顶破 80px、整页滚起来。现在 `flex:1 1 auto; min-height:0` 让它按剩余
+   空间伸缩（`min-height:0` 不能省：flex 项的自动最小尺寸 = min-content，
+   不给 0 它就死活不缩）。图缩小/放大时 `preserveAspectRatio` 默认 `meet`，
+   画面整体等比缩放居中 —— **不会**被拉扁（拉扁的话那些刻度字会跟着变形）。 */
+.dash-data{ display:flex; flex-direction:column; min-height:0; }
+.dchart{ width:100%; height:auto; display:block; }
+.dash-data .dchart{ flex:1 1 auto; min-height:0; }
+.dchart .axis{ stroke:var(--line-3); stroke-width:1; }
+.dchart .grid{ stroke:var(--fill-3); stroke-width:1; stroke-dasharray:2 4; }
+.dchart .lbl{ fill:var(--muted); font-size:8px; }
+.dchart .na{ fill:var(--muted); font-size:9.5px; }
+
+/* ★ 2026-09-25：这里原来有一组 `.nv`（系统公告那四条：小圆点 + 标题 + 日期 +
+   一段说明的横向栅格）。**系统公告整卡被删**（开发日志，见 index.html 那段
+   墓碑），这组类在 `ui/web/` 下一个使用者都没有了，一并删掉。要往回加公告，
+   这套排版得跟着一起写回来（备份：`_bak_20260924_prose/pages.css`）。 */
+/* 弹窗一样的小入口：「更多 ›」
+   ★ 2026-09-25：**现在页面上没有使用者** —— 原来只有系统公告那张卡的卡头用它。
+   留着是因为它是通用小样式（卡头右上角一个低调入口），不是公告专用；
+   谁再往某张卡头放「更多 ›」可以直接用。**别当它是活的**：grep 不到 `dash-more`
+   就说明它现在没人用，不是坏了。 */
+.dash-more{ font-size:.7rem; color:var(--muted); text-decoration:none; }
+.dash-more:hover{ color:var(--accent); }
+
+/* =========================================================================
+   ★ 第六次改版：驾驶监测页（detail.html = 参考图 驾驶监测.png）
+   -------------------------------------------------------------------------
+   上行 = 驾驶员实时画面 + 驾驶状态评分 + 小瑞·驾驶陪伴
+   下行 = 数据趋势（含当前驾驶行为）+ 最近事件 + 背景上那行手写
+   最下 = 小瑞对话栏（**从首页搬过来的**，用户拍板「搬到驾驶监测页」）
+
+   ★ 只改「综合概览」那一个页签，另外四个（疲劳分析 / 生理指标 / 行为特征 /
+     历史记录）**一个字没动** —— 参考图根本没画到那里，而那四页的信息是真的
+     （支路二原始量、各条趋势、判据注解）。参考图要的是"概览一眼看懂"，
+     那正好是概览页签该干的事。
+
+   三个比例**都是照 驾驶监测.png 量的**（参考图 1649 宽，和屏上 CSS px 基本 1:1）：
+     行 A   505 : 490 : 398  -> 1.27fr : 1.23fr : 1fr
+     行 B   785 : 465 : 160  -> 1.69fr : 1fr : .34fr
+     两行   400 : 310        -> 1.29 : 1
+   ⚠️ 行 B 的第三格**不是卡片**，是参考图上画在背景里的那行手写（「一直在，陪着你～」）。
+   ========================================================================= */
+
+/* 底部多出一行对话栏，所以骨架从「一行」变成「内容 + 对话栏」两行。
+   ⚠️ 对话栏挂在 `.main.sub` 上（`.sub-body` 的**兄弟**），不挂在 `.sub-body` 里 ——
+      后者是 `overflow-y:auto` 的滚动容器，放进去的话对话栏会跟着内容滚走。 */
+.main.sub{ grid-template-rows:minmax(0,1fr) auto; row-gap:.7rem; }
+.main.sub .sub-body{ grid-column:2; grid-row:1; }
+.main.sub .talk{ grid-column:2; grid-row:2; }
+
+/* 概览页签是**唯一一个撑满高度**的页签：它要在一屏里放下两行卡片（参考图就是
+   这么排的）。另外四个页签内容多、按内容高整页滚动，**不要一起改**。
+   ⚠️ 下面那条 `display:flex` 会**盖掉**浏览器默认样式表里的 `[hidden]{display:none}`
+      （作者样式里的 display 优先）—— 所以 `[data-tab][hidden]` 那条**必须写**。
+      少写它的表现是：切到别的页签时概览这一整块**照样显示**，而且不报错。 */
+.sub-body > [data-tab="overview"]:not([hidden]){
+  flex:1 1 auto; min-height:0;
+  display:flex; flex-direction:column; gap:.85rem;
+}
+.sub-body > [data-tab][hidden]{ display:none; }
+
+/* ★ 第七次改版（参考图 `ui/图片效果/驾驶监测页.jpg`）：概览只剩**三块** ——
+   左边一整块「驾驶员实时画面」，右边一列「实时监测数据」+「小瑞·智能陪伴」。
+   原来是三列（画面|评分|小瑞）+ 底下一整排（数据趋势|最近事件|手写），
+   用户原话「数据趋势 最近事件那些去掉」「只留下摄像头 实时数据监测 小瑞智能陪伴」。
+   ⚠️ 左宽右窄（1.62 : 1）是照参考图量的，别改成等宽。 */
+.mon-a{
+  flex:1 1 auto; min-height:0;
+  display:grid; gap:.85rem;
+  grid-template-columns:minmax(0,1.62fr) minmax(0,1fr);
+}
+/* 右列两卡上下排：上面「实时监测数据」**按内容高**（`flex:0 0 auto`），
+   下面「小瑞 · 智能陪伴」吃掉剩下的 —— 所以这一列永远填满，而上面那张卡
+   不会被拉成一块空荡荡的大卡（用户 2026-09-25：「实时数据监测部分过大」，
+   那条就是它被拉伸出来的）。
+   ⚠️ 别改成两张都 `flex:1 1 auto` 去"平均分"：矮屏上那七行会被挤扁，
+      高屏上它们又被拉得行距老大。 */
+.mon-side{ display:flex; flex-direction:column; gap:.85rem; min-height:0; }
+.mon-side > .mon-data{ flex:0 0 auto; }
+.mon-side > .mon-xq{ flex:1 1 auto; min-height:14rem; }
+/* 画面那张卡自己就是 `.livecard`（`overflow:hidden` + 绝对定位的媒体层），
+   它的 `min-height:20rem` 是给旧的「三列等宽」定的，这里由行高决定。 */
+.mon-a .livecard{ min-height:0; }
+
+/* ------------------------------------------------- 页标题那行右端的两颗东西 */
+/* 「实时监测中」是**状态**不是装饰：它说的是"这条通道现在真的在收数"。
+   ⚠️ 所以它跟着 onDown 灭、跟着 onState 亮，不写死成常亮 ——
+      常亮的绿点会在断线时继续撒谎。 */
+.mon-live{
+  display:flex; align-items:center; gap:.4rem; flex:0 0 auto;
+  padding:.4rem .85rem; border-radius:2rem; font-size:.78rem;
+  color:#1E8E5A; background:rgba(46,196,124,.14); border:1px solid rgba(46,196,124,.4);
+}
+.mon-live.off{ color:var(--muted); background:var(--fill-2); border-color:var(--line); }
+.mon-live .d{ width:.42rem; height:.42rem; border-radius:50%; background:currentColor; }
+.mon-live.off .d{ box-shadow:none; }
+.mon-live:not(.off) .d{ animation:monPulse 1.9s ease-in-out infinite;
+                        box-shadow:0 0 0 .16rem rgba(46,196,124,.18); }
+@keyframes monPulse{ 0%,100%{ opacity:1 } 50%{ opacity:.35 } }
+.mon-clock{
+  flex:0 0 auto; font-size:.8rem; color:var(--muted);
+  font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:.35rem;
+}
+.mon-clock svg{ width:.9rem; height:.9rem; }
+
+/* --------------------------------------- 「实时监测数据」那张卡（含评分块）
+   ★★ 第七次改版第二稿（用户 2026-09-25 原话：「实时数据监测部分 过于杂乱
+   可视化程度不高」「布局不好」）：这一卡原来是**七格一样大的小字**，满屏数字
+   没有重点。现在分三层 —— 块首状态、中间四格大数（各带一根条）、底下一行
+   辅助量小字。七路数一个没少，只是分了主次。
+   ⚠️ 评分环从"整张卡"缩成这一卡的**块首**（用户拍板「并进实时监测数据卡」），
+      环缩到 5.2rem —— 按原来 7.4rem 放，底下那四格在这一列里就没地方站了。 */
+.mon-data{ display:flex; flex-direction:column; gap:.62rem; min-height:0; }
+.md-live{
+  flex:0 0 auto; padding:.24rem .6rem; border-radius:2rem; font-size:.7rem;
+  white-space:nowrap; color:#1E8E5A; background:rgba(46,196,124,.14);
+  border:1px solid rgba(46,196,124,.4);
+}
+.md-live.off{ color:var(--muted); background:var(--fill-2); border-color:var(--line); }
+.md-score{ display:flex; align-items:center; gap:.85rem; flex:0 0 auto; }
+.md-score .score-ring{ width:5.2rem; height:5.2rem; }
+.md-score .score-ring .num b{ font-size:1.65rem; }
+.md-score .score-ring .num u{ font-size:.58rem; margin-top:.1rem; }
+.md-score .score-txt .k{ font-size:.7rem; margin-bottom:.12rem; }
+.md-score .score-txt b.word{ font-size:1.45rem; margin-bottom:.18rem; }
+.md-score .score-txt .say{ font-size:.73rem; line-height:1.42; }
+
+/* 七行数：**一行一路，数就跟着自己的名字**（用户原话见 detail.html 那段注释）。
+   名字在左、条在中间、数在最右 —— 摆法照 `行为特征` 那页的 `.p4-row`。
+   ⚠️ 每一路**不套盒子**：原来那种"每格一个圆角底 + 边框"正是"过大 / 太杂"
+      的来源。这里只有一个统一的行高，行与行之间用一条极淡的分隔线。
+   ⚠️ 行**不拉伸**（`flex:0 0 auto` + 卡本身也是内容高）：拉伸会把行距撑开，
+      看着又是一块空荡荡的大卡。 */
+.md-rows{
+  flex:0 1 auto; min-height:0;
+  display:flex; flex-direction:column;
+}
+.mr{
+  display:flex; align-items:center; gap:.55rem; min-width:0;
+  padding:.32rem 0; border-top:1px solid var(--fill-2);
+}
+.mr:first-child{ border-top:none; }
+.mr .k{
+  flex:0 0 auto; font-size:.82rem; color:var(--muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:52%;
+}
+/* 条**吃掉中间剩下的宽度**（`flex:1 1 auto`），所以右边那个数的位置
+   对每一路都一样，不管是三格的「14.0 次/分」还是两格的「无」。
+   条很长也不是问题：它是一条**刻度**，长一点读得出比例。 */
+.mr .bar{
+  flex:1 1 auto; min-width:2rem; height:.36rem; border-radius:2rem;
+  background:var(--track); overflow:hidden;
+}
+.mr .bar i{
+  display:block; height:100%; border-radius:2rem; background:var(--accent);
+  width:0; transition:width .4s ease-out;
+}
+/* 数。⚠️ 不写 `color` —— 跟着正文色走，拿 `--accent` 去涂每一个数会让
+   "异常"和"正常"看起来一个样。字号比名字大一档（用户说"字太小"）。 */
+.mr .v{
+  margin-left:auto; flex:0 0 auto; text-align:right;
+  font-size:1.06rem; font-weight:600; letter-spacing:-.01em;
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.mr .v.na{ font-size:.9rem; font-weight:500; color:var(--muted); }
+.md-note{
+  flex:0 0 auto; font-size:.68rem; color:var(--muted);
+  border-top:1px solid var(--fill-2); padding-top:.42rem;
+}
+.mon-data .alarms{ margin:0; }
+
+/* 评分环本体（块首那一颗）。尺寸由上面 `.md-score` 那两句定，这里只管形状。
+   环：底圈 + 进度弧。`stroke-dasharray` 由 JS 按分数改（2πr = 314.159）。 */
+.score-ring{ position:relative; width:7.4rem; height:7.4rem; flex:0 0 auto; }
+.score-ring svg{ width:100%; height:100%; transform:rotate(-90deg); }
+.score-ring .trk{ fill:none; stroke:var(--track); stroke-width:9; }
+.score-ring .arc{
+  fill:none; stroke:var(--accent); stroke-width:9; stroke-linecap:round;
+  stroke-dasharray:314.159; stroke-dashoffset:314.159;
+  transition:stroke-dashoffset .5s ease-out, stroke .6s;
+}
+.score-ring .num{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; line-height:1;
+}
+.score-ring .num b{ font-size:2.35rem; font-weight:700; font-variant-numeric:tabular-nums;
+              letter-spacing:-.02em; }
+.score-ring .num u{ text-decoration:none; font-size:.68rem; color:var(--muted); margin-top:.2rem; }
+.score-txt{ min-width:0; }
+.score-txt .k{ font-size:.78rem; color:var(--muted); margin-bottom:.3rem; }
+.score-txt b.word{ display:block; font-size:1.75rem; font-weight:700; letter-spacing:.04em;
+                   color:var(--accent); transition:color .6s; margin-bottom:.4rem; }
+.score-txt .say{ font-size:.8rem; color:var(--ink-3); line-height:1.5; }
+/* ⚠️ 这里原来还有一条 `.stiles`（「驾驶状态评分」卡底下那三格的容器）。
+   第七次改版那张卡整张没了，它跟着删 —— 留着的话是一个**看着像活的**死类，
+   下一个人会以为页面里还有那块东西。
+   `.st` 那一条**不能删**：`link.html` 的 `.chain .st` 借的就是它。 */
+.st{
+  background:var(--fill-1); border:1px solid var(--fill-2);
+  border-radius:.8rem; padding:.62rem .5rem; text-align:center; min-width:0;
+}
+.st .k{ font-size:.68rem; color:var(--muted); margin-bottom:.28rem;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.st .v{ font-size:1.24rem; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.15; }
+.st .v u{ text-decoration:none; font-size:.68rem; font-weight:400; color:var(--muted); margin-left:.1rem; }
+.st .v.na{ font-size:.82rem; font-weight:400; color:var(--muted); }
+/* ⚠️ `.score-note` 那条（"环里那个数是什么"的小结）**已删** ——
+   2026-09-24 用户要求去掉成段说明，markup 先删的，这条 CSS 留了一阵像个活类。
+   现在环的说明在 detail.html 那段注释里，不在页面上占地方。 */
+
+/* ------------------------------------------------------- 小瑞·驾驶陪伴那张卡 */
+/* ========== 2026-09-25 第十三次改版：这一格的底图（`.mon-xq`）=========
+   用户给了 `驾驶监测页 小瑞智能陪伴部分背景图.png`，原话「…小瑞智能陪伴部分背景图.png
+   还有整体左栏背景图.png 都换上」（第一条消息把"换上"打成了"换算"，紧接着补了「换上」）。
+   源图是一张**画好的玻璃面板**（圆角描边 + 光晕 + 太阳/光斑），由 `_scratch/_mk_bg.py`
+   的 `SRC_4` 出成 `assets/detail_xq.jpg`，右下角那行「豆包AI生成」在生成那一步裁掉了。
+
+   ★★ `100% auto` **不是** `cover`，这两个字是这一条的要点，**别改回去**。
+      铺上去之后用户报过一次「背景边框和我实际边框感觉有矛盾…不然有两个边框」——
+      源图面板**自己**带一圈描边，四周还留着一圈底色；直接铺，那圈描边就落在卡片
+      **里面**百分之几的地方，和卡片自己的边并排，看着就是两个边框。
+      所以生成那一步先把"面板外那圈底色"裁掉了（`_mk_bg.py` 的 `frame_crop()`，
+      框是 x 157..2157 / y 133..1562，量法写在那个函数里），
+      **再用 `100% auto` 按宽度铺满** —— 这样面板的左右两条描边**永远**落在
+      卡片的左右边上，和卡片自己的 1px 白描边合成一条。
+      📏 **"落在边上"是量过的，不是估的**：`_shot_bgs4.py` 截完图，
+         `_probe_monxq_edge.py` 在截图上一行一行地读灰阶（`runs/_monxq_edge_out.txt`）——
+         从左往外是 `254/254/251`（卡片自己那 1px 白描边）、接着 `239/222/222/234`
+         （面板的描边线），右边缘对称。**描边线的心离卡片外沿约 2 CSS px**，
+         里头 1 px 是 `background-origin: padding-box` 的账（图从 border 里侧开始画），
+         另外 1 px 是 `frame_crop` 故意留下的面板**外圈高光**（那条 251 的亮边，
+         留着才像"玻璃的边"而不是"一条孤零零的线"）。
+         改这张图之前先用 `_probe_monxq_edge.py` 重念一遍这两个数，别信这段文字。
+      📏 顺带：`_probe_monxq_dom.py` 会去问 DOM 要 `background-size` ——
+         **CSS 里写了 `100% auto` 不等于浏览器认了**（`cover` 在这一格的画面
+         恰好一样，看截图分辨不出来），这个探针回的是算出来的值，唯一可信。
+
+      ⚠️ **为什么不能用 `cover`**：`cover` 是"两个方向都盖满、取大的那个缩放比"。
+         卡片比例一旦**窄过**出图比例（出图 1.3996、卡片实测 2.6461），`cover`
+         就改成按高度铺、左右各裁掉一截 —— 两条描边正好被裁到画面外，
+         于是"裁面板"那一步白干、边框直接消失。`100% auto` 把宽度钉死，
+         卡片怎么变，描边都在边上。**这一条要出图比例 < 卡片比例才成立**
+         （不然图铺不满高度、下面露空档），`_mk_bg.py` 的 `frame_crop()` 里有一条
+         断言守这个上界（出图比例必须 < 2.0），改图会当场报错。
+      ⚠️ 代价：`100% auto` 之后画面上只剩面板**中间 53% 高**（面板 1429 高的出图
+         铺成 384.7px 高，卡片只有 203.47px），所以**上下两条描边看不见** ——
+         看不看得见不影响它是"一个边框"，因为卡片上真正露出来的是左右两条。
+
+   ★ **这一张不压白纱**（和同页 `#stageHost` 的 `cam_off.jpg` 一个做法），理由是量出来的：
+     出图 p05 灰阶 191，卡名（`--ink #0E2A4A`）**7.88:1**、气泡字（`--ink-2 #14406F`）
+     **5.73:1** —— 连最暗的那 5% 都过了 WCAG 正文线 4.5:1，白纱 0.20/0.30/0.40
+     只是把 9.01/9.61/10.23 抬得更高，**拿观感换一个已经不需要的余量**
+     （这张图本来就很浅，用户挑的就是它那个"玻璃面板"的样子）。
+     ⚠️ 这几行数是 `_mk_bg.py` 跑完 `detail_xq.jpg` 那段打出来的，**换图必须重跑**。
+     ⚠️ 别拿"多媒体那三张都压了 .30"当理由来补一层：那三张是**并排**的卡，
+        互相之间不能一张洗过一张没洗；这一张自己在一页上，而且它是**画好的面板**，
+        不是照片 —— 压纱正好把它的描边和光晕压平。
+
+   🔴 选择器**必须带 `html[data-theme="light"]` 前缀**，而且这里写的是
+      **`.card.mon-xq`（0,3,1）**，比多媒体那三张多带了一个 `.card`：
+      管着卡片底色的 `html[data-theme="light"] .card{background:rgba(255,255,255,.80)}`
+      特指度是 (0,2,1)，和 `html[data-theme="light"] .mon-xq` **(0,2,1) 打平** ——
+      打平就要看"谁写在后面"，而这一条在 `pages.css`、那一条在 `style.css`，
+      恰好 pages.css 在后面所以今天是对的。**但那是巧合，不是保证**：
+      以后谁调一下 `<link>` 顺序、或者往 style.css 末尾再补一条 `.card`，
+      这张卡就会**静默变回白底**（页面不报错、CSS 里明明有 `detail_xq` 这个串、
+      `getComputedStyle(...).backgroundImage` 回 `none`）。多带一个 `.card`
+      就稳过 (0,2,1)，也不用 `!important`。这个坑的完整症状写在 `media.html`
+      的 `.mp-hero` 那一段，同一件事。
+   ⚠️ 这是**整条替换** `.card` 的 `background` —— 这张卡从此不透出页面底图，
+      照片就是它的底（和 `.mp-hero` 那三张一样，是要的效果）。
+   ⚠️ 真要看效果用 `_shot_bgs4.py` 截图看（它会念一遍算出来的 background-image），
+      别拿这段文字推。 */
+html[data-theme="light"] .card.mon-xq{
+  background:url("assets/detail_xq.jpg") center/100% auto no-repeat;
+}
+.mon-xq{ display:flex; flex-direction:column; min-height:0; }
+.mon-xq .xq-head{ display:flex; align-items:flex-start; gap:.4rem; flex:1 1 auto; min-height:0; }
+/* ★ 2026-09-25（第十七次改版）：**小瑞的高度从写死的 8.2rem 改成"最多 8.2rem"。**
+
+   原来这里是 `width:8.2rem; height:8.2rem;`（定死、且 `flex:0 0 auto` 不许缩），
+   而 `.xq-head` 是 `flex:1 1 auto; min-height:0`（**可以缩到 0**）——
+   两者一撞，小瑞就**从卡片里往下溢**。实测（`_scratch/_probe_music_click.py`，
+   真实窗口 1638x843）：这一行被压到 **66 px**，小瑞要 **119 px**，
+   溢出 **54 px**，正好压住 `.qk-round` 第一颗圆钮 = **「舒缓音乐」**。
+   于是那颗按钮**中心点上最上面的是 `IMG#mascotImg`**（`elementFromPoint` 量的），
+   点它变成"换形象"——**这正是用户报的那个"点了只有固定话术、音乐没放"**。
+
+   ⚠️ 真凶**不是 z-index**。给 `.ring` 加 `pointer-events:none` 治不了：光环后面
+      还有 `#mascotImg`（矩形更大）和 `div.mascot` 自己，两个都可命中，
+      **透明 div 在这个项目里确实吃点击**（`runs/_check_clickable.txt:16` 有实例）。
+   ⚠️ 也**不要**用"给这一行加 `min-height:8.2rem` 顶住"那种写法：卡片是被侧栏
+      挤到 `min-height:14rem` 的地板上的（`.mon-side > .mon-xq`），
+      顶住的结果是整张卡的内容**从卡片底边溢出去**（圆钮落到卡外），
+      在 843 高的窗口上换汤不换药。
+
+   **修法照抄 `style.css` 的 `.rail-xr`**（那里写着「为了让窗口矮的时候让立绘自己缩，
+   而不是把导航卡撑出滚动条」）——这个项目对"槽不够高"的既有答案是**让它缩**：
+   `height:100%` 量的是父行（`.xq-head`）**已经定下来的**高度，
+   `max-height:8.2rem` 保证**窗口够高时和原来一模一样**（1920x1080 实测 8.2rem 原样），
+   `aspect-ratio:1` 让小瑞**永远是正方形** —— 否则 `.ring`（`border-radius:50%`）
+   会被压成椭圆、`#mascotImg` 靠 `object-fit:contain` 变成信箱式留白。
+   ⚠️ 溢出在结构上**不可能**再发生：小瑞越高越不过父行。
+   ⚠️ 余量只有几 px，**别靠读这几行推**：改完必须重跑那个探针，
+      且要在不止一个窗口尺寸下量（挤的是**高度**，全站只有一条 `@media`，管封面）。
+   ⚠️ `width:auto` **一个字都不能省**，而且必须是这一条自己写的：
+      `.mascot` 的基条（`style.css:1315`）是 `width:6.6rem`——不写 `auto`，
+      宽度就被那个 6.6rem 定死，`aspect-ratio` 两边都是确定值**等于没写**，
+      小瑞变成 **6.6rem 宽 × 行高** 的长方形（实测 96x66），
+      而 `.ring` 是 `border-radius:50%`，**当场变成一个椭圆** —— 不报错。 */
+.mon-xq .mascot{
+  width:auto; height:100%;
+  max-width:8.2rem; max-height:8.2rem;
+  aspect-ratio:1; flex:0 0 auto;
+}
+.mon-xq .xq-bubble{ flex:1 1 auto; min-width:0; margin-top:1.1rem; overflow:hidden; }
+/* 参考图上那四颗是**圆形图标按钮 + 下面一行字**，不是横向长条按钮
+   （`.xq-btn` 是长条那种，首页在用，别混）。
+   ⚠️ 第四颗「更多」是一颗 `<a href="monitor.html">`（★ 第八次改版：点它换页），
+      所以下面每条选择器都写 **`button` 和 `a` 两份** —— 少写一份，那一颗就会
+      掉回浏览器默认的蓝字带下划线，而且**不报错**（看着像"这颗坏了"）。 */
+.qk-round{ display:grid; grid-template-columns:repeat(4,1fr); gap:.4rem; margin-top:.6rem; }
+.qk-round button, .qk-round a{
+  display:flex; flex-direction:column; align-items:center; gap:.35rem;
+  padding:.45rem .2rem; border-radius:.8rem; cursor:pointer; font:inherit;
+  font-size:.7rem; color:var(--ink-3); background:none; border:1px solid transparent;
+  transition:.25s; min-width:0; text-decoration:none;
+}
+/* ★ 2026-09-25（第十四次改版）：描边 `.34 → .42`，和 `.qk` / `.adv li` / `.rec li`
+   那一档对齐（这一格没有选中态，所以可以足一点）。原来 .34 在
+   「静止 `.14` 的淡蓝底」上几乎看不出边亮起来。语汇见 `style.css` `.ri` 上面那段。 */
+.qk-round button:hover, .qk-round a:hover{
+  background:rgba(var(--rgb),.12); border-color:rgba(var(--rgb),.42); color:var(--ink-3);
+}
+.qk-round button .ic, .qk-round a .ic{
+  width:2.4rem; height:2.4rem; display:grid; place-items:center; border-radius:50%;
+  color:var(--accent); background:rgba(var(--rgb),.14);
+}
+.qk-round button:hover .ic, .qk-round a:hover .ic{ background:rgba(var(--rgb),.24); }
+.qk-round button svg, .qk-round a svg{ width:1.15rem; height:1.15rem; }
+.qk-round button span, .qk-round a span{
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+
+/* =========================================================================
+   ⚠️ 这里原来是四块 CSS，第七次改版把它们连 markup 一起删了 —— **别照着
+   CSS 把页面加回来**，它们是：
+     · `.mon-trend` / `.trend-body` / `.trend-chart` / `.trend-note`
+       —— 概览那张「数据趋势」大图（用户：「数据趋势 最近事件那些去掉」）；
+     · `.beh-title` / `.beh*` —— 那张图右边的「当前驾驶行为」四行；
+     · `.mon-events` / `.mon-more` —— 概览右下那张「最近事件」（`#tl`）；
+     · `.mon-script` / `.mon-script .swash` —— 卡片外那行手写体。
+   留下的 `.chart` / `.plot` / `.mt` / `.tl` 那些**基础类**还活着：
+   四张深层面板（疲劳分析 / 生理指标 / 行为特征 / 历史记录）在用。
+   ========================================================================= */
+
+/* =========================================================================
+   ★ 第六次改版（续）：画面卡的两颗浮层 + 评分卡的高度优先级
+   ========================================================================= */
+
+/* 右上那颗「识别中」。参考图上就有它 —— 和左上那颗「驾驶员实时画面」是**两件事**：
+   左上说的是"画面从哪来"，这一颗说的是"推理在跑"。 */
+.mon-recog{
+  position:absolute; top:1rem; right:1rem; z-index:3;
+  display:flex; align-items:center; gap:.38rem;
+  padding:.3rem .72rem; border-radius:2rem; font-size:.74rem;
+  color:#1E8E5A; background:rgba(255,255,255,.88);
+  border:1px solid rgba(46,196,124,.45);
+}
+.mon-recog .d{
+  width:.4rem; height:.4rem; border-radius:50%; background:currentColor;
+  animation:monPulse 1.9s ease-in-out infinite;
+}
+
+/* 「接入摄像头 / 断开摄像头」——**全页唯一的换源按钮**（2026-09-25 深夜）。
+   用户原话：「是否接入摄像头按键 放到一个可选择的地方 然后无论有没有实时图像
+   都可以按 可以自由切换是否接入」。
+   它**常驻**（没有 `hidden`，`onHello` 也不改它的可见性），摆在「识别中」正下方 ——
+   那一颗是常驻的，所以 `top` 是个**写死的**值：`.mon-recog` 是 `top:1rem`，
+   它本身约 1.6rem 高（.3+.3 的 padding + 一行 .74rem 的字），留 .5rem 缝 → 3.1rem。
+   ⚠️ 改 `.mon-recog` 的字号或内边距，这一条要跟着改（没有靠流布局自动让位的办法：
+       `.mon-recog` 自己是绝对定位的，`.livecard` 里那一列浮层全是绝对定位）。
+   ⚠️ 配色**故意比「识别中」素**：断开是个次要动作，不该和上面那颗常驻状态灯
+      抢注意力。压在画面上，所以底色仍要够实（不是全透明）。 */
+.cam-toggle{
+  position:absolute; top:3.1rem; right:1rem; z-index:4;
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.28rem .72rem; border-radius:2rem; cursor:pointer;
+  font:inherit; font-size:.72rem; font-weight:600; letter-spacing:.02em;
+  color:#EAF4FF; background:rgba(8,22,32,.62);
+  border:1px solid rgba(234,244,255,.42);
+}
+.cam-toggle svg{
+  width:.98rem; height:.98rem; flex:0 0 auto;
+  fill:none; stroke:currentColor; stroke-width:1.9;
+  stroke-linecap:round; stroke-linejoin:round;
+}
+.cam-toggle:hover{ background:rgba(8,22,32,.78); }
+.cam-toggle:disabled{ opacity:.62; cursor:default; }
+/* 两个方向的**主次**不一样，所以两套配色（`data-on` 由 `camPaint()` 一处写）：
+   · `data-on="0"` 没接摄像头 → 「接入摄像头」是**主操作**（人打开这一页多半就是
+     要接上它），压画面的深色玻璃上必须一眼看见 → accent 实心；
+   · `data-on="1"` 接着 → 「断开摄像头」是**次要动作**，回到素色玻璃，
+     不去和上面那颗常驻状态灯抢注意力。
+   压在画面上，所以两种底色都要够实（不是全透明）。 */
+.cam-toggle[data-on="0"]{
+  color:#fff; background:var(--accent);
+  border-color:rgba(255,255,255,.26);
+  box-shadow:0 .25rem .7rem rgba(0,0,0,.28);
+}
+.cam-toggle[data-on="0"]:hover{ filter:brightness(1.08); background:var(--accent); }
+/* ❌ 已删 · `.cam-off` 的 `[hidden]{display:none}`（2026-09-25 深夜）。
+   那颗按钮现在叫 `.cam-toggle`，而且**不再有 hidden 这个状态** ——
+   「无论有没有实时图像都可以按」就是这条要求的代码形态：不许再给它加
+   任何按状态藏起来的写法（真需要藏的时候，说明需求变了，回来重读 detail.html
+   里那段用户原话）。 */
+
+/* 画面底边那条：**横贯整张卡的半透明条**（参考图就是这个形状，不是一颗胶囊）。
+   左 = 在算什么（跟档位变，`#camAlertTxt`），右 = 画面从哪来（`#camNote`）。
+   ⚠️ 它替代了原来那颗 `.cam-note` 胶囊。`.cam-note` 那几条规则**留着不删** ——
+      别的页面上还有用它样式的地方没有，删规则比删元素危险；这里只是不再用。
+      字符下面压着画面，所以文字要自带阴影，不然白背景的视频里会看不见。 */
+.cam-bar{
+  position:absolute; left:0; right:0; bottom:0; z-index:3;
+  display:flex; align-items:center; gap:.6rem;
+  padding:.6rem .95rem;
+  font-size:.74rem; color:#EAF4FF;
+  background:linear-gradient(to top, rgba(8,20,30,.74), rgba(8,20,30,.30) 68%, transparent);
+}
+.cam-bar .at{
+  display:flex; align-items:center; gap:.42rem; min-width:0;
+  text-shadow:0 .05rem .32rem rgba(0,0,0,.55);
+}
+.cam-bar .at svg{ width:.95rem; height:.95rem; flex:0 0 auto; color:#FFC46B; }
+/* ⚠️ 类名是 `.cam-from`，**不是 `.nt`**：`pages.css` 的首页那一段里有一条
+   **光杆的 `.nt{...}`**（`.ntiles` 里那种白底小格）。光杆单类选择器是
+   **全站共享**的，`.cam-bar .nt` 只覆盖了我写到的属性，那条的白底和圆角
+   照样跟过来 —— 实际表现是画面底边那颗"画面从哪来"变成一颗白色胶囊、
+   还被卡片右边裁掉。
+   ⚠️ `min-width:0` 不能省：`text-overflow:ellipsis` 只对**能收缩**的盒子生效，
+   flex 项默认 `min-width:auto` = 内容宽，于是它不收缩、直接溢出卡片。
+   这个坑和 `.ring` 是同一类（见 `_scratch/_audit_class.py`），写新页面前跑一下。 */
+.cam-bar .cam-from{
+  margin-left:auto; min-width:0;
+  font-size:.66rem; color:rgba(234,244,255,.74);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ⚠️ 这里原来是「评分卡的高度优先级」那三条（`.mon-score > *` / `.mon-score .alarms`
+   / `.mon-score .score-note`），宿主卡第七次改版并进了「实时监测数据」，
+   整组连 markup 一起删。
+   它记的那个坑仍然有效、换个地方还得防：**flex 列的孩子默认 `flex:0 1 auto`**，
+   内容超高时每个孩子都被按比例压一压（不是从底部整齐裁掉），表现是"某行字
+   只剩 padding 那么高"。这一卡里凡是**不许压**的行都写了 `flex:0 0 auto`
+   （见 `.md-rows` / `.md-note`），别再靠"卡够高"碰运气。 */

@@ -122,7 +122,15 @@ def draw_hud(bgr, lines):
 #
 # 顺序只往后追加：前 7 个键的编号别动，用户可能已经按老编号录过了。
 REC_EXTRA = ["yawn", "talking", "long_closure", "yawn_open"]
-REC_TARGETS = list(C.CLASSES) + REC_EXTRA
+# ⚠️ **逐字写死，不许写成 `list(C.CLASSES) + REC_EXTRA`。**
+# 2026-09-25 支路一三类并二类，`C.CLASSES` 从 3 项变 2 项 —— 拼出来的话数字键
+# **整体前移一位**：用户按老编号按 3 (原 yawn) 会把哈欠录进 `data/raw/fatigue/`，
+# 既污染训练集、又白录一场，而且当场没有任何报错（目录存在、文件写成功）。
+# 上面那句"编号别动"的承诺只有在**这张表本身不跟着 CLASSES 动**时才成立。
+# 类别增删时这里保持原样：`phone` 目录仍然可录，它按 DIR_CLASS 归 fatigue 类。
+REC_TARGETS = ["normal", "phone", "fatigue"] + REC_EXTRA
+assert len(REC_TARGETS) == 7 and REC_TARGETS[3:] == REC_EXTRA, \
+    "REC_TARGETS 的前 7 个键被改动了 —— 用户的老编号会错位，见上面的注释"
 # 数字键 1..N 直接映射到 REC_TARGETS 的下标
 KEY2IDX = {ord(str(i + 1)): i for i in range(len(REC_TARGETS))}
 

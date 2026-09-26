@@ -9,8 +9,8 @@
     5. 标准化统计量只从训练集拟合，一并序列化进 npz 供推理复用
 
 为什么第 4 步必须按片段划分：
-    窗口步长 15 < 窗口长度 60，相邻窗口重叠 75 帧中的 45 帧，几乎是同一条
-    数据。若按窗口随机划分，训练集和测试集里会出现大量近乎重复的样本，
+    窗口步长 15 < 窗口长度 45，相邻窗口重叠 45 帧中的 30 帧（67%），几乎是
+    同一条数据。若按窗口随机划分，训练集和测试集里会出现大量近乎重复的样本，
     测试准确率能刷到 95%+ 但现场一坐上去就崩。按片段划分，测试集里是
     模型完全没见过的人/坐姿/光线，才是真实水平。
 
@@ -97,38 +97,60 @@ def make_windows(seq, window=C.WINDOW, stride=C.STRIDE_TRAIN):
 
 
 # ---------------------------------------------------------------- 划分
+# 目录 -> 类别。★ 2026-09-25 二类合并：`phone` 目录里的样本打 `fatigue` 标签
+# （"看手机 = 持续低头 = 重度疲劳"，`src/live.py` 的 CLASS_LEVEL 里两者本来就同落 L3）。
+# 目录**不删不搬**，只是标签变了 —— 想回三类就把这里 phone 改回 "phone"
+# 并把 config.CLASSES 改回去。
+DIR_CLASS = {"normal": "normal", "phone": "fatigue", "fatigue": "fatigue"}
+
+# ⚠️ 这个**顺序**不是随便排的：它是"消费随机数"的顺序。
+# 三类那一轮 `split_clips` 按 CLASSES = [normal, phone, fatigue] 逐类 shuffle 一次；
+# 本表照抄同样的顺序、同样的**每目录**段数（27 / 26 / 26），于是 rng 状态逐次一致，
+# 二类重训的 val/test 成员才会和三类那一轮**逐段相同**（受控对拍，不是换考卷）。
+# 想改合并方式（比如 phone 归 normal）就得接受 val/test 换一批样本。
+DIRS = ("normal", "phone", "fatigue")
+
+
 def discover_clips(pose_dir):
-    """{类别: [csv 路径, ...]}"""
+    """{目录: [csv 路径, ...]}"""
     found = {}
-    for cls in C.CLASSES:
-        d = Path(pose_dir) / cls
-        found[cls] = sorted(d.glob("*.csv")) if d.is_dir() else []
+    for name in DIRS:
+        d = Path(pose_dir) / name
+        found[name] = sorted(d.glob("*.csv")) if d.is_dir() else []
     return found
 
 
-def split_clips(clips_by_class, seed=C.SPLIT_SEED, ratio=C.SPLIT_RATIO):
+def split_clips(clips_by_dir, seed=C.SPLIT_SEED, ratio=C.SPLIT_RATIO):
     """按片段整体划分。返回 {split: [(path, cls), ...]} 和告警列表。
 
     同一片段的所有窗口只会进同一个 split —— 这是整个脚本最重要的一步。
+
+    ★ 二类合并之后这里是**按目录划、再按类合并**，不是按类直接划：
+    每个目录各 shuffle 一次、各自算 n_val/n_test，最后把同类的目录并到一起。
+    换成"先把 phone+fatigue 合成 52 段再 shuffle"，随机数消耗的次数就变了，
+    val/test 会换一批样本，重训结果和三类的合并读数（误报 0/27、漏报 0/52）
+    就不再可比 —— 而"可比"正是这次重训的目的。
     """
     rng = np.random.RandomState(seed)
     out = {"train": [], "val": [], "test": []}
     warns = []
+    per_dir = {}
 
-    for cls in C.CLASSES:
-        paths = list(clips_by_class.get(cls, []))
+    for name in DIRS:
+        paths = list(clips_by_dir.get(name, []))
         n = len(paths)
         if n == 0:
-            warns.append(f"类别 [{cls}] 一个片段都没有，请先录视频并跑 extract_pose.py")
+            warns.append(f"目录 [{name}] 一个片段都没有，请先录视频并跑 extract_pose.py")
+            per_dir[name] = {"train": [], "val": [], "test": []}
             continue
         if n < C.MIN_CLIPS_PER_CLASS:
-            warns.append(f"类别 [{cls}] 只有 {n} 段，建议至少 {C.MIN_CLIPS_PER_CLASS} 段，"
+            warns.append(f"目录 [{name}] 只有 {n} 段，建议至少 {C.MIN_CLIPS_PER_CLASS} 段，"
                          f"否则验证/测试集太薄，指标不可信")
 
         if n < 3:
-            warns.append(f"类别 [{cls}] 只有 {n} 段，全部划入训练集，"
-                         f"该类没有验证/测试样本")
-            out["train"] += [(p, cls) for p in paths]
+            warns.append(f"目录 [{name}] 只有 {n} 段，全部划入训练集，"
+                         f"该目录没有验证/测试样本")
+            per_dir[name] = {"train": paths, "val": [], "test": []}
             continue
 
         rng.shuffle(paths)
@@ -136,9 +158,24 @@ def split_clips(clips_by_class, seed=C.SPLIT_SEED, ratio=C.SPLIT_RATIO):
         n_test = max(1, int(round(n * ratio[2])))
         n_train = n - n_val - n_test
 
-        out["train"] += [(p, cls) for p in paths[:n_train]]
-        out["val"] += [(p, cls) for p in paths[n_train:n_train + n_val]]
-        out["test"] += [(p, cls) for p in paths[n_train + n_val:n_train + n_val + n_test]]
+        per_dir[name] = {
+            "train": paths[:n_train],
+            "val": paths[n_train:n_train + n_val],
+            "test": paths[n_train + n_val:n_train + n_val + n_test],
+        }
+
+    for split in ("train", "val", "test"):
+        for name in DIRS:
+            cls = DIR_CLASS[name]
+            out[split] += [(p, cls) for p in per_dir[name][split]]
+
+    # 合并之后的**类**总段数也要够，否则划分仍然太薄（目录数达标不代表类达标）
+    for cls in C.CLASSES:
+        n_cls = sum(1 for split in ("train", "val", "test")
+                    for _, c in out[split] if c == cls)
+        if 0 < n_cls < C.MIN_CLIPS_PER_CLASS:
+            warns.append(f"类别 [{cls}] 合并后只有 {n_cls} 段，"
+                         f"建议至少 {C.MIN_CLIPS_PER_CLASS} 段")
 
     return out, warns
 
@@ -150,12 +187,17 @@ def build(pose_dir=C.DATA_POSE, out_path=None, stride=C.STRIDE_TRAIN,
     t0 = time.time()
     out_path = Path(out_path) if out_path else (C.DATA_DATASET / "dataset.npz")
 
-    clips_by_class = discover_clips(pose_dir)
-    for cls in C.CLASSES:
-        if verbose:
-            print(f"  类别 {cls:<8} {len(clips_by_class[cls])} 个片段")
+    clips_by_dir = discover_clips(pose_dir)
+    if verbose:
+        for name in DIRS:
+            print(f"  目录 {name:<8} {len(clips_by_dir[name]):>3} 个片段 -> 类别 "
+                  f"{DIR_CLASS[name]}")
+        for cls in C.CLASSES:
+            tot = sum(len(v) for n2, v in clips_by_dir.items() if DIR_CLASS[n2] == cls)
+            print(f"  类别 {cls:<8} {tot:>3} 个片段"
+                  f"（合并自 {[n2 for n2 in DIRS if DIR_CLASS[n2] == cls]}）")
 
-    splits, warns = split_clips(clips_by_class, seed=seed)
+    splits, warns = split_clips(clips_by_dir, seed=seed)
     for w in warns:
         print(f"  [warn] {w}")
     if not splits["train"]:
@@ -211,7 +253,8 @@ def build(pose_dir=C.DATA_POSE, out_path=None, stride=C.STRIDE_TRAIN,
         "split_ratio_target": list(C.SPLIT_RATIO),
         "split_seed": seed,
         "classes": C.CLASSES,
-        "clips": {},
+        "clips": {},           # 按**目录**键（下游按路径段查，见下面那段注释）
+        "clips_by_class": {},  # 按**类别**键（合并后的视图，给人看的）
         "windows": {},
         "class_windows": {},
     }
@@ -225,9 +268,20 @@ def build(pose_dir=C.DATA_POSE, out_path=None, stride=C.STRIDE_TRAIN,
         stats["class_windows"][split] = {
             cls: int((y == i).sum()) for i, cls in enumerate(C.CLASSES)
         }
+        # ⚠️ `clips` **按目录**键，不是按类别键。
+        # 三个读者（`tools/replay_clip.py:144`、`tools/calibration.py:50`、
+        # `tools/lag_breakdown.py:133`）都把键当成**路径段**拼
+        # `f"{键}/{片段名}"` 去查"这段落在哪个划分"。二类合并后 phone 目录的样本
+        # 标签变成了 fatigue，若这里按类别键，那 26 段就会在"划分"那一列静默变成
+        # `--`（查不到 ≠ 报错）。所以键保持目录名，另存一份按类的视图给汇总用。
         stats["clips"][split] = {}
-        for i, cls in enumerate(C.CLASSES):
-            stats["clips"][split][cls] = sorted(
+        for name in DIRS:
+            stats["clips"][split][name] = sorted(
+                p.stem for p, c in splits[split] if DIR_CLASS[name] == c
+            )
+        stats["clips_by_class"][split] = {}
+        for cls in C.CLASSES:
+            stats["clips_by_class"][split][cls] = sorted(
                 p.stem for p, c in splits[split] if c == cls
             )
 
