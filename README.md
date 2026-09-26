@@ -1,3 +1,9 @@
+> 📢 Copyright Notice: This competition prototype (Lingtu‑Zhixing).
+All source codes and UI assets are owned by the project team.
+No reproduction or reuse for other competitions without written permission.
+
+>【中文】版权说明：作品【灵途智行】为本竞赛原型项目，全部代码与UI素材版权属于项目团队。未经书面许可，禁止复制用于其他赛事。
+
 # 灵途智行 · 驾驶员状态实时监测系统
 
 **时序姿态 × 面部表情 双路融合**，从一颗普通单目摄像头出发，在不接触驾驶员的前提下
