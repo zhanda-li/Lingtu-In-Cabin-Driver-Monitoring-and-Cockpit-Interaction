@@ -131,6 +131,11 @@ Concurrent replay log inference latency median 51.88 ms, p95 97.16 ms for three 
 this is under concurrent CPU load and is not interchangeable with single-model timing.
 Evidence: `yolo_runtime_regression.json`. This clip stays L0 and is shorter than the
 full LR history; no claim of full L0-L3 coverage or board real-time performance.
+Repeated the same original-vs-shadow camera comparison on `fatigue_00.mp4`:
+127 decision rows, all 19 columns exactly equal, observed L0 and L3. This clip
+also has genuine FaceMesh loss (121/299 detected), and the existing gate remains
+closed for all 127 decisions. Thus it exercises high-risk/facial-loss isolation,
+but not LR voting or L1/L2 transitions. Evidence: `yolo_fatigue_runtime_regression.json`.
 NITYMED official access page https://datasets.esdalab.ece.uop.gr/elementor-65/
 requires a name/email/purpose request form. It was read but not submitted, so no
 nighttime data was obtained or validation claimed.
