@@ -3,15 +3,127 @@ import unittest
 import ast
 import subprocess
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+import threading
+import types
 import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT))
 BASELINE = '97f11b7'
 sys.path.insert(0, str(ROOT/'src'))
-from face_roi_yolo import crop_roi, REGIONS, Temporal, FaceRoiYolo
+from face_roi_yolo import crop_roi, REGIONS, Temporal, FaceRoiYolo, AsyncFaceRoiYolo
 
 
 class ShadowTests(unittest.TestCase):
+    def test_ui_state_shadow_serialization(self):
+        sys.path.insert(0, str(ROOT))
+        from ui.state import State
+        state = State()
+        before = state.to_json()
+        self.assertNotIn('yolo_shadow', before)
+        state.yolo_shadow = {'mode':'shadow','eye_event':'long_closure'}
+        state.derive({})
+        enabled = state.to_json()
+        self.assertEqual(enabled['yolo_shadow'],state.yolo_shadow)
+        for k in ['l_fused','l1','l2']:
+            self.assertEqual(before[k],enabled[k])
+
+    def test_all_ui_levels_match_original_with_shadow_evidence(self):
+        from ui.state import State
+        source = subprocess.check_output(['git','show',f'{BASELINE}:ui/state.py'],cwd=ROOT).decode('utf-8')
+        baseline = types.ModuleType('baseline_ui_state')
+        with patch.dict(sys.modules, {baseline.__name__:baseline}):
+            exec(compile(source,'baseline_ui_state.py','exec'),baseline.__dict__)
+        for level in range(4):
+            kwargs = dict(l_fused=level,l1=3 if level==3 else 0,l2=min(level,2),
+                          p_fat=level*.3,perclos=level*.2,src='pose' if level==3 else 'face')
+            before = baseline.State(**kwargs).derive({}).to_json()
+            state = State(**kwargs)
+            state.yolo_shadow = {'mode':'shadow','eye_event':'long_closure','yawn_event':'yawn_candidate'}
+            after = state.derive({}).to_json()
+            after.pop('yolo_shadow')
+            self.assertEqual(before,after)
+
+    def test_async_queue_bounded_and_loss_invalidates(self):
+        entered, release = threading.Event(), threading.Event()
+        fake = Mock()
+        def slow(*args):
+            entered.set(); release.wait(3)
+            return dict(eye_status='active', yawn_status='inactive')
+        fake.process.side_effect = slow
+        with patch('face_roi_yolo.FaceRoiYolo', return_value=fake):
+            worker = AsyncFaceRoiYolo('', '')
+        try:
+            image = np.zeros((100,100,3), np.uint8)
+            points = {i:np.array([20.,30.]) for i in REGIONS['left']}
+            worker.process(image, points, .2, 0)
+            self.assertTrue(entered.wait(2))
+            for i in range(10):
+                worker.process(image, points, .2, i*.01)
+            self.assertLessEqual(worker.pending.qsize(), 1)
+            self.assertEqual(worker.process(image, None, None, .2)['eye_status'], 'invalid')
+        finally:
+            worker.close(); release.set(); worker.worker.join(3)
+
+    def test_onnx_preprocessing_matches_ultralytics(self):
+        from yolo_runtime import preprocess, OnnxClassifier
+        from ultralytics.data.augment import classify_transforms
+        from PIL import Image
+        rng = np.random.default_rng(42)
+        for h,w in [(91,140),(140,91),(96,96),(93,130)]:
+            image = rng.integers(0,256,(h,w,3),dtype=np.uint8)
+            expected = classify_transforms(224)(Image.fromarray(image[:,:,::-1])).numpy()[None]
+            np.testing.assert_allclose(preprocess(image), expected, atol=1e-7)
+        for name,pos,neg in [('best',{'open'},{'closed'}),('best_yawn',{'yawn'},{'no_yawn'})]:
+            native = __import__('face_roi_yolo').Classifier(ROOT/f'models/yolo_shadow/{name}.pt',pos,neg)
+            onnx = OnnxClassifier(ROOT/f'models/yolo_shadow/{name}.onnx',pos,neg)
+            self.assertAlmostEqual(native(image), onnx(image), places=5)
+
+    def test_rknn_missing_runtime_falls_back_to_real_onnx(self):
+        from yolo_runtime import OnnxClassifier, RknnClassifier
+        path = ROOT/'models/yolo_shadow/best.onnx'
+        with patch.dict(sys.modules, {'rknnlite':None}):
+            fallback = RknnClassifier(path, {'open'}, {'closed'})
+        cpu = OnnxClassifier(path, {'open'}, {'closed'})
+        image = np.full((90,140,3),127,np.uint8)
+        self.assertEqual(fallback.backend, 'onnx_cpu_fallback')
+        self.assertIsNotNone(fallback.fallback_reason)
+        self.assertAlmostEqual(fallback(image), cpu(image), places=7)
+        fallback.close()
+
+    def test_disabled_face_detect_matches_original(self):
+        import face
+        source = subprocess.check_output(['git','show',f'{BASELINE}:src/face.py'],cwd=ROOT).decode('utf-8')
+        original = {'__file__':str(ROOT/'src/face.py'), '__name__':'baseline_face'}
+        exec(compile(source, 'baseline_face.py', 'exec'), original)
+        old = original['FaceExtractor'].__new__(original['FaceExtractor'])
+        new = face.FaceExtractor.__new__(face.FaceExtractor)
+        new.yolo_shadow = None
+        # Identical landmark observations isolate behavior from MediaPipe nondeterminism.
+        points = [types.SimpleNamespace(x=.2+(i%20)*.02,y=.2+(i//20)*.015) for i in range(478)]
+        for extractor in [old,new]:
+            extractor._mp = Mock()
+            extractor._last_ts = -1
+            extractor.running_mode = 'VIDEO'
+            extractor._landmarker = Mock()
+        image = np.zeros((120,160,3),np.uint8)
+        for ts, found in [(0,True),(67,False),(134,True)]:
+            result = types.SimpleNamespace(face_landmarks=[points] if found else [],
+                                           facial_transformation_matrixes=[np.eye(4)])
+            for extractor in [old,new]:
+                extractor._landmarker.detect_for_video.return_value = result
+            a,b = old.detect(image,ts),new.detect(image,ts)
+            if not found:
+                self.assertIsNone(a); self.assertIsNone(b)
+            else:
+                self.assertEqual(a.keys(),b.keys())
+                for key in a:
+                    if key == 'P':
+                        for i in a[key]:
+                            np.testing.assert_array_equal(a[key][i],b[key][i])
+                    else:
+                        np.testing.assert_equal(a[key],b[key])
+
     def test_roi(self):
         image = np.zeros((100, 100, 3), np.uint8)
         for ids in REGIONS.values():

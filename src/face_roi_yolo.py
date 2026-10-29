@@ -6,6 +6,8 @@ to the driver's anatomical sides (unmirrored camera), not screen positions.
 import math
 import time
 import numpy as np
+import queue
+import threading
 
 REGIONS = {'left': (362, 263, 386, 374, 385, 373),
            'right': (33, 133, 145, 159, 144, 160),
@@ -84,6 +86,13 @@ class Temporal:
                 values[k] = self.smooth[k]
         out = dict(eye_left_open_prob=values['left'], eye_right_open_prob=values['right'],
                    yawn_probability=values['mouth'])
+        for side in ['left', 'right']:
+            p = values[side]
+            out[f'eye_{side}_status'] = ('invalid' if p is None else
+                                        'open' if p > .7 else 'closed' if p < .3 else 'uncertain')
+            out[f'eye_{side}_confidence'] = None if p is None else max(p, 1-p)
+        p = values['mouth']
+        out['mouth_confidence'] = None if p is None else max(p, 1-p)
         eye_valid = values['left'] is not None and values['right'] is not None
         mouth_valid = values['mouth'] is not None and mar is not None and math.isfinite(mar)
         for key, valid, active, threshold in [
@@ -111,8 +120,17 @@ class Temporal:
 
 class FaceRoiYolo:
     def __init__(self, eye_path, mouth_path):
-        self.eye = Classifier(eye_path, {'open', 'open_eye', 'opened'}, {'closed', 'close', 'closed_eye'})
-        self.mouth = Classifier(mouth_path, {'yawn', 'yawning'}, {'no_yawn', 'not_yawn', 'no_yawning'})
+        import os
+        from pathlib import Path
+        factory = Classifier
+        if os.environ.get('DMS_YOLO_BACKEND', 'pt') in ('onnx', 'rknn'):
+            from yolo_runtime import OnnxClassifier, RknnClassifier
+            factory = RknnClassifier if os.environ['DMS_YOLO_BACKEND'] == 'rknn' else OnnxClassifier
+            eye_path, mouth_path = Path(eye_path).with_suffix('.onnx'), Path(mouth_path).with_suffix('.onnx')
+        elif os.environ.get('DMS_YOLO_BACKEND', 'pt') != 'pt':
+            raise ValueError('Supported backends: pt, onnx, rknn')
+        self.eye = factory(eye_path, {'open', 'open_eye', 'opened'}, {'closed', 'close', 'closed_eye'})
+        self.mouth = factory(mouth_path, {'yawn', 'yawning'}, {'no_yawn', 'not_yawn', 'no_yawning'})
         self.temporal = Temporal()
 
     def process(self, frame, points, mar, now):
@@ -128,5 +146,73 @@ class FaceRoiYolo:
                     errors.append(f'{key}: {type(exc).__name__}: {exc}')
         out = self.temporal.update(now, probs['left'], probs['right'], probs['mouth'], mar)
         out.update(mode='shadow', inference_ms=(time.perf_counter()-start)*1000, errors=errors,
+                   eye_backend=getattr(self.eye,'backend','pt_cpu'),
+                   mouth_backend=getattr(self.mouth,'backend','pt_cpu'),
+                   fallback_reasons=[v for v in [getattr(self.eye,'fallback_reason',None),getattr(self.mouth,'fallback_reason',None)] if v],
                    probability_kind='uncalibrated_class_probability')
         return out
+
+    def close(self):
+        for adapter in [self.eye,self.mouth]:
+            if hasattr(adapter,'close'):
+                adapter.close()
+
+
+class AsyncFaceRoiYolo:
+    """One worker, one pending frame; replaces queued stale work instead of blocking DMS."""
+    def __init__(self, eye_path, mouth_path):
+        self.detector = FaceRoiYolo(eye_path, mouth_path)
+        self.pending = queue.Queue(maxsize=1)
+        self.latest = None
+        self.generation = 0
+        self.stopped = threading.Event()
+        self.worker = threading.Thread(target=self._run, name='dms-yolo-shadow', daemon=True)
+        self.worker.start()
+
+    def _run(self):
+        while not self.stopped.is_set():
+            try:
+                frame, points, mar, timestamp, generation = self.pending.get(timeout=.1)
+            except queue.Empty:
+                continue
+            try:
+                if getattr(self, '_worker_generation', None) != generation:
+                    self.detector.temporal = Temporal()
+                    self._worker_generation = generation
+                out = self.detector.process(frame, points, mar, timestamp)
+                out['sample_timestamp'] = timestamp
+                if generation == self.generation:
+                    self.latest = out
+            except Exception as exc:
+                if generation == self.generation:
+                    self.latest = dict(mode='shadow', sample_timestamp=timestamp,
+                                       eye_status='invalid', yawn_status='invalid',
+                                       errors=[f'{type(exc).__name__}: {exc}'])
+        self.detector.close()
+
+    def process(self, frame, points, mar, now):
+        # Face loss invalidates published evidence immediately, even when inference is busy.
+        if points is None:
+            self.generation += 1
+            self.latest = None
+        if hasattr(self, '_last_submitted') and (now <= self._last_submitted or now-self._last_submitted > .5):
+            self.generation += 1
+            self.latest = None
+        self._last_submitted = now
+        item = (frame.copy(), None if points is None else {k:v.copy() for k,v in points.items()}, mar, now, self.generation)
+        try:
+            self.pending.get_nowait()
+        except queue.Empty:
+            pass
+        try:
+            self.pending.put_nowait(item)
+        except queue.Full:
+            pass
+        result = self.latest
+        if result is None or now - result['sample_timestamp'] > .5 or now < result['sample_timestamp']:
+            return dict(Temporal().update(now,None,None,None,None), mode='shadow',
+                        errors=[], pending=True)
+        return dict(result, pending=False, result_age_seconds=now-result['sample_timestamp'])
+
+    def close(self):
+        self.stopped.set()

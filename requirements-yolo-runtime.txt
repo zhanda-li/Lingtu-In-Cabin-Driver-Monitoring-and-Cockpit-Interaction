@@ -1,0 +1,4 @@
+# Optional torch-free inference runtime. Verify ARM64 wheel availability on board.
+numpy
+Pillow
+onnxruntime

@@ -117,6 +117,7 @@ LABEL_SMOOTH = 0.05
 # Optional auxiliary inference; never consumed by L0-L3 fusion.
 import os
 YOLO_SHADOW_ENABLED = os.environ.get('DMS_YOLO_SHADOW', '0') == '1'
+YOLO_SHADOW_ASYNC = os.environ.get('DMS_YOLO_ASYNC', '1') == '1'
 YOLO_EYE_PATH = MODELS_DIR / 'yolo_shadow' / 'best.pt'
 YOLO_MOUTH_PATH = MODELS_DIR / 'yolo_shadow' / 'best_yawn.pt'
 YOLO_SHADOW_LOG = os.environ.get('DMS_YOLO_LOG', '')

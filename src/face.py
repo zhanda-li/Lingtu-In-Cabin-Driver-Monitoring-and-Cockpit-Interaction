@@ -912,9 +912,10 @@ class FaceExtractor:
         self.yolo_shadow = None
         self.shadow_latest = None
         if getattr(C, 'YOLO_SHADOW_ENABLED', False):
-            from face_roi_yolo import FaceRoiYolo
+            from face_roi_yolo import FaceRoiYolo, AsyncFaceRoiYolo
             try:
-                self.yolo_shadow = FaceRoiYolo(C.YOLO_EYE_PATH, C.YOLO_MOUTH_PATH)
+                factory = AsyncFaceRoiYolo if getattr(C, 'YOLO_SHADOW_ASYNC', True) else FaceRoiYolo
+                self.yolo_shadow = factory(C.YOLO_EYE_PATH, C.YOLO_MOUTH_PATH)
             except Exception as exc:
                 import warnings
                 warnings.warn(f'YOLO shadow unavailable: {exc}')
@@ -980,8 +981,16 @@ class FaceExtractor:
 
     def _shadow(self, bgr, P, mar, timestamp_ms):
         import json
-        self.shadow_latest = self.yolo_shadow.process(bgr, P, mar, timestamp_ms / 1000.)
+        try:
+            self.shadow_latest = self.yolo_shadow.process(bgr, P, mar, timestamp_ms / 1000.)
+        except Exception as exc:
+            self.shadow_latest = dict(mode='shadow', eye_status='invalid', yawn_status='invalid',
+                                      errors=[f'{type(exc).__name__}: {exc}'])
         if getattr(C, 'YOLO_SHADOW_LOG', ''):
+            sample = self.shadow_latest.get('sample_timestamp')
+            if sample is not None and sample == getattr(self, '_shadow_logged_sample', None):
+                return
+            self._shadow_logged_sample = sample
             try:
                 with open(C.YOLO_SHADOW_LOG, 'a', encoding='utf-8') as stream:
                     stream.write(json.dumps(dict(timestamp=timestamp_ms / 1000., **self.shadow_latest),
@@ -992,6 +1001,8 @@ class FaceExtractor:
 
     def close(self):
         """显式释放。**正常不要调用** —— 固定 42 秒，见 PoseExtractor.close()。"""
+        if hasattr(self.yolo_shadow, 'close'):
+            self.yolo_shadow.close()
         try:
             self._landmarker.close()
         except Exception:

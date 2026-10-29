@@ -199,6 +199,7 @@ class State:
     eye_sec: float | None = None      # 最长的一次"持续闭眼"（秒）
     head_swing: float | None = None   # 最近 2 秒头摆了多少度（免基线）
     src: str = ""
+    yolo_shadow: dict | None = None   # Auxiliary only; never read by derive/risk rules.
 
     # ---- 派生（下面 derive() 填）----
     severity: str = "normal"
@@ -450,5 +451,7 @@ class State:
 
     def to_json(self) -> dict:
         d = asdict(self)
+        if self.yolo_shadow is None:
+            d.pop('yolo_shadow', None)
         d["probs"] = {k: round(float(v), 4) for k, v in self.probs.items()}
         return d

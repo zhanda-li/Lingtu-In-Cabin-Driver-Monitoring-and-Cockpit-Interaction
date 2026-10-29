@@ -30,10 +30,12 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+import config as C
 PY = sys.executable
 OUT = ROOT / "runs" / "fuse_regress"
 # 两边都必须相同的列（按列名取，不按位置取）
-KEYS = ("normal", "glance", "phone", "fatigue", "level")
+KEYS = (*C.CLASSES, "level")
 TOL = 1e-6
 
 
@@ -110,16 +112,23 @@ def main():
         if not cb or not ca:
             bad.append((name, "空日志", ""))
             continue
+        missing = [k for k in KEYS if k not in cb or k not in ca]
+        if missing:
+            bad.append((name, f"缺少列 {missing}", ""))
+            continue
         n = min(len(cb["level"]), len(ca["level"]))
         if len(cb["level"]) != len(ca["level"]):
             bad.append((name, f"行数不同 {len(cb['level'])} vs {len(ca['level'])}",
                         ""))
         dmax, lv_bad = 0.0, 0
-        for k in ("normal", "glance", "phone", "fatigue"):
+        for k in C.CLASSES:
+            if not np.isfinite(cb[k][:n]).all() or not np.isfinite(ca[k][:n]).all():
+                bad.append((name, f"概率含非有限值 {k}", ""))
+                dmax = float('inf')
             d = float(np.nanmax(np.abs(cb[k][:n] - ca[k][:n]))) if n else 0.0
             dmax = max(dmax, d)
         lv_bad = int(np.nansum(cb["level"][:n] != ca["level"][:n]))
-        ok = dmax <= TOL and lv_bad == 0 and len(cb["level"]) == len(ca["level"])
+        ok = n > 0 and dmax <= TOL and lv_bad == 0 and len(cb["level"]) == len(ca["level"])
         print(f"{name:<22}{n:>7}{dmax:>12.2e}{lv_bad:>11}   "
               + ("✅" if ok else "❌"))
         if not ok:

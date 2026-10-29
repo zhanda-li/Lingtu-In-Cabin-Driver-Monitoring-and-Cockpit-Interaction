@@ -1,0 +1,44 @@
+[
+  {
+    "model": "best",
+    "names": {
+      "0": "closed",
+      "1": "open"
+    },
+    "onnx": "D:\\sdk_env_v1.12.1\\dms_project\\models\\yolo_shadow\\best.onnx",
+    "input_shape": [
+      1,
+      3,
+      224,
+      224
+    ],
+    "output_shape": [
+      1,
+      2
+    ],
+    "samples": 6,
+    "max_abs_error": 2.980232238769531e-07,
+    "note": "Identical tensors; export parity only, not recognition accuracy"
+  },
+  {
+    "model": "best_yawn",
+    "names": {
+      "0": "no_yawn",
+      "1": "yawn"
+    },
+    "onnx": "D:\\sdk_env_v1.12.1\\dms_project\\models\\yolo_shadow\\best_yawn.onnx",
+    "input_shape": [
+      1,
+      3,
+      224,
+      224
+    ],
+    "output_shape": [
+      1,
+      2
+    ],
+    "samples": 6,
+    "max_abs_error": 1.1026859283447266e-06,
+    "note": "Identical tensors; export parity only, not recognition accuracy"
+  }
+]

@@ -416,7 +416,7 @@ class CamSource:
                     self.head = head
                     self.latest = row_to_state(head, "cam")
                     if self.face.yolo_shadow is not None:
-                        self.latest['yolo_shadow'] = self.face.shadow_latest
+                        self.latest.yolo_shadow = self.face.shadow_latest
                     # 基线攒了多少秒 —— 界面的「基线热身中 · 还需 N 秒」照它算。
                     # ★ 2026-09-26 起这个数**从开机起单调增长**：闸门不再清缓冲
                     #   （见上面那段），所以低头一次不会让它跳回去 —— 用户投诉的
@@ -505,6 +505,8 @@ class CamSource:
 
     def stop(self):
         self._stop.set()
+        if getattr(self, 'face', None) is not None and hasattr(self.face.yolo_shadow, 'close'):
+            self.face.yolo_shadow.close()
         self._th.join(timeout=1.5)
 
 

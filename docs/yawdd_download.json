@@ -1,0 +1,21 @@
+{
+  "source": "http://skuld.cs.umass.edu/traces/mmsys/2014/user06.tar",
+  "selected": [
+    {
+      "member": "YawDD dataset\\Dash\\Female\\1-FemaleNoGlasses.avi",
+      "path": "D:\\sdk_env_v1.12.1\\dms_project\\datasets\\yawdd_samples\\01-FemaleNoGlasses.avi",
+      "size": 170254546,
+      "note": "First independent RAR member; one participant only"
+    }
+  ],
+  "inspected_members": [
+    {
+      "name": "user06",
+      "size": 0
+    },
+    {
+      "name": "user06/YawDD dataset.rar",
+      "size": 5307787227
+    }
+  ]
+}

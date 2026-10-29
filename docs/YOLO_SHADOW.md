@@ -13,10 +13,14 @@ No second FaceMesh, training, replacement weights, or additional controller.
 
 ## Files
 
-Modified: `config.py`, `src/face.py`, `ui/cam.py`.
+Modified: `config.py`, `src/face.py`, `ui/cam.py`, `ui/state.py`, `tools/regress_fuse.py`.
 Added: `src/face_roi_yolo.py`, `requirements-yolo-shadow.txt`,
 `tools/check_yolo_shadow.py`, `tools/test_yolo_shadow.py`,
 `tools/validate_yolo_mrl.py`, this guide and JSON evidence in `docs/`.
+Additional modules/tools: `src/yolo_runtime.py`, `tools/export_yolo_shadow.py`,
+`tools/convert_yolo_rknn.py`, `tools/fetch_yawdd_samples.py`, `tools/validate_yolo_video.py`,
+`requirements-yolo-runtime.txt`.
+`tools/download_yolo_shadow.py` downloads/verifies the exact audited checkpoints by SHA256.
 Existing unrelated dirty files are excluded from the commit.
 
 ## Real public weights
@@ -50,6 +54,7 @@ both preferred models run successfully; backup names/input/license were not runt
 cd D:\sdk_env_v1.12.1\dms_project
 $py = 'D:\Anaconda3\envs\dms\python.exe'
 & $py -m pip install -r requirements-yolo-shadow.txt
+& $py tools/download_yolo_shadow.py
 & $py tools/check_yolo_shadow.py
 $env:DMS_YOLO_SHADOW = '1'
 $env:DMS_YOLO_LOG = 'runs/yolo_shadow.jsonl'
@@ -83,10 +88,14 @@ are zero when invalid/inactive. Inference latency and errors are included.
 
 ## Verification evidence and limitations
 
-Seven unit tests passed: three ROI regions, bounds/missing ROI, missing face with no
+Thirteen tests passed: three ROI regions, bounds/missing ROI, missing face with no
 inference, invalid/gaps, blink, long closure one-shot, MAR disagreement and sustained
 yawn candidate, plus AST comparisons of original algorithms. These are synthetic
-state/structure checks, NOT real-video behavioural accuracy tests.
+state/structure checks, NOT real-video behavioural accuracy tests. Additional tests
+cover disabled FaceExtractor output against the original code on identical landmark
+observations, UI serialization/risk isolation, bounded async queue, exact ONNX
+preprocessing, actual ONNX fallback when Lite2 is missing, and all four UI severity
+levels compared with the original implementation while shadow events are present.
 Both real model loading and CPU forward tests passed. Warm synthetic 96x96 BGR
 input resized by Ultralytics to 224, 10 iterations: eye median 7.15 ms / p95 8.86 ms,
 mouth median 6.71 ms / p95 7.74 ms. Excludes FaceMesh, camera and whole-app overhead.
@@ -98,24 +107,74 @@ Outstanding: labelled open/closed and yawn/no-yawn evaluation, actual blink/long
 closure video tests, YawDD talking/laughing/singing false positives, NITYMED night
 validation, full original L0-L3 and enabled/disabled end-to-end video regression.
 YawDD access documented at https://qualinet.github.io/databases/video/yawdd_a_yawning_detection_dataset/
-(4.9 GB archive); it was not downloaded. MRL and NITYMED websites timed out during
-inspection. Split future evaluation by participant/video, never neighboring frames.
+(5.3 GB tar containing a RAR); bounded member download is supported by
+`tools/fetch_yawdd_samples.py`. Split future evaluation by participant/video, never neighboring frames.
 Independent nod_event is optional and not implemented; original nod remains intact.
-Executed `tools/regress_fuse.py --limit 1`: both child inference programs returned
-success, but the legacy comparator raised `KeyError: 'glance'` because it still
-hardcodes four classes while current config has two. This is a failed regression
-test, not a pass. Existing generated logs were not treated as fresh test evidence.
-Current inference is synchronous (three forwards per detected face); enabled mode
-can reduce frame rate and thereby alter sampling even though formulas are unchanged.
+Fixed legacy regression comparator's four-class assumption; it now uses configured
+classes, fails on missing columns/nonfinite probabilities/empty logs. Re-executed
+`tools/regress_fuse.py --limit 1`: A__A_00, 146 rows, maximum probability difference
+0, zero level differences. This checks Pose-only `live.py` against `fuse.py --no-face`,
+not full face/risk regression. Existing old logs are not fresh test evidence.
+Default enabled-mode scheduling now uses a single daemon worker and one queued frame,
+replacing queued stale frames. Models/FaceMesh are not duplicated. `sample_timestamp`
+and `result_age_seconds` identify results; consumers must deduplicate events by sample
+timestamp. Results older than .5 seconds or with lost face are invalid. Async replay
+with `--fast` may legitimately skip most frames: use `DMS_YOLO_ASYNC=0` for deterministic
+offline analysis. Logs deduplicate completed samples. This bounds queue memory but
+CPU contention and the image copy still require whole-system board profiling.
 No CPU/memory whole-app profiling or NPU performance claims are made.
+Real camera-source regression was also executed on `normal_00.mp4`: YOLO-disabled
+CLI fusion versus ONNX shadow-enabled UI camera source, 167 decision rows and all
+19 original columns identical. Shadow completed 336 samples with no inference errors.
+Concurrent replay log inference latency median 51.88 ms, p95 97.16 ms for three ROIs;
+this is under concurrent CPU load and is not interchangeable with single-model timing.
+Evidence: `yolo_runtime_regression.json`. This clip stays L0 and is shorter than the
+full LR history; no claim of full L0-L3 coverage or board real-time performance.
+NITYMED official access page https://datasets.esdalab.ece.uop.gr/elementor-65/
+requires a name/email/purpose request form. It was read but not submitted, so no
+nighttime data was obtained or validation claimed.
 
-## RK3568 deployment plan (not yet converted or board-tested)
+## Public YawDD qualitative replay completed
+
+`tools/fetch_yawdd_samples.py` inspected the official tar directory and obtained
+the first independent RAR4 compressed member using bounded HTTP ranges. First
+single-connection attempt was stopped after confirming its process command; the
+bounded eight-connection range retry completed. UnRAR verified/decompressed the
+member; it was not necessary to download the whole archive.
+Local video: `datasets/yawdd_samples/01-FemaleNoGlasses.avi`;
+original member `YawDD dataset/Dash/Female/1-FemaleNoGlasses.avi`.
+The video is 91.37 seconds, 2741 frames at approximately 30 fps. Visual contact-sheet
+inspection confirms a driver in a daylight car scene with varying mouth/eye states.
+Replay sampled every sixth frame (5 Hz), reached video end, and processed 457 frames
+with a face on all 457. Outputs: 10 blink events, one yawn_candidate at 56.60 s,
+zero long_closure events. These are predictions, NOT measured accuracy or ground truth.
+No reliable per-frame labels were supplied; talking/laughing/singing false-positive
+rates, sensitivity and night performance remain unmeasured. One participant is not
+a generalization test. There was no training or random adjacent-frame data split.
+
+This actual standalone ONNX + FaceMesh validation process took 15.41 seconds to
+process the video at sampled speed. FaceMesh + three ROI inference median 24.81 ms,
+p95 28.66 ms; peak sampled RSS 173.17 MiB, process CPU time / wall time 1.10 cores.
+These exclude full Pose Transformer/UI and are desktop results, not RK3568 estimates.
+Detailed predictions/resources: `yawdd_shadow_replay.json`;
+download provenance: `yawdd_download.json`. No video/images are committed.
+
+```powershell
+& $py tools/fetch_yawdd_samples.py
+$env:DMS_YOLO_BACKEND = 'onnx'
+& $py tools/validate_yolo_video.py datasets/yawdd_samples/01-FemaleNoGlasses.avi
+```
+
+## ONNX and RK3568 deployment (ONNX verified; RKNN not converted/board-tested)
 
 Use a separate desktop/Linux conversion environment with official RKNN-Toolkit2:
 https://github.com/airockchip/rknn-toolkit2 . Do not install the training environment
-on RK3568. Export each classifier with Ultralytics `model.export(format='onnx',
-imgsz=224, batch=1, dynamic=False, opset=12)` in a separate environment; export has
-not been executed here. Inspect ONNX shapes and outputs first.
+on RK3568. `tools/export_yolo_shadow.py` has exported both classifiers successfully,
+opset 12, fixed [1,3,224,224] inputs and [1,2] probability outputs.
+ONNX 1.23.0 and ONNX Runtime 1.23.2 were used. Six identical tensors per model
+(one synthetic image and five MRL eye images) passed parity assertions; max absolute
+errors: eyes 2.98e-7, mouth 1.10e-6. Mouth-on-eye samples check export numerics ONLY.
+Evidence: `yolo_onnx_parity.json`. Artifacts stay local under `models/yolo_shadow/`.
 Match Ultralytics classify preprocessing exactly (BGR to RGB, resize/center crop,
 normalization); determine whether outputs are logits or probabilities, and apply
 softmax only once. Start with non-quantized RKNN, `target_platform='rk3568'`,
@@ -125,8 +184,36 @@ For INT8, use a separate public-data calibration participant set, including IR a
 glasses; compare probability error, class agreement and temporal events on held-out
 participants. Never assume INT8 parity. Use matched Lite2/runtime and board driver.
 Measure warm p50/p95 latency, RSS and CPU on the 4GB board with the existing UI.
-The current module implements desktop CPU inference only; NPU/ONNX runtime adapters
-and board CPU fallback remain work to do. Keep shadow disabled on board until tested.
+`src/yolo_runtime.py` now supplies torch-free ONNX CPU and opt-in Lite2 with CPU
+fallback. Native ONNX preprocessing matches the tested Ultralytics/PIL preprocessing
+(RGB, shortest-edge bilinear resize, center crop, divide by 255; mean 0/std 1).
+NPU expects RGB uint8 NHWC with the converter's divide-by-255 normalization. It accepts
+only finite normalized two-class outputs; it does not guess/duplicate softmax.
+RKNN load/init/inference errors switch that model to ONNX CPU and expose a reason.
+Only the missing-Lite2 fallback was desktop tested. Successful NPU inference is untested.
+`tools/convert_yolo_rknn.py` targets RK3568 with FP conversion by default. INT8 requires
+explicit `--calibration` list of preprocessed public ROIs from separate participants.
+Execution here failed with `ModuleNotFoundError: rknn`; no RKNN files were fabricated.
+Keep shadow disabled on board until output parity and resource usage are verified.
+
+```powershell
+# Desktop export and verification
+& $py tools/export_yolo_shadow.py
+& $py -m pip install -r requirements-yolo-runtime.txt
+$env:DMS_YOLO_BACKEND = 'onnx'  # pt (default), onnx, or opt-in rknn
+$env:DMS_YOLO_ASYNC = '1'     # bounded async worker (default)
+$env:DMS_YOLO_SHADOW = '1'
+& $py ui/server.py --source cam
+# Separate Linux conversion environment with RKNN-Toolkit2 installed:
+# python tools/convert_yolo_rknn.py models/yolo_shadow/best.onnx
+# python tools/convert_yolo_rknn.py models/yolo_shadow/best_yawn.onnx
+# Board after verified conversion: set DMS_YOLO_BACKEND=rknn
+# Deploy .onnx plus matching .fp.rknn files; no Ultralytics/Torch needed by YOLO runtime.
+```
+
+UI state integration uses an optional `State.yolo_shadow` field. It is omitted from
+JSON when disabled, and ignored by `derive()`. The original dict-assignment bug was
+fixed and covered by the serialization regression test.
 
 ## Git delivery and rollback
 
