@@ -101,6 +101,10 @@ YawDD access documented at https://qualinet.github.io/databases/video/yawdd_a_ya
 (4.9 GB archive); it was not downloaded. MRL and NITYMED websites timed out during
 inspection. Split future evaluation by participant/video, never neighboring frames.
 Independent nod_event is optional and not implemented; original nod remains intact.
+Executed `tools/regress_fuse.py --limit 1`: both child inference programs returned
+success, but the legacy comparator raised `KeyError: 'glance'` because it still
+hardcodes four classes while current config has two. This is a failed regression
+test, not a pass. Existing generated logs were not treated as fresh test evidence.
 Current inference is synchronous (three forwards per detected face); enabled mode
 can reduce frame rate and thereby alter sampling even though formulas are unchanged.
 No CPU/memory whole-app profiling or NPU performance claims are made.

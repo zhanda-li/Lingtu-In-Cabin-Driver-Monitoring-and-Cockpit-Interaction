@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import Mock
 import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
+BASELINE = '97f11b7'
 sys.path.insert(0, str(ROOT/'src'))
 from face_roi_yolo import crop_roi, REGIONS, Temporal, FaceRoiYolo
 
@@ -54,9 +55,9 @@ class ShadowTests(unittest.TestCase):
 
     def test_original_algorithms_unchanged(self):
         for file in ['src/fuse.py', 'src/live.py', 'src/model.py', 'src/pose.py']:
-            before = subprocess.check_output(['git','show',f'HEAD:{file}'], cwd=ROOT).decode('utf-8')
+            before = subprocess.check_output(['git','show',f'{BASELINE}:{file}'], cwd=ROOT).decode('utf-8')
             self.assertEqual(ast.dump(ast.parse(before)), ast.dump(ast.parse((ROOT/file).read_text(encoding='utf-8'))))
-        before = ast.parse(subprocess.check_output(['git','show','HEAD:src/face.py'], cwd=ROOT).decode('utf-8'))
+        before = ast.parse(subprocess.check_output(['git','show',f'{BASELINE}:src/face.py'], cwd=ROOT).decode('utf-8'))
         after = ast.parse((ROOT/'src/face.py').read_text(encoding='utf-8'))
         for node in before.body:
             if isinstance(node, ast.FunctionDef):
