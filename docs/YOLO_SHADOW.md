@@ -21,6 +21,7 @@ Additional modules/tools: `src/yolo_runtime.py`, `tools/export_yolo_shadow.py`,
 `tools/convert_yolo_rknn.py`, `tools/fetch_yawdd_samples.py`, `tools/validate_yolo_video.py`,
 `requirements-yolo-runtime.txt`.
 `tools/download_yolo_shadow.py` downloads/verifies the exact audited checkpoints by SHA256.
+`tools/evaluate_yolo_mrl.py` performs labelled, participant-separated MRL subset evaluation.
 Existing unrelated dirty files are excluded from the commit.
 
 ## Real public weights
@@ -99,11 +100,11 @@ levels compared with the original implementation while shadow events are present
 Both real model loading and CPU forward tests passed. Warm synthetic 96x96 BGR
 input resized by Ultralytics to 224, 10 iterations: eye median 7.15 ms / p95 8.86 ms,
 mouth median 6.71 ms / p95 7.74 ms. Excludes FaceMesh, camera and whole-app overhead.
-MRL local public images: participant-separated qualitative smoke samples in
-`yolo_mrl_smoke.json`; no accuracy reported, no train/validation split used to train.
+MRL initial public-image qualitative smoke samples are in `yolo_mrl_smoke.json`.
+Subsequent labelled subset evaluation is reported below; no training was performed.
 Model training provenance/possible overlap with MRL is unknown.
 
-Outstanding: labelled open/closed and yawn/no-yawn evaluation, actual blink/long
+Outstanding: full eye-ROI pipeline and labelled yawn/no-yawn evaluation, actual blink/long
 closure video tests, YawDD talking/laughing/singing false positives, NITYMED night
 validation, full original L0-L3 and enabled/disabled end-to-end video regression.
 YawDD access documented at https://qualinet.github.io/databases/video/yawdd_a_yawning_detection_dataset/
@@ -163,6 +164,24 @@ download provenance: `yawdd_download.json`. No video/images are committed.
 & $py tools/fetch_yawdd_samples.py
 $env:DMS_YOLO_BACKEND = 'onnx'
 & $py tools/validate_yolo_video.py datasets/yawdd_samples/01-FemaleNoGlasses.avi
+```
+
+## Labelled MRL subset evaluation
+
+The public dataset's bundled `annotation.txt` explicitly defines filename fields
+and eye state 0=closed, 1=open. `tools/evaluate_yolo_mrl.py` uses this label rather
+than inferred model names. Evaluation uses only subjects s0034–s0037, up to 50
+evenly spaced images per class per participant; other subjects are excluded.
+No random neighboring-frame split, training, threshold tuning or calibration.
+The subset has 371 images: confusion matrix rows=true/cols=predicted, order
+[closed,open], is `[[167,4],[11,189]]`; accuracy is 356/371 = 95.96% at open p>=.5.
+This is a measured labelled-subset result, NOT full MRL, end-to-end FaceMesh ROI,
+night-driving or unseen-person generalization accuracy. The checkpoint's original
+training provenance is unknown, so overlap with these subjects cannot be ruled out.
+Detailed predictions/partition: `yolo_mrl_labelled_eval.json`.
+
+```powershell
+& $py tools/evaluate_yolo_mrl.py
 ```
 
 ## ONNX and RK3568 deployment (ONNX verified; RKNN not converted/board-tested)
