@@ -909,6 +909,15 @@ class FaceExtractor:
     """
 
     def __init__(self, model_path=None, running_mode="VIDEO", num_faces=1):
+        self.yolo_shadow = None
+        self.shadow_latest = None
+        if getattr(C, 'YOLO_SHADOW_ENABLED', False):
+            from face_roi_yolo import FaceRoiYolo
+            try:
+                self.yolo_shadow = FaceRoiYolo(C.YOLO_EYE_PATH, C.YOLO_MOUTH_PATH)
+            except Exception as exc:
+                import warnings
+                warnings.warn(f'YOLO shadow unavailable: {exc}')
         import mediapipe as mp
         from mediapipe.tasks import python as mp_python
         from mediapipe.tasks.python import vision
@@ -953,6 +962,8 @@ class FaceExtractor:
             res = self._landmarker.detect(img)
 
         if not res.face_landmarks:
+            if self.yolo_shadow is not None:
+                self._shadow(bgr, None, None, timestamp_ms)
             return None
         if w is None or h is None:
             h, w = bgr.shape[:2]
@@ -963,7 +974,21 @@ class FaceExtractor:
             out.update(pitch=float(pitch), yaw=float(yaw), roll=float(roll))
         else:
             out.update(pitch=np.nan, yaw=np.nan, roll=np.nan)
+        if self.yolo_shadow is not None:
+            self._shadow(bgr, P, out['mar'], timestamp_ms)
         return out
+
+    def _shadow(self, bgr, P, mar, timestamp_ms):
+        import json
+        self.shadow_latest = self.yolo_shadow.process(bgr, P, mar, timestamp_ms / 1000.)
+        if getattr(C, 'YOLO_SHADOW_LOG', ''):
+            try:
+                with open(C.YOLO_SHADOW_LOG, 'a', encoding='utf-8') as stream:
+                    stream.write(json.dumps(dict(timestamp=timestamp_ms / 1000., **self.shadow_latest),
+                                            allow_nan=False) + '\n')
+            except OSError as exc:
+                import warnings
+                warnings.warn(f'YOLO shadow log unavailable: {exc}')
 
     def close(self):
         """显式释放。**正常不要调用** —— 固定 42 秒，见 PoseExtractor.close()。"""

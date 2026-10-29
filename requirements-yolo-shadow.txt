@@ -1,0 +1,2 @@
+# Desktop inference only. Keep the established DMS environment constraints.
+ultralytics==8.4.163

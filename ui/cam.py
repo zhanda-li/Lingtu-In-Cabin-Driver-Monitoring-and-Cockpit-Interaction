@@ -415,6 +415,8 @@ class CamSource:
                                       src_of_level, ear, mar, pitch)
                     self.head = head
                     self.latest = row_to_state(head, "cam")
+                    if self.face.yolo_shadow is not None:
+                        self.latest['yolo_shadow'] = self.face.shadow_latest
                     # 基线攒了多少秒 —— 界面的「基线热身中 · 还需 N 秒」照它算。
                     # ★ 2026-09-26 起这个数**从开机起单调增长**：闸门不再清缓冲
                     #   （见上面那段），所以低头一次不会让它跳回去 —— 用户投诉的

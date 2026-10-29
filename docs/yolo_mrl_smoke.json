@@ -1,0 +1,86 @@
+{
+  "kind": "qualitative_smoke_only",
+  "split": "first and last participant; no training",
+  "samples": [
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_00001_0_0_0_0_0_01.png",
+      "open_probability": 0.033894337713718414
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_00325_0_0_0_0_0_01.png",
+      "open_probability": 0.03889217972755432
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_00649_0_0_0_0_1_01.png",
+      "open_probability": 0.02146795205771923
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_00973_0_1_0_2_0_01.png",
+      "open_probability": 0.1134277880191803
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_01297_0_1_0_2_0_01.png",
+      "open_probability": 0.18071860074996948
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_01621_0_1_0_2_0_01.png",
+      "open_probability": 0.2969608008861542
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_01945_0_0_1_0_0_01.png",
+      "open_probability": 0.9486174583435059
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_02269_0_0_1_0_0_01.png",
+      "open_probability": 0.6550473570823669
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_02593_0_1_1_0_0_01.png",
+      "open_probability": 0.9887491464614868
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0001\\s0001_02917_0_1_1_0_0_01.png",
+      "open_probability": 0.06470099091529846
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_00001_1_0_0_0_0_01.png",
+      "open_probability": 0.06877146661281586
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_01026_1_0_0_0_1_01.png",
+      "open_probability": 0.0637226551771164
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_02051_1_0_0_0_0_01.png",
+      "open_probability": 0.02648685872554779
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_03076_1_1_0_0_0_01.png",
+      "open_probability": 0.04265226051211357
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_04101_1_1_0_2_0_01.png",
+      "open_probability": 0.424305260181427
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_05126_1_1_0_0_0_01.png",
+      "open_probability": 0.05187615752220154
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_06151_1_0_1_0_0_01.png",
+      "open_probability": 0.9008194208145142
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_07176_1_0_1_0_0_01.png",
+      "open_probability": 0.9624028205871582
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_08201_1_0_1_0_0_01.png",
+      "open_probability": 0.9346122741699219
+    },
+    {
+      "file": "mrlEyes_2018_01\\s0037\\s0037_09226_1_1_1_0_0_01.png",
+      "open_probability": 0.9202881455421448
+    }
+  ]
+}
