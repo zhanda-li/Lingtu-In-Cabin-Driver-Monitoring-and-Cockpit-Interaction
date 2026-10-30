@@ -548,8 +548,8 @@ bindTalk();
 
 link = XQ.connect({
   onHello: (d) => {
-    XQ.wake.attach(link, d.voice);
-    XQ.wake.autostart();     // ★ 不用点任何一下就开始听（见 web/wake.js 文首第 1 条）
+    // Voice connection is managed by XQ.connect in live.js.
+    // Autostart is managed by XQ.connect.     // ★ 不用点任何一下就开始听（见 web/wake.js 文首第 1 条）
     if (d.severity_cfg) SEV_CFG = d.severity_cfg;
     /* 支路二那两条告警的两个数（保持时长 / 哈欠阈值）存在 live.js 里，
        这一页不另存一份 —— 下面「哈欠时长」「面部表情」都读它。 */
@@ -590,7 +590,7 @@ link = XQ.connect({
   },
   /* 常听唤醒那条通道只有**开着耳朵的那张页面**关心，这里照 detail.html 转一次。 */
   onMsg: (type, d) => {
-    if (type === 'voice' && XQ.wake && XQ.wake.onMsg) XQ.wake.onMsg(d);
+    // Voice events are dispatched once by XQ.connect.
   },
 });
 

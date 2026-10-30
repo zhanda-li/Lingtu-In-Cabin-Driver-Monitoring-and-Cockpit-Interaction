@@ -499,7 +499,11 @@ def make_asr(cfg: dict | None = None, local=None):
     `local` 传服务端已有的那个 `ui.asr.LocalAsr`，见 `WhisperAsr.__init__`。
     """
     c = (cfg or {}).get("asr") or {}
-    prefer = str(c.get("prefer") or "stream")
+    # `prefer=browser` configures push-to-talk, not the always-listening engine.
+    # Keep the old explicit `local`/`whisper` choices; use streaming for `browser`.
+    prefer = str(c.get("wake_prefer") or c.get("prefer") or "stream")
+    if prefer == "browser":
+        prefer = "stream"
     cands = [("stream", StreamAsr), ("whisper", WhisperAsr)] if prefer == "stream" \
         else [("whisper", WhisperAsr), ("stream", StreamAsr)]
     tried = []

@@ -225,6 +225,9 @@ XQ.wake = {
   /* ★★ 2026-09-26：跳过来之后要**替这一页**跟服务端要的那一句话。见 `ask()`。 */
   _ask: null,
   _seq: 0,
+  _captureToken: 0,
+  _serverReady: false,
+  _needsRestart: false,
   _stream: null, _ctx: null, _src: null, _proc: null, _sink: null,
   _acc: null,              // 攒着还没到 100 ms 的样本
   _btn: null, _host: null,
@@ -235,6 +238,12 @@ XQ.wake = {
     XQ.wake.link = link || null;
     XQ.wake.cfg = cfg || {};
     XQ.wake.engine = cfg || null;
+    if (XQ.wake._needsRestart && XQ.wake._stream && XQ.wake.link.online) {
+      XQ.wake._needsRestart = false;
+      XQ.wake._seq = 0;
+      XQ.wake._acc = new Float32Array(0);
+      XQ.wake.link.send({ type: 'voice_start' });
+    }
     /* ⚠️ 字段名有两套，这里抹平：
          · `hello.voice`（服务端 `Hub.voice_hello`）报的是 `asr_engine`，
            因为那一份是给**页面/语音输入**看的，全站都叫这个名字；
@@ -261,6 +270,16 @@ XQ.wake = {
   },
 
   toggle() { if (XQ.wake.state === 'listening' || XQ.wake.state === 'starting') XQ.wake.stop('manual'); else XQ.wake.start(); },
+
+  disconnected() {
+    XQ.wake._serverReady = false;
+    XQ.wake._needsRestart = !!XQ.wake._stream;
+    if (XQ.wake._stream) {
+      XQ.wake.state = 'starting';
+      XQ.wake.why = '连接断开，正在重连麦克风服务…';
+      XQ.wake._render();
+    }
+  },
 
   /**
    * ★★ 2026-09-26：**替这一页**跟服务端要一句话说（用户拍板的「跳过去 + 问一句」）。
@@ -352,6 +371,7 @@ XQ.wake = {
     const quiet = XQ.wake.silent;
     XQ.wake.silent = false;
 
+    const captureToken = ++XQ.wake._captureToken;
     XQ.wake.state = 'starting';
     XQ.wake.why = '';
     XQ.wake.partial = '';
@@ -387,12 +407,17 @@ XQ.wake = {
                  noiseSuppression: false, autoGainControl: false },
       });
     } catch (e) {
+      if (captureToken !== XQ.wake._captureToken) return;
       clearTimeout(XQ.wake._permTimer);          // 有真错了就别再说"在等权限"
       XQ.wake.state = 'error';
       XQ.wake.why = '拿不到麦克风：' + ((e && e.name) || e) +
                     (e && e.name === 'NotAllowedError' ? '（权限被拒了，地址栏那个小锁里改）' : '');
       XQ.wake._render();
       XQ.flash(XQ.wake.why);
+      return;
+    }
+    if (captureToken !== XQ.wake._captureToken) {
+      stream.getTracks().forEach(t => t.stop());
       return;
     }
     clearTimeout(XQ.wake._permTimer);            // 麦到手了，看门狗撤掉
@@ -425,6 +450,7 @@ XQ.wake = {
     if (ctx.state !== 'running') {
       try { await ctx.resume(); } catch (e) {}
     }
+    if (captureToken !== XQ.wake._captureToken) return;
     if (ctx.state !== 'running') {
       XQ.wake.stop('notrunning');
       XQ.wake.state = 'error';
@@ -434,7 +460,7 @@ XQ.wake = {
     }
 
     const src = ctx.createMediaStreamSource(stream);
-    const proc = ctx.createScriptProcessor(4096, 1, 1);
+    const proc = ctx.createScriptProcessor(1024, 1, 1);
     // 没地方接的 ScriptProcessor 在某些版本上不会被触发，接一个静音出口
     const sink = ctx.createGain();
     sink.gain.value = 0;
@@ -447,15 +473,16 @@ XQ.wake = {
     src.connect(proc); proc.connect(sink); sink.connect(ctx.destination);
     XQ.wake._src = src; XQ.wake._proc = proc; XQ.wake._sink = sink;
 
-    XQ.wake.state = 'listening';
+    XQ.wake.state = 'starting';
+    XQ.wake.why = '麦克风就绪，正在准备识别模型…';
+    XQ.wake._serverReady = false;
     XQ.wake._render();
     if (XQ.mascot && XQ.mascot.react) XQ.mascot.react('listen');
     XQ.wake.link.send({ type: 'voice_start' });   // 服务端那边开始建唤醒器
     /* ★★ 2026-09-26：跳过来之前攒下的那句 `ask`（见 `ask()`），到这一刻才发。
        ⚠️ **必须在 `voice_start` 之后**：服务端认的是"谁开麦谁算数"，先发 ask 的话
            `hub.ear_ws` 还没轮到这一页，那条消息会被直接丢掉。 */
-    XQ.wake._flushAsk();
-    XQ.flash('在听了 —— 说「你好，小瑞」');
+    // Wait for the real server ready message before inviting speech.
   },
 
   stop(why) {
@@ -477,6 +504,9 @@ XQ.wake = {
   },
 
   _release() {
+    ++XQ.wake._captureToken;
+    XQ.wake._serverReady = false;
+    XQ.wake._needsRestart = false;
     clearTimeout(XQ.wake._permTimer);            // 麦已经在收了，看门狗没意义了
     try { if (XQ.wake._proc) { XQ.wake._proc.onaudioprocess = null; XQ.wake._proc.disconnect(); } } catch (e) {}
     try { if (XQ.wake._src) XQ.wake._src.disconnect(); } catch (e) {}
@@ -505,6 +535,7 @@ XQ.wake = {
   },
 
   _send(floats) {
+    if (!XQ.wake._serverReady || !XQ.wake.link || !XQ.wake.link.online) return;
     // Float32(-1~1) → Int16。⚠️ 别忘了乘 32767 再取整（不乘就是全零，静默无声）。
     const pcm = new Int16Array(floats.length);
     for (let i = 0; i < floats.length; i++) {
@@ -525,6 +556,13 @@ XQ.wake = {
     const ev = d.ev || '';
     if (ev === 'ready') {
       XQ.wake.engine = d.voice || XQ.wake.engine;
+      if (XQ.wake._stream) {
+        XQ.wake._serverReady = true;
+        XQ.wake.state = 'listening';
+        XQ.wake.why = '';
+        try { sessionStorage.setItem(XQ.wake.WANT_KEY, 'on'); } catch (e) {}
+        XQ.wake._flushAsk();
+      }
       XQ.wake._render();
       return;
     }
@@ -768,6 +806,11 @@ XQ.wake = {
       return;
     }
     if (ev === 'idle') {
+      if (d.why && XQ.wake.state === 'starting' && !XQ.wake._serverReady) {
+        XQ.wake._release();
+        XQ.wake.state = 'error';
+        XQ.wake.why = d.why;
+      }
       XQ.wake.partial = '';
       XQ.wake.busy = false;
       XQ.wake.follow = 0;          // 追问窗口关了（也可以是超时自己关的）

@@ -158,4 +158,5 @@ _prev/
 # max30102信息/ 是传感器厂商资料包（168 MB，含 zip 和它的解压目录，重复的一份）。
 edge_kiosk_dms/
 ChatTTS-main/
+models/sherpa/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30/
 max30102信息/

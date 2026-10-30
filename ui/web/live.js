@@ -2048,7 +2048,7 @@ XQ.connect = function (opts = {}) {
      真正的 onmessage 一定晚于这一行返回。 */
   const api = {
     send: (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); },
-    get online() { return !down; },
+    get online() { return !!ws && ws.readyState === 1 && !down; },
   };
   XQ.fusionTransport = api;
 
@@ -2070,8 +2070,16 @@ XQ.connect = function (opts = {}) {
         // 再语音输入读着顺），而且同样要在 `onHello` 之前 —— 页面的 onHello 里
         // 可能就调 `XQ.asr.bind()` 去画麦克风按钮的状态。
         if (XQ.asr && XQ.asr.attach) XQ.asr.attach(api, d.asr);
+        if (XQ.wake) {
+          XQ.wake.attach(api, d.voice);
+          const initialPages = ['detail.html', 'monitor.html', 'nav.html'];
+          let active = false;
+          try { active = sessionStorage.getItem(XQ.wake.WANT_KEY) === 'on'; } catch (e) {}
+          if (active || initialPages.includes(location.pathname.split('/').pop())) XQ.wake.autostart();
+        }
         opts.onHello && opts.onHello(d);
       }
+      else if (m.type === 'voice' && XQ.wake) XQ.wake.onMsg(d);
       else if (m.type === 'state') { XQ.Hist.push(d); opts.onState && opts.onState(d); window.dispatchEvent(new CustomEvent('xq-state',{detail:d})); }
       else if (m.type === 'say') opts.onSay && opts.onSay(d);
       // ⚠️ 第二个参数是整个 payload，不只是文案：驾驶监测页那颗换源按钮要靠
@@ -2087,7 +2095,11 @@ XQ.connect = function (opts = {}) {
       if (opts.onMsg) opts.onMsg(m.type, d);
       window.dispatchEvent(new CustomEvent('xq-message',{detail:{type:m.type,data:d}}));
     };
-    ws.onclose = () => { setDown(true); clearTimeout(retry); retry = setTimeout(open, 1800); };
+    ws.onclose = () => {
+      setDown(true);
+      if (XQ.wake && XQ.wake.link === api) XQ.wake.disconnected();
+      clearTimeout(retry); retry = setTimeout(open, 1800);
+    };
     ws.onerror = () => {};
   };
   open();

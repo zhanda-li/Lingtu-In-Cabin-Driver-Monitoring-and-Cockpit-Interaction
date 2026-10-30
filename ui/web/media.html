@@ -821,6 +821,7 @@ body .ptitle{ gap:1.3rem; }
 <script src="/static/chrome.js"></script>
 <script src="/static/live.js"></script>
 <script src="/static/player.js"></script>
+<script src="/static/wake.js"></script>
 <script>
 /* =========================================================================
    多媒体（车机左导航「多媒体」那一项的目标页）
@@ -2050,7 +2051,16 @@ au.volume = (+$('vol').value) / 100;
    接管的意思是：它只**读**（位置/音量/在放哪一首按秒存下来），不建自己的
    audio、不画那条悬浮条 —— 这一页自己就是一整个播放器。
    ⚠️ `meta` 传的是**函数不是值**：`idx` 随时在变，传值等于把它钉死在开局那一首。 */
-XQP.bind(au, () => TRACKS[idx] || null);
+XQP.bind(au, () => TRACKS[idx] || null, async () => {
+  if (!TRACKS.length) return { ok: false, why: 'nolib' };
+  let i = pickCalm();
+  const measured = i >= 0;
+  if (!measured) i = Math.max(0, TRACKS.findIndex(t => t.src === '内置'));
+  const t = TRACKS[i];
+  const ok = await playTrack(i);
+  if (ok) calmNote(i);
+  return { ok: !!ok, why: ok ? '' : 'blocked', file: t.file, title: t.title, measured };
+});
 $('listNote').textContent = '读曲库…';
 bindSay();          // ★ 打字聊天那一行（`#xqSay` + `#xqSend`）
 renderXq();

@@ -84,6 +84,7 @@
 
   const XQP = {};
   let native = null;            // 多媒体页那个真播放器（`bind` 进来的）
+  let nativePlayCalm = null;
   let metaOf = null;            // 多媒体页给的"当前这首是什么"（它自己知道）
   let local = null;             // 别的页面自己造的那个 audio
   let bar = null, ppBtn = null, nxBtn = null, nameEl = null, subEl = null, progEl = null;
@@ -172,9 +173,10 @@
 
   /* ---------------------------------------------------------------- 多媒体页 */
   /* 把这一层接管到页面那个**真播放器**上。不画条、不建 audio、不改它的行为。 */
-  XQP.bind = function (a, m) {
+  XQP.bind = function (a, m, playCalm) {
     native = a;
     metaOf = m || null;
+    nativePlayCalm = typeof playCalm === 'function' ? playCalm : null;
     /* 前四个是"状态变了"，必须当场写；`timeupdate` 是"在走"，按秒写。 */
     ['play', 'pause', 'seeked', 'loadedmetadata', 'volumechange'].forEach((ev) => {
       a.addEventListener(ev, () => push(true));
@@ -367,7 +369,9 @@
      ⚠️ 三种"没放成"各有各的话，**不许合并成一句**：曲库没读到 vs 没量过（降级放了
         另一首）vs 浏览器不让自动放。用户看到的是哪一句，就是他遇上的是哪件事。 */
   XQP.playCalm = function () {
-    if (native) return Promise.resolve({ ok: false, why: 'native' });
+    if (native) return nativePlayCalm
+      ? Promise.resolve().then(nativePlayCalm)
+      : Promise.resolve({ ok: false, why: 'no_player' });
     return tracks().then(function () {
       const list = listRaw || [];
       if (!list.length) {

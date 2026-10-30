@@ -837,13 +837,13 @@ link = XQ.connect({
        通道（麦克风在浏览器这边，服务端只做推理），源是 cam 还是 demo 都不影响它。
        `d.voice` 报的是"唤醒模型在不在、识别走哪条路"，点「听」时页面靠它决定
        "能不能真听"还是"如实说一句缺什么"（见 web/wake.js 的 start()）。 */
-    XQ.wake.attach(link, d.voice);
+    // Voice connection is managed by XQ.connect in live.js.
     /* ★ 2026-09-25 晚：**不用点任何一下就开始听**（见 web/wake.js 文首第 1 条）。
        挂在这里而不是 DOMContentLoaded，是因为这一刻 `link.online` 才是真的、
        `d.voice` 里的引擎状态也才到手 —— `start()` 头两句就要这两样。
        ⚠️ 这句在**换源成功**时也会跟着 hello 再跑一次，`autostart()` 自己会挡住
           （`state !== 'off'` 直接返回），别在这外面再包一层判断。 */
-    XQ.wake.autostart();
+    // Autostart is managed by XQ.connect.
     /* ⚠️ `CAM_LIVE` 这一处判据管着**三件事**：要不要出等待卡（`XQ.headMode`）、
        这颗按钮往哪个方向画、按下去往哪个方向发协议。都由 `d.source === 'cam'`
        定 —— 仍是**一处**判据，没有第二份真相。
@@ -958,7 +958,7 @@ link = XQ.connect({
        表现是"对着麦克风说了半天，屏幕上一点反应都没有"（自测第一版就是这么
        判红的，服务端全绿、页面全哑）。`XQ.wake.onMsg` 里自己认是不是它在听。 */
   onMsg: (type, d) => {
-    if (type === 'voice' && XQ.wake && XQ.wake.onMsg) XQ.wake.onMsg(d);
+    // Voice events are dispatched once by XQ.connect.
   },
 });
 

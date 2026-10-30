@@ -2647,8 +2647,8 @@ if ($('wake')) XQ.wake.bind($('wake'), $('wakeHost'));
 link = XQ.connect({
   onHello: (d) => {
     $('connPill').textContent = '已连接';
-    XQ.wake.attach(link, d.voice);
-    XQ.wake.autostart();
+    // Voice connection is managed by XQ.connect in live.js.
+    // Autostart is managed by XQ.connect.
     const a = (d && d.amap) || {};
     AMAP_KEY = (a.js && a.js.key) || '';
     AMAP_SEC = (a.js && a.js.security) || '';
@@ -2699,7 +2699,7 @@ link = XQ.connect({
      漏了它，站在这一页喊「最近有服务区吗」服务端会等到超时（4 s），
      然后说一句"没拿到定位" —— 而实际上这一页本来能画。 */
   onMsg: (type, d) => {
-    if (type === 'voice' && XQ.wake && XQ.wake.onMsg) XQ.wake.onMsg(d);
+    // Voice events are dispatched once by XQ.connect.
   },
 });
 
