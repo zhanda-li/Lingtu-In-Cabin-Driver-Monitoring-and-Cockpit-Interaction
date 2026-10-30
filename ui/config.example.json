@@ -147,7 +147,9 @@
       "edge_rate": "+6%",
       "edge_pitch": "+8Hz"
     },
-    "voice_profile": "sprite-playful-v1"
+    "voice_profile": "sprite-playful-v1",
+    "enable_revision": "reply-audible-20261030",
+    "_enable_revision": "按用户要求恢复语音回复：首次载入该版本且允许当前模式播报时开启一次；之后保留手动静音。"
   },
   "media": {
     "_说明": "多媒体页放的是**本机自己的歌**。这些文件**不拷进仓库** —— 仓库是公开的，歌有版权；服务端只加了一条 /music/<文件名> 路由按这个目录读（带 Range，所以进度条能拖）。目录不存在也不会坏：页面会说清楚「没找到这个目录」，不是安静地显示一个空列表。",

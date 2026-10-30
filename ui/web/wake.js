@@ -204,6 +204,7 @@ XQ.wake = {
   engine: null,            // hello.voice 报上来的（模型在不在、识别的状态）
   partial: '',
   reply: '',
+  playbackWhy: '',
   lastHeard: '',
   frames: 0,
   sent: 0,
@@ -602,6 +603,7 @@ XQ.wake = {
     if (ev === 'partial') { XQ.wake.partial = d.text || ''; XQ.wake._render(); return; }
     if (ev === 'heard') { XQ.wake.lastHeard = d.text || ''; XQ.wake._render(); return; }
     if (ev === 'thinking') {
+      XQ.wake.playbackWhy = '';
       // 转文字那一段是 **0.5~2 秒的阻塞调用**（whisper 整段识别），服务端把它
       // 丢在线程里跑，所以这里必须有话说 —— 否则用户看到的是"说完了，界面
       // 一动不动"，然后突然蹦出一句答复。
@@ -776,6 +778,7 @@ XQ.wake = {
     }
     if (ev === 'reply') {
       XQ.wake.reply = d.text || '';
+      XQ.wake.playbackWhy = '';
       XQ.wake.busy = false;
       /* ★★ 2026-09-26：把这一轮的**轮次号**记下来，念完原样带回去（见 `round`
          那一格和 server.py `voice_spoken` 的两道卫兵）。⚠️ 缺了就当没带 ——
@@ -795,14 +798,22 @@ XQ.wake = {
          ⚠️ 掐断（`XQ.tts.halt`）也走这条 `done` 吗？—— **不走**，那一推 `_seq`
             让 `onend` 里的 `token === _seq` 不成立，所以被掐断的那一句不会回执。
             这是**两道**防线里的第一道，第二道在服务端（轮次 + 状态）。 */
-      const done = () => {
+      const replyRound = XQ.wake.round;
+      const done = (played = true, reason = '') => {
         if (XQ.wake.link && XQ.wake.link.online) {
-          XQ.wake.link.send({ type: 'voice_spoken', round: XQ.wake.round });
+          XQ.wake.link.send({ type: 'voice_spoken', round: replyRound, played, reason });
         }
       };
       let spoke = false;
-      try { spoke = XQ.speak(XQ.wake.reply, { emotion: d.emotion || 'normal', done }); } catch (e) { spoke = false; }
-      if (!spoke) done();
+      try {
+        spoke = XQ.speak(XQ.wake.reply, { emotion: d.emotion || 'normal', done: () => done(true) });
+      } catch (e) { XQ.wake.playbackWhy = '语音播放异常：' + (e.message || String(e)); }
+      if (!spoke) {
+        XQ.wake.playbackWhy = XQ.wake.playbackWhy || (XQ.tts && XQ.tts.lastError) || '语音播放未启动';
+        XQ.wake._render();
+        XQ.flash('回复未播放：' + XQ.wake.playbackWhy);
+        done(false, XQ.wake.playbackWhy);
+      }
       return;
     }
     if (ev === 'idle') {
@@ -871,6 +882,7 @@ XQ.wake = {
     const line = st === 'error' ? ('起不来：' + XQ.wake.why)
       : st === 'starting' ? (XQ.wake.why || '正在起麦克风…')
         : XQ.wake.busy ? '听到了，正在想…'
+          : XQ.wake.playbackWhy ? '回复未播放：' + XQ.wake.playbackWhy
           : st === 'listening'
             ? (XQ.wake.partial ? '在听…「' + XQ.wake.partial + '」'
               : (XQ.wake.follow ? '在听 —— 接着说' : '在听 —— 说「你好，小瑞」'))
@@ -883,6 +895,7 @@ XQ.wake = {
     if (detail) {
       const bits = [];
       if (XQ.wake.lastHeard) bits.push('听到：' + XQ.wake.lastHeard);
+      if (XQ.wake.reply) bits.push('小瑞：' + XQ.wake.reply);
       if (XQ.wake.sent) bits.push(XQ.wake.sent + ' 片音频');
       if (XQ.wake.lost) bits.push('⚠️ 丢了 ' + XQ.wake.lost + ' 片'
         + (XQ.wake.goneWhy ? '（' + XQ.wake.goneWhy + '）' : ''));

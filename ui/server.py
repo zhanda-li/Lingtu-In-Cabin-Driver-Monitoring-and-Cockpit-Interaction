@@ -775,6 +775,7 @@ class Hub:
             "default_on": default_on and self.voice.enabled,
             "voice": c.get("voice") or "自动",
             "voice_profile": c.get("voice_profile") or "",
+            "enable_revision": c.get("enable_revision") or "",
             "prosody": prosody,
             "server_fallback": bool(c.get("server_fallback", True)),
             "server_ok": self.voice.enabled,
@@ -2080,6 +2081,17 @@ async def handle(hub: Hub, req: dict, ws: web.WebSocketResponse):
         if hub.ear is not None and hub.ear.state != "speak":
             print("[voice] 丢掉一条 voice_spoken：状态机已经不在 speak 了（现在是 %r）"
                   % hub.ear.state)
+            return
+        if hub.ear is not None and hub.ear_ws is not ws:
+            return
+        if req.get("played") is False:
+            if hub.ear is not None:
+                hub.ear.answer_done(follow=False)
+            if hub.ear_task is not None and not hub.ear_task.done():
+                hub.ear_task.cancel()
+            reason = str(req.get("reason") or "语音播放未启动")[:160]
+            print("[voice] 回复未播放：%r" % reason)
+            await voice_send(ws, {"ev": "idle", "why": "回复未播放：" + reason})
             return
         if hub.ear is not None:
             hub.ear.answer_done()

@@ -1382,6 +1382,12 @@ XQ.tts = {
       XQ.tts._write('xq.tts.profile', profile);
     }
     XQ.tts.keyword = XQ.tts._read(XQ.tts.LS.voice) || XQ.tts.cfgKeyword;
+    // This revision explicitly restores audible replies once at the user's request.
+    const enableRevision = String(cfg.enable_revision || '');
+    if (enableRevision && cfg.default_on && XQ.tts._read('xq.tts.enabledRevision') !== enableRevision) {
+      XQ.tts._write(XQ.tts.LS.on, '1');
+      XQ.tts._write('xq.tts.enabledRevision', enableRevision);
+    }
     const stored = XQ.tts._read(XQ.tts.LS.on);
     XQ.tts.on = stored === '1' ? true : (stored === '0' ? false : !!cfg.default_on);
     XQ.tts.voice = XQ.tts._pick();
@@ -1532,8 +1538,9 @@ XQ.tts._init();
 XQ.speak = function (text, opts) {
   opts = opts || {};
   const t = String(text == null ? '' : text).trim();
-  if (!t) return false;
-  if (!XQ.tts.on) return false;
+  XQ.tts.lastError = '';
+  if (!t) { XQ.tts.lastError = '没有可播放的回复文字'; return false; }
+  if (!XQ.tts.on) { XQ.tts.lastError = '已静音，请在设置中开启语音播报'; return false; }
 
   /* 后台标签页不出声。
      ⚠️ 这里**故意只看 visibility，不看 hasFocus()** —— 后者会把"你点到终端窗口
@@ -1541,7 +1548,10 @@ XQ.speak = function (text, opts) {
      而本项目真正要防的"两个说话页同时开口"，在同一个 Kiosk 窗口里就是
      "另一个标签页 hidden"，visibility 这一条已经覆盖了。
      （并排两个窗口仍然会双声，这个不做跨页仲裁 —— 不值当。） */
-  if (document.visibilityState && document.visibilityState !== 'visible') return false;
+  if (document.visibilityState && document.visibilityState !== 'visible') {
+    XQ.tts.lastError = '页面在后台，回复未播放，请切回座舱页面';
+    return false;
+  }
 
   if (!XQ.tts.supported) return XQ.tts._fallback(t, opts);
   if (!XQ.tts.voice) XQ.tts.voice = XQ.tts._pick();      // 事件还没来也救得回来

@@ -20,6 +20,27 @@ function env() {
   return vm.createContext(context);
 }
 async function main() {
+  const t=env();
+  const memory=new Map([['xq.tts.on','0']]);
+  t.localStorage={getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)};
+  t.document.visibilityState='visible';
+  const live=read('live.js');
+  const tb=live.indexOf('XQ.tts = {');
+  vm.runInContext(live.slice(tb,live.indexOf('XQ.tts._init();',tb)),t);
+  const sb=live.indexOf('XQ.speak = function');
+  vm.runInContext(live.slice(sb,live.indexOf('\n};',sb)+4),t);
+  t.XQ.tts.attach(null,{default_on:true,enable_revision:'reply-audible-v1'});
+  assert.equal(t.XQ.tts.on,true,'explicit voice restoration must clear old mute once');
+  t.XQ.tts.set(false);
+  t.XQ.tts.attach(null,{default_on:true,enable_revision:'reply-audible-v1'});
+  assert.equal(t.XQ.tts.on,false,'later manual mute must remain effective');
+  assert.equal(t.XQ.speak('reply'),false);
+  assert.match(t.XQ.tts.lastError,/静音/);
+  t.XQ.tts.on=true;t.document.visibilityState='hidden';
+  assert.equal(t.XQ.speak('reply'),false);
+  assert.match(t.XQ.tts.lastError,/后台/);
+  console.log('PASS one-time audible restoration, later mute, and visible failure reasons');
+
   const c=env(); vm.runInContext(read('player.js'),c);
   let calls=0;
   const au={addEventListener(){}};
@@ -74,5 +95,21 @@ async function main() {
   assert.equal(messages[0].same,true);
   assert.equal(messages[0].ok,true);
   console.log('PASS music failure acknowledgement and same-page navigation');
+  messages=[];
+  m.XQ.tts={lastError:'已静音'};
+  m.XQ.speak=()=>false;
+  m.XQ.wake.onMsg({ev:'reply',text:'test reply',round:7});
+  assert.equal(messages[0].played,false);
+  assert.equal(messages[0].round,7);
+  assert.match(m.XQ.wake.playbackWhy,/静音/);
+  messages=[];
+  let completed;
+  m.XQ.speak=(_,opts)=>{completed=opts.done;return true;};
+  m.XQ.wake.onMsg({ev:'reply',text:'test reply',round:8});
+  m.XQ.wake.round=9;
+  completed();
+  assert.equal(messages[0].round,8,'completion must retain its original round');
+  assert.equal(messages[0].played,true);
+  console.log('PASS unplayed reply reports failure and completion retains its round');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
