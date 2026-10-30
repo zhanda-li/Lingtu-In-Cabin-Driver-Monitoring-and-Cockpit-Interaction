@@ -49,32 +49,9 @@ DEFAULT_VOICE = "Microsoft Huihui Desktop"
 DEFAULT_RATE = 2                      # SAPI 的 -10..10，2 约等于常速偏快
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
-# ---------------------------------------------------------------- 在线音色（edge-tts）
-# ★ 2026-09-25 新增。用户报「声音不像小精灵」—— 这句抱怨指向的正是**这一路**。
-#
-# 为什么要给**服务端**加一个在线引擎（主路本来就是浏览器的在线神经音色）：
-#   浏览器那条路的判据是"1.6 秒没开口就算它不行"，而在线音色第一句要先联网合成，
-#   起声慢的时候正好卡在这个窗口上 —— 于是一句本来该用晓晓念的话，被这一侧用
-#   **Windows 自带的 Huihui** 抢在中间念了出来。Huihui 是 2010 年代的拼接音，
-#   又高又飘，就是用户说的那个"小精灵"。也就是说：**用户听到的很可能是这一路**，
-#   而不是浏览器那一路。
-#
-# ⚠️ 所以修法是"把这一路也换成在线神经音色"，不是"去调浏览器的音色关键词"——
-#   只改浏览器那边的话，探测窗口一超时，小精灵照样出来。
-#
-# `edge-tts` 用的是 Edge 浏览器"朗读"那个公开接口，**免费、不要 key、不要装 Edge**。
-# 代价是**要联网**。所以它失败时**自动退回 SAPI**，这一路永远保得住"一定出声"——
-# 见 `_run()` 里那段。中文音色全表见 `python ui/tts.py --edge-voices`。
-#
-# ⚠️ 音色名是 **edge-tts 的短名**（`zh-CN-XiaoxiaoNeural`），和 SAPI 的全名
-#   （`Microsoft Huihui Desktop`）**不是一套命名**，所以配置里是两个字段，
-#   由 `engine` 决定用哪个。别把短名填进 `voice`。
-#
-# ⚠️ 钉的是**晓晓**（XiaoxiaoNeural，成年女声），不是列表里那几个"年轻/卡通"
-#   音色（晓伊 XiaoyiNeural、云夏 YunxiaNeural 是明写的 child/cartoon）。
-#   用户抱怨的就是"小精灵"——**挑音色时避开年轻的那些**才是对的方向，
-#   这一条比"好听不好听"重要。要换就打开 web/voice.html 挨个听，别照名字猜。
-DEFAULT_EDGE_VOICE = "zh-CN-XiaoxiaoNeural"
+# 在线语音备路：与浏览器主路独立；失败时记录原因并退回 SAPI。
+# 当前用户选择活泼俏皮的晓伊，配置可覆盖。见 docs/VOICE_PROFILE.md。
+DEFAULT_EDGE_VOICE = "zh-CN-XiaoyiNeural"
 
 # 情感 → 语速/音高修正。**存的是整数**（百分点 / Hz），拼字符串只发生在
 # `_edge_mp3()` 那一处。

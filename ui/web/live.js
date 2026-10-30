@@ -1375,6 +1375,12 @@ XQ.tts = {
     // 换机器/换人演示才该改配置。配置文件里那个关键词留一份，
     // 试音页的"恢复自动"要回到它（那才是这台机器上"自动"的含义）。
     XQ.tts.cfgKeyword = cfg.voice || '自动';
+    // A changed profile applies once; later manual choices and mute stay intact.
+    const profile = String(cfg.voice_profile || '');
+    if (profile && XQ.tts._read('xq.tts.profile') !== profile) {
+      XQ.tts._write(XQ.tts.LS.voice, XQ.tts.cfgKeyword);
+      XQ.tts._write('xq.tts.profile', profile);
+    }
     XQ.tts.keyword = XQ.tts._read(XQ.tts.LS.voice) || XQ.tts.cfgKeyword;
     const stored = XQ.tts._read(XQ.tts.LS.on);
     XQ.tts.on = stored === '1' ? true : (stored === '0' ? false : !!cfg.default_on);

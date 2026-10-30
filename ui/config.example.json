@@ -93,11 +93,11 @@
     "hz": 8
   },
   "tts": {
-    "_说明": "小瑞出声。主路是浏览器的 speechSynthesis —— Edge 白送晓晓/云希那一批中文神经音色，零安装零 key；断网或浏览器挑不出音色时，退回服务端 PowerShell 念 Huihui（难听但一定能出声）。挑音色打开 web/voice.html 挨个试听 —— 音色好坏光看形容词判断不了。",
+    "_说明": "小瑞俏皮伙伴音色。浏览器优先；服务端 Edge 在线音色兜底，失败时保留 Windows 离线语音。试听 /voice.html。",
     "enabled": true,
     "_enabled": "总开关。界面左栏有个喇叭按钮可以随时改，改的是浏览器里的记忆，不回写这个文件。",
-    "voice": "自动",
-    "_voice": "浏览器音色关键词，子串匹配。\"自动\" = 优先名字带 Natural 的中文音色（也就是晓晓）。想钉死某个音色就填它的名字片段，比如 \"晓伊\"。注意它和下面 server.voice 不是一回事：这个是浏览器音色的关键词，那个是 Windows SAPI 的音色全名。",
+    "voice": "Xiaoyi",
+    "_voice": "优先晓伊（Xiaoyi）。首次收到新版 profile 时更新浏览器旧音色偏好；之后保留手动选择。静音设置不变。",
     "enabled_in_modes": {
       "_说明": "哪些数据源下界面默认出声。⚠️ 要逐源写清楚，不能只给一份名单 —— 漏写的源会按 '除 live 外都开' 处理，而 replay 是**最该出声**的一种（那时界面是唯一的发声方），漏掉它就等于那一整轮演示都是哑的。live 故意是 false：那时读的是 fuse.py 正在写的 CSV，而 fuse.py 那个进程自己就在念同一条预警（src/fuse.py:697 的 tts.say），界面再念一遍就是两个声音叠着说同一句话。live 这个 false 也是代码里的兜底默认值 —— 就算这个映射整段漏写，live 依然不出声。",
       "demo": true,
@@ -110,8 +110,8 @@
     "emotion_prosody": {
       "_说明": "情感 → 语速/音高，让小瑞的语气跟着状态走。⚠️ 方向是**越严重越低越慢**，不是又高又急 —— 哪怕在最严重那档，它的语气也该是沉住气的，不能变成警报音：亮灯和喇叭是另一条通道的事（src/live.py / src/fuse.py），小瑞这条通道负责的是情绪和出路。emotion 由 ui/xiaorui.py 的 emotion_for() 给，**四个键一个都不能少**：少一个不会报错，前端 XQ.tts.prosody[emotion] 取不到就退回 normal 的语速，四档听起来一模一样（很难发现）。",
       "normal": {
-        "rate": 1.0,
-        "pitch": 1.0
+        "rate": 1.06,
+        "pitch": 1.06
       },
       "concerned": {
         "rate": 0.95,
@@ -127,7 +127,7 @@
       }
     },
     "server": {
-      "_说明": "服务端备路。只在浏览器那条路没开口时才走，所以音质差一点可以接受 —— 它的价值是断网也一定能出声。",
+      "_说明": "浏览器无声时使用 Edge 在线音色；联网失败退回 SAPI，并记录 edge_error。",
       "voice": "Microsoft Huihui Desktop",
       "_voice": "Windows SAPI 的音色全名。本机实测只有这一个是中文的，跑 `python ui/tts.py --voices` 可以列出这台机器实际装了什么。填错不会哑掉：SelectVoice 失败会用默认音色接着念，但会把原因写进 last_error，界面上看得见。",
       "rate": 2,
@@ -137,8 +137,13 @@
       "max_chars": 120,
       "_max_chars": "超过就截断。小瑞的话本来就不长，这行是防模型生成失控时念个没完。",
       "queue": 2,
-      "_queue": "排队的格子数。满了就丢（dropped 加一），和 src/live.py 的 TTSWorker 一个哲学：宁可少念一句，也不能让念稿把状态推送拖住。"
-    }
+      "_queue": "排队的格子数。满了就丢（dropped 加一），和 src/live.py 的 TTSWorker 一个哲学：宁可少念一句，也不能让念稿把状态推送拖住。",
+      "engine": "edge",
+      "edge_voice": "zh-CN-XiaoyiNeural",
+      "edge_rate": "+6%",
+      "edge_pitch": "+8Hz"
+    },
+    "voice_profile": "sprite-playful-v1"
   },
   "media": {
     "_说明": "多媒体页放的是**本机自己的歌**。这些文件**不拷进仓库** —— 仓库是公开的，歌有版权；服务端只加了一条 /music/<文件名> 路由按这个目录读（带 Range，所以进度条能拖）。目录不存在也不会坏：页面会说清楚「没找到这个目录」，不是安静地显示一个空列表。",

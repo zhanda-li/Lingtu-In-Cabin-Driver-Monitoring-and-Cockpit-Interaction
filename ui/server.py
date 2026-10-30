@@ -774,6 +774,7 @@ class Hub:
         return {
             "default_on": default_on and self.voice.enabled,
             "voice": c.get("voice") or "自动",
+            "voice_profile": c.get("voice_profile") or "",
             "prosody": prosody,
             "server_fallback": bool(c.get("server_fallback", True)),
             "server_ok": self.voice.enabled,

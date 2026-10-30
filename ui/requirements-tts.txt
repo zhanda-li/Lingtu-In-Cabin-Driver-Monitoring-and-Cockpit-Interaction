@@ -13,7 +13,7 @@
 # "先快照环境 → 装 → 再快照 → 比对"，和 install_asr.bat 一个套路。
 #
 # ✅ 这一份**没有 numpy 风险**（这是它和 requirements-asr.txt 最大的区别）：
-#    edge-tts 7.2.8 的依赖是下面这四行，全是纯 python 或早已装好的东西，
+#    edge-tts 7.3.1 的依赖是下面这四行，全是纯 python 或早已装好的东西，
 #    不碰 numba/llvmlite，动不到 numpy，也就动不到 mediapipe 和 cam 模式。
 #    换句话说：装了不满意，`pip uninstall edge-tts` 就干净回去了，
 #    不会留下"摄像头打不开"这种要命的后遗症。
@@ -24,7 +24,7 @@
 #    写进 status（界面上看得见）。**"断网也一定有声音"是这一路的底线。**
 # ---------------------------------------------------------------------------
 
-edge-tts
+edge-tts==7.3.1
 aiohttp
 certifi
 typing-extensions

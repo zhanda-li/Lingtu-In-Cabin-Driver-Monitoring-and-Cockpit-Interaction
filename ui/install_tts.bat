@@ -24,7 +24,7 @@ rem  this and the README flow runs". Speech is optional - the UI runs without
 rem  any of it - so it gets its own file plus a snapshot/compare wrapper.
 rem
 rem  *** WHY THIS ONE IS SAFE, UNLIKE install_asr.bat ***
-rem  edge-tts 7.2.8 needs aiohttp, certifi, tabulate, typing-extensions. None
+rem  edge-tts 7.3.1 needs aiohttp, certifi, tabulate, typing-extensions. None
 rem  of them touches numba/llvmlite, so pip cannot move numpy out from under
 rem  mediapipe, so this cannot break cam mode. install_asr.bat needs all that
 rem  ceremony because whisper CAN break it. This one keeps the snapshot anyway -
