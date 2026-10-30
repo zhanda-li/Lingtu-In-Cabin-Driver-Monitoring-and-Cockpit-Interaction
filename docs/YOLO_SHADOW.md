@@ -89,7 +89,7 @@ are zero when invalid/inactive. Inference latency and errors are included.
 
 ## Verification evidence and limitations
 
-Thirteen tests passed: three ROI regions, bounds/missing ROI, missing face with no
+Seventeen tests passed: three ROI regions, bounds/missing ROI, missing face with no
 inference, invalid/gaps, blink, long closure one-shot, MAR disagreement and sustained
 yawn candidate, plus AST comparisons of original algorithms. These are synthetic
 state/structure checks, NOT real-video behavioural accuracy tests. Additional tests
@@ -97,6 +97,10 @@ cover disabled FaceExtractor output against the original code on identical landm
 observations, UI serialization/risk isolation, bounded async queue, exact ONNX
 preprocessing, actual ONNX fallback when Lite2 is missing, and all four UI severity
 levels compared with the original implementation while shadow events are present.
+Fusion expressions from the original and current `fuse.py` are also executed on
+512 combinations of levels, gates, face presence and rule activity, exercising
+L0/L1/L2/L3 without modifying any fusion source. This is deterministic source-code
+regression coverage; it is not natural-video coverage of every risk transition.
 Both real model loading and CPU forward tests passed. Warm synthetic 96x96 BGR
 input resized by Ultralytics to 224, 10 iterations: eye median 7.15 ms / p95 8.86 ms,
 mouth median 6.71 ms / p95 7.74 ms. Excludes FaceMesh, camera and whole-app overhead.
@@ -123,7 +127,7 @@ timestamp. Results older than .5 seconds or with lost face are invalid. Async re
 with `--fast` may legitimately skip most frames: use `DMS_YOLO_ASYNC=0` for deterministic
 offline analysis. Logs deduplicate completed samples. This bounds queue memory but
 CPU contention and the image copy still require whole-system board profiling.
-No CPU/memory whole-app profiling or NPU performance claims are made.
+Desktop full-camera-source profiling is reported below. No NPU performance claims are made.
 Real camera-source regression was also executed on `normal_00.mp4`: YOLO-disabled
 CLI fusion versus ONNX shadow-enabled UI camera source, 167 decision rows and all
 19 original columns identical. Shadow completed 336 samples with no inference errors.
@@ -152,15 +156,18 @@ original member `YawDD dataset/Dash/Female/1-FemaleNoGlasses.avi`.
 The video is 91.37 seconds, 2741 frames at approximately 30 fps. Visual contact-sheet
 inspection confirms a driver in a daylight car scene with varying mouth/eye states.
 Replay sampled every sixth frame (5 Hz), reached video end, and processed 457 frames
-with a face on all 457. Outputs: 10 blink events, one yawn_candidate at 56.60 s,
+with a face on all 457. After requiring confirmed-open eyes before ending a blink,
+latest outputs are 7 blink events, one yawn_candidate at 56.60 s,
 zero long_closure events. These are predictions, NOT measured accuracy or ground truth.
 No reliable per-frame labels were supplied; talking/laughing/singing false-positive
 rates, sensitivity and night performance remain unmeasured. One participant is not
 a generalization test. There was no training or random adjacent-frame data split.
 
-This actual standalone ONNX + FaceMesh validation process took 15.41 seconds to
-process the video at sampled speed. FaceMesh + three ROI inference median 24.81 ms,
-p95 28.66 ms; peak sampled RSS 173.17 MiB, process CPU time / wall time 1.10 cores.
+The latest acceptance-run ONNX + FaceMesh process took 33.07 seconds to process
+the video at sampled speed. FaceMesh + three ROI inference median 62.97 ms,
+p95 77.63 ms; peak sampled RSS 174.73 MiB, process CPU time / wall time 1.04 cores.
+Earlier runs were faster; these are observed host-load-sensitive measurements,
+not fixed latency guarantees or directly comparable full-pipeline timings.
 These exclude full Pose Transformer/UI and are desktop results, not RK3568 estimates.
 Detailed predictions/resources: `yawdd_shadow_replay.json`;
 download provenance: `yawdd_download.json`. No video/images are committed.
@@ -188,6 +195,67 @@ Detailed predictions/partition: `yolo_mrl_labelled_eval.json`.
 ```powershell
 & $py tools/evaluate_yolo_mrl.py
 ```
+
+## Desktop acceptance and failure handling
+
+The current desktop scope can be reproduced without a board:
+
+```powershell
+# Existing desktop dms environment, exact checkpoint hashes checked first.
+& $py -m pip install -r requirements-yolo-validation.txt
+& $py tools/validate_yolo_desktop.py
+# Also starts two short-lived localhost servers and profiles full CamSource:
+& $py tools/validate_yolo_desktop.py --full
+```
+
+`--full` needs permission to use localhost networking. On Windows a restricted
+network sandbox can stall creation of the asyncio event loop before test code
+starts; the initial sandboxed probe was stopped after verifying its process
+command, then the same check passed outside that network restriction. Test servers
+bind only 127.0.0.1, use temporary test config with external agents/ASR/TTS/WeChat
+and serial hardware disabled, and are terminated by the test's cleanup block.
+It does not load the user's private UI config or send messages to other people.
+
+`tools/check_yolo_websocket.py` starts actual aiohttp servers with shadow off/on.
+Cover/index pages return HTTP 200 in both modes. The 42 original state keys are
+identical; the off payload has no shadow field, and the on payload carries a
+completed ONNX shadow result. Evidence: `yolo_websocket_check.json`. Browser
+rendering is not tested by this API-level check.
+
+Async publication uses a lock plus generation counters. Face loss, invalid ROI
+or a discontinuous source timestamp invalidates previous evidence immediately;
+late results from previous generations cannot replace it. Invalid inference output
+retains the complete null/invalid schema. A blink now requires both smoothed open
+probabilities above .7 on release; returning only to the uncertain range is not
+counted as a blink. These changes affect shadow events only.
+
+`tools/review_yolo_mouth.py` summarizes contact-sheet-reviewed YawDD intervals.
+At 0–3 s and 20–23 s, visible smiles/varying mouth poses generated no candidate;
+at 54–58 s sustained opening generated the candidate at 56.60 s. Review did not
+include audio or reliable speech/laughter/singing labels. These observations are
+qualitative, not a measured false-positive rate. Evidence:
+`yolo_mouth_qualitative_review.json`.
+
+`tools/profile_yolo_desktop.py` sequentially runs the full camera source with
+shadow off/on using the public video. It includes decode, Pose Transformer,
+FaceMesh, fusion and JPEG, but excludes the HTTP server/browser and hardware.
+Warm CPU measurements exclude the first 10 seconds; RSS is sampled every .25 s.
+The two bounded wall-time runs reach different video positions, so their CPU
+figures must not be interpreted as an optimization or equal-workload speedup.
+Actual numbers are in `yolo_desktop_resources.json`. The acceptance manifest
+`yolo_desktop_acceptance.json` records per-case exit codes and source hashes.
+The latest full run passed all eight stages. Full camera-source peak RSS was
+469.54 MiB with shadow off and 511.39 MiB with ONNX async shadow on. Warm process
+CPU/wall ratios were 7.52 and 7.85 core equivalents respectively. Both runs were
+CPU-heavy and processed less video time than wall time; this does not establish
+real-time operation, camera performance or RK3568 suitability. The standalone
+ROI-only figures above must not be substituted for these full-source results.
+
+RK3568/NPU execution is deferred by the user's choice until the board is connected.
+Remaining desktop evidence gaps are reliable talking/laughter/singing labels,
+multi-participant mouth/night validation, natural-video L1/L2 and warmed-LR voting
+regressions, and commercial checkpoint licensing. No accuracy is claimed for
+unlabelled YawDD intervals or synthetic fusion cases.
 
 ## ONNX and RK3568 deployment (ONNX verified; RKNN not converted/board-tested)
 

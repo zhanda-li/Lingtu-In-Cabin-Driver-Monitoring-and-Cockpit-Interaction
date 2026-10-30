@@ -1,0 +1,36 @@
+{
+  "source": "datasets\\yawdd_samples\\01-FemaleNoGlasses.avi",
+  "review": "Contact sheets reviewed at selected 1-second timestamps",
+  "limitation": "No audio review or reliable speech/laughter/singing frame labels. No false-positive rate, sensitivity or accuracy can be inferred.",
+  "intervals": [
+    {
+      "start": 0,
+      "end": 3,
+      "visual_note": "Visible smile/teeth in sampled frames",
+      "samples": 16,
+      "max_smoothed_yawn_probability": 0.5113632005066956,
+      "max_mar": 0.2771727100684544,
+      "candidate_times": []
+    },
+    {
+      "start": 20,
+      "end": 23,
+      "visual_note": "Varying mouth poses and a smile in sampled frames",
+      "samples": 15,
+      "max_smoothed_yawn_probability": 0.5429415559344264,
+      "max_mar": 0.2642006850242078,
+      "candidate_times": []
+    },
+    {
+      "start": 54,
+      "end": 58,
+      "visual_note": "Sustained wide mouth opening, qualitatively consistent with yawning",
+      "samples": 20,
+      "max_smoothed_yawn_probability": 0.9999972920121318,
+      "max_mar": 0.6933815199837499,
+      "candidate_times": [
+        56.599433999999995
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 import threading
 import types
+import itertools
 import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -15,6 +16,80 @@ from face_roi_yolo import crop_roi, REGIONS, Temporal, FaceRoiYolo, AsyncFaceRoi
 
 
 class ShadowTests(unittest.TestCase):
+    def test_async_invalid_roi_cannot_reuse_previous_closed_result(self):
+        fake = Mock()
+        fake.process.return_value = dict(eye_status='invalid',yawn_status='invalid')
+        with patch('face_roi_yolo.FaceRoiYolo',return_value=fake):
+            worker = AsyncFaceRoiYolo('','')
+        try:
+            with worker._state_lock:
+                worker.latest = dict(sample_timestamp=0.,eye_status='active',eye_event='long_closure')
+            result = worker.process(np.zeros((100,100,3),np.uint8),{},.2,.1)
+            self.assertEqual(result['eye_status'],'invalid')
+            self.assertEqual(result['eye_event'],'invalid')
+        finally:
+            worker.close(); worker.worker.join(2)
+
+    def test_async_result_finishing_after_face_loss_is_discarded(self):
+        entered,release = threading.Event(),threading.Event()
+        second_entered,second_release = threading.Event(),threading.Event()
+        calls = []
+        def slow(*args):
+            calls.append(args)
+            if len(calls)==1:
+                entered.set(); release.wait(3)
+            else:
+                second_entered.set(); second_release.wait(3)
+            return dict(eye_status='active',yawn_status='inactive')
+        fake = Mock(); fake.process.side_effect = slow
+        with patch('face_roi_yolo.FaceRoiYolo',return_value=fake):
+            worker = AsyncFaceRoiYolo('','')
+        points = {i:np.array([30.+j*2,40.+j%2]) for ids in REGIONS.values() for j,i in enumerate(ids)}
+        image = np.zeros((100,100,3),np.uint8)
+        try:
+            worker.process(image,points,.2,0)
+            self.assertTrue(entered.wait(2))
+            worker.process(image,None,None,.1)
+            worker.process(image,points,.2,.2)
+            release.set()
+            self.assertTrue(second_entered.wait(2))
+            with worker._state_lock:
+                self.assertIsNone(worker.latest)
+        finally:
+            worker.close(); release.set(); second_release.set(); worker.worker.join(3)
+
+    def test_all_fusion_levels_and_gates_against_original(self):
+        def fusion(source):
+            picked = []
+            names = {'l_face','l_base','l_yawn','l_eye','l_head','l_fused'}
+            for node in ast.walk(ast.parse(source)):
+                if isinstance(node,ast.Assign) and len(node.targets)==1 and isinstance(node.targets[0],ast.Name):
+                    if node.targets[0].id in names and isinstance(node.value,(ast.IfExp,ast.Call)):
+                        picked.append(node)
+            picked.sort(key=lambda n:n.lineno)
+            self.assertEqual([n.targets[0].id for n in picked],['l_face','l_base','l_yawn','l_eye','l_head','l_fused'])
+            return compile(ast.Module(body=picked,type_ignores=[]),'fusion_regression','exec')
+        original = subprocess.check_output(['git','show',f'{BASELINE}:src/fuse.py'],cwd=ROOT).decode('utf-8')
+        before = fusion(original)
+        after = fusion((ROOT/'src/fuse.py').read_text(encoding='utf-8'))
+        observed = set()
+        for l1,l2,gate,present,yawn,eye,head in itertools.product(range(4),range(4),*[ [False,True] ]*5):
+            inputs = dict(l1=l1,l2=l2,gate=gate,face=object() if present else None,
+                          yawn_on=yawn,eye_on=eye,head_on=head,B2_MAX_LEVEL=2,
+                          args=types.SimpleNamespace(yawn_action='level',eye_level=2,head_level=3))
+            a,b = dict(inputs),dict(inputs,yolo_shadow={'eye_event':'long_closure','yawn_event':'yawn_candidate','risk':99})
+            exec(before,a); exec(after,b)
+            self.assertEqual(a['l_fused'],b['l_fused'])
+            observed.add(b['l_fused'])
+        self.assertEqual(observed,{0,1,2,3})
+
+    def test_uncertain_eyes_do_not_create_blink(self):
+        t = Temporal()
+        t.update(0,0,0,0,.1)
+        out = t.update(.2,.5,.5,0,.1)
+        self.assertEqual(out['eye_event'],'none')
+        self.assertEqual(out['eye_left_status'],'uncertain')
+
     def test_ui_state_shadow_serialization(self):
         sys.path.insert(0, str(ROOT))
         from ui.state import State

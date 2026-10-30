@@ -1,0 +1,68 @@
+{
+  "all_passed": true,
+  "full": true,
+  "source_sha256": {
+    "src\\face_roi_yolo.py": "55a3e1c7268e9f0c7b6d00c849565fd6ffb2697066c6467362a5408effa6a928",
+    "src\\yolo_runtime.py": "cffaeb5d8fa97b7ec20a759031a0dbc5300a84692bd403d938f6e5e4f7849c87",
+    "src\\face.py": "0a467347fdcfe5fab854f7253f556722abb560dd2c04d1ce31ed4f903c712e1e",
+    "ui\\state.py": "0a34554db4cf15fc0ede5e1ca9c219b9432195ce7ba6889b74c83900c97dcc1b",
+    "ui\\cam.py": "a9cb3a51f540c10c15ceceda251e3c2d44dc23e98234598d2383987e3dd9f9b3"
+  },
+  "cases": [
+    {
+      "case": "weight_hashes",
+      "exit_code": 0,
+      "seconds": 0.23500000000058208,
+      "log": "runs\\yolo_accept_weight_hashes.txt"
+    },
+    {
+      "case": "unit_and_original_fusion",
+      "exit_code": 0,
+      "seconds": 9.156000000002678,
+      "log": "runs\\yolo_accept_unit_and_original_fusion.txt"
+    },
+    {
+      "case": "real_model_loading_cpu",
+      "exit_code": 0,
+      "seconds": 7.687999999998283,
+      "log": "runs\\yolo_accept_real_model_loading_cpu.txt"
+    },
+    {
+      "case": "labelled_mrl",
+      "exit_code": 0,
+      "seconds": 3.0,
+      "log": "runs\\yolo_accept_labelled_mrl.txt"
+    },
+    {
+      "case": "public_yawdd",
+      "exit_code": 0,
+      "seconds": 34.67099999999846,
+      "log": "runs\\yolo_accept_public_yawdd.txt"
+    },
+    {
+      "case": "mouth_qualitative_review",
+      "exit_code": 0,
+      "seconds": 0.14100000000325963,
+      "log": "runs\\yolo_accept_mouth_qualitative_review.txt"
+    },
+    {
+      "case": "http_websocket",
+      "exit_code": 0,
+      "seconds": 27.76599999999962,
+      "log": "runs\\yolo_accept_http_websocket.txt"
+    },
+    {
+      "case": "full_camera_resources",
+      "exit_code": 0,
+      "seconds": 75.01499999999942,
+      "log": "runs\\yolo_accept_full_camera_resources.txt"
+    }
+  ],
+  "limits": [
+    "No RK3568 device used",
+    "No reliable speech/laughter/singing frame labels",
+    "No NITYMED access",
+    "MRL upstream training overlap unknown",
+    "Fusion L0-L3 combination test is a source-code regression, not natural-video coverage of every level"
+  ]
+}

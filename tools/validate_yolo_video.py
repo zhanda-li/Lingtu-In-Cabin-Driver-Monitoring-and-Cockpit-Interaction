@@ -29,6 +29,7 @@ def main():
     if not capture.isOpened():
         ap.error('Video cannot be opened')
     fps = capture.get(cv2.CAP_PROP_FPS)
+    frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     if fps <= 0:
         ap.error('Invalid video frame rate')
     stride = max(1,int(round(fps/args.hz)))
@@ -49,6 +50,7 @@ def main():
             d = face.detect(image,timestamp*1000)
             out = yolo.process(image,d['P'] if d else None,d['mar'] if d else None,timestamp)
             out.update(timestamp=timestamp,face_present=d is not None)
+            out['mar'] = float(d['mar']) if d is not None and np.isfinite(d['mar']) else None
             rows.append(out)
             latency.append((time.perf_counter()-t0)*1000)
             rss.append(process.memory_info().rss)
@@ -59,7 +61,8 @@ def main():
     report = dict(video=str(args.video),mode='qualitative_only_no_frame_labels',
         backend=os.environ.get('DMS_YOLO_BACKEND','pt'),source_fps=fps,sample_stride=stride,
         processed_frames=len(rows),face_present=sum(r['face_present'] for r in rows),
-        max_frames=args.max_frames,decode_reached_end=len(rows)<args.max_frames,
+        max_frames=args.max_frames,source_frame_count=frame_count,
+        decode_reached_end=(index>=frame_count) if frame_count>0 else None,
         wall_seconds=wall,peak_sampled_rss_mb=max(rss,default=0)/1024**2,
         cpu_core_equivalents=(cpu1.user+cpu1.system-cpu0.user-cpu0.system)/max(wall,1e-6),
         face_plus_yolo_ms_median=float(np.median(latency)) if latency else None,

@@ -1,0 +1,7 @@
+# Desktop validation/export only; not for RK3568 installation.
+-r requirements-yolo-shadow.txt
+-r requirements-yolo-runtime.txt
+onnx==1.23.0
+onnxruntime==1.23.2
+psutil
+aiohttp

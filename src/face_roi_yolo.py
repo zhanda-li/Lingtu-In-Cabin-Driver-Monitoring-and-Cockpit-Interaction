@@ -105,7 +105,7 @@ class Temporal:
                 self.start.setdefault(key, now)
             else:
                 began = self.start.pop(key, None)
-                if key == 'eye' and began is not None and .05 <= now-began < .8:
+                if key == 'eye' and began is not None and min(values['left'],values['right']) > .7 and .05 <= now-began < .8:
                     event = 'blink'
                 self.fired.discard(key)
             duration = now - self.start[key] if key in self.start else 0.
@@ -165,6 +165,7 @@ class AsyncFaceRoiYolo:
         self.pending = queue.Queue(maxsize=1)
         self.latest = None
         self.generation = 0
+        self._state_lock = threading.Lock()
         self.stopped = threading.Event()
         self.worker = threading.Thread(target=self._run, name='dms-yolo-shadow', daemon=True)
         self.worker.start()
@@ -181,25 +182,30 @@ class AsyncFaceRoiYolo:
                     self._worker_generation = generation
                 out = self.detector.process(frame, points, mar, timestamp)
                 out['sample_timestamp'] = timestamp
-                if generation == self.generation:
-                    self.latest = out
+                with self._state_lock:
+                    if generation == self.generation and not self.stopped.is_set():
+                        self.latest = out
             except Exception as exc:
-                if generation == self.generation:
-                    self.latest = dict(mode='shadow', sample_timestamp=timestamp,
-                                       eye_status='invalid', yawn_status='invalid',
-                                       errors=[f'{type(exc).__name__}: {exc}'])
+                with self._state_lock:
+                    if generation == self.generation and not self.stopped.is_set():
+                        self.latest = dict(Temporal().update(timestamp,None,None,None,None),
+                                           mode='shadow',sample_timestamp=timestamp,
+                                           errors=[f'{type(exc).__name__}: {exc}'])
         self.detector.close()
 
     def process(self, frame, points, mar, now):
         # Face loss invalidates published evidence immediately, even when inference is busy.
-        if points is None:
-            self.generation += 1
-            self.latest = None
-        if hasattr(self, '_last_submitted') and (now <= self._last_submitted or now-self._last_submitted > .5):
-            self.generation += 1
-            self.latest = None
-        self._last_submitted = now
-        item = (frame.copy(), None if points is None else {k:v.copy() for k,v in points.items()}, mar, now, self.generation)
+        invalid_roi = points is None or any(crop_roi(frame,points,ids) is None for ids in REGIONS.values())
+        with self._state_lock:
+            discontinuity = hasattr(self, '_last_submitted') and (now <= self._last_submitted or now-self._last_submitted > .5)
+            if invalid_roi or discontinuity:
+                self.generation += 1
+                self.latest = None
+            self._last_submitted = now
+            generation = self.generation
+            result = self.latest
+        item = (frame.copy() if frame is not None else None,
+                None if points is None else {k:v.copy() for k,v in points.items()}, mar, now, generation)
         try:
             self.pending.get_nowait()
         except queue.Empty:
@@ -208,7 +214,6 @@ class AsyncFaceRoiYolo:
             self.pending.put_nowait(item)
         except queue.Full:
             pass
-        result = self.latest
         if result is None or now - result['sample_timestamp'] > .5 or now < result['sample_timestamp']:
             return dict(Temporal().update(now,None,None,None,None), mode='shadow',
                         errors=[], pending=True)
