@@ -43,6 +43,14 @@ chcp 65001 >nul
 setlocal enabledelayedexpansion
 set PYTHONIOENCODING=utf-8
 
+rem User-selected UI default: Fusion V2. Explicit overrides remain supported.
+rem Use run_ui_legacy.bat for the original Legacy-only path.
+if not defined DMS_YOLO_SHADOW set "DMS_YOLO_SHADOW=1"
+if not defined DMS_YOLO_BACKEND set "DMS_YOLO_BACKEND=onnx"
+if not defined DMS_FUSION_COMPARE set "DMS_FUSION_COMPARE=1"
+if not defined DMS_FUSION_V2_ALLOWED set "DMS_FUSION_V2_ALLOWED=1"
+if not defined FUSION_MODE set "FUSION_MODE=v2"
+
 rem Repair PATH: a garbled inherited environment can mangle the drive-letter
 rem colons and break both the python lookup and the cd below.
 set "PATH=C:\Windows\System32;C:\Windows;%PATH%"

@@ -1370,6 +1370,8 @@ MRL 数据目录为 `datasets/mrlEyes_2018_01/mrlEyes_2018_01/`，需包含原�
 
 ## 16. Fusion V2 · 多模型证据融合与增量监测 UI
 
+当前双击 UI 启动器已按用户选择默认使用 V2；原 `run_ui.bat` 和 `run_ui_fusion.bat` 均可使用，`run_ui_legacy.bat` 用于回退。库/API 未显式配置时仍默认 Legacy。
+
 第三阶段新增独立的 `src/fusion_v2.py` 和摄像头接入层 `src/fusion_session.py`。
 原 `src/fuse.py` 保留为 Legacy 参考，Transformer、LR 权重及特征定义不变。
 当前默认仍为 Legacy；V2 是需要匹配验证报告和显式许可的 **PC 试验模式**。

@@ -59,7 +59,10 @@ Physical touch, microphone, speech output and hardware outputs were not exercise
 Start the existing UI using the commands in [FUSION_V2.md](FUSION_V2.md).
 
 For double-click use, launch `ui/run_ui_fusion.bat`. It calls the unchanged
-`run_ui.bat`, enables real ONNX YOLO and side-by-side comparison, keeps Legacy
-selected, and requests the report-gated selector. On the driving-monitor page,
+`run_ui.bat`, enables real ONNX YOLO and side-by-side comparison, and now selects
+V2 at the user's explicit request. `run_ui.bat` uses the same V2 defaults unless
+overridden; `run_ui_legacy.bat` explicitly restores the original Legacy-only path.
+The matching-report gate remains enforced. On the driving-monitor page,
 click connect camera, then the assistant's More link to monitoring details and
-scroll to the new multi-model section. The original launcher remains available.
+scroll to the new multi-model section. Restart an already-running server for the
+launcher defaults to take effect; an allowed active session can also switch via WS.
