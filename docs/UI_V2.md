@@ -57,3 +57,9 @@ not a claim of pixel identity for evolving data or physical 10.1-inch device tes
 Physical touch, microphone, speech output and hardware outputs were not exercised.
 
 Start the existing UI using the commands in [FUSION_V2.md](FUSION_V2.md).
+
+For double-click use, launch `ui/run_ui_fusion.bat`. It calls the unchanged
+`run_ui.bat`, enables real ONNX YOLO and side-by-side comparison, keeps Legacy
+selected, and requests the report-gated selector. On the driving-monitor page,
+click connect camera, then the assistant's More link to monitoring details and
+scroll to the new multi-model section. The original launcher remains available.
