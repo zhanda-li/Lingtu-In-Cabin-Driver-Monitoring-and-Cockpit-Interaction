@@ -1,0 +1,59 @@
+{
+  "all_passed": true,
+  "total_rows": 294,
+  "results": [
+    {
+      "clip": "D:\\sdk_env_v1.12.1\\dms_project\\data\\raw\\normal\\normal_00.mp4",
+      "rows": 167,
+      "differences": {
+        "t": 0,
+        "normal": 0,
+        "fatigue": 0,
+        "l1": 0,
+        "gate": 0,
+        "ema_normal": 0,
+        "p_fat": 0,
+        "l2": 0,
+        "perclos": 0,
+        "brate": 0,
+        "nod": 0,
+        "en_now": 0,
+        "d_pitch": 0,
+        "yawn_sec": 0,
+        "head_swing": 0,
+        "l_fused": 0,
+        "ear": 0,
+        "mar": 0,
+        "pitch": 0
+      },
+      "passed": true
+    },
+    {
+      "clip": "D:\\sdk_env_v1.12.1\\dms_project\\data\\raw\\fatigue\\fatigue_00.mp4",
+      "rows": 127,
+      "differences": {
+        "t": 0,
+        "normal": 0,
+        "fatigue": 0,
+        "l1": 0,
+        "gate": 0,
+        "ema_normal": 0,
+        "p_fat": 0,
+        "l2": 0,
+        "perclos": 0,
+        "brate": 0,
+        "nod": 0,
+        "en_now": 0,
+        "d_pitch": 0,
+        "yawn_sec": 0,
+        "head_swing": 0,
+        "l_fused": 0,
+        "ear": 0,
+        "mar": 0,
+        "pitch": 0
+      },
+      "passed": true
+    }
+  ],
+  "note": "Original local regression clips only; not public-data accuracy. Real model inference in both processes, with OMP/MKL thread counts fixed to 1 equally."
+}

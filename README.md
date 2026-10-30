@@ -12,7 +12,7 @@
 >
 > 两条线跑在同一台机器上、共用同一条推理链路，只是出口不同。
 
-> **YOLO 辅助识别（默认关闭）**：新增双眼睁闭与嘴部哈欠分类，采用 Shadow Mode，不参与原有疲劳等级判决。启用、电脑端验证和限制见 [§15](#15-yolo-眼部与嘴部辅助识别--shadow-mode)。
+> **YOLO 与融合模式**：YOLO 默认关闭，启用后默认以 Legacy/Shadow 对照运行；仅显式选择 Fusion V2 后参与等级判断。推理与验证见 [§15](#15-yolo-眼部与嘴部辅助识别--shadow-mode)，多模型融合和 UI 升级见 [§16](#16-fusion-v2--多模型证据融合与增量监测-ui)。
 
 ---
 
@@ -33,6 +33,7 @@
 - [13. 工程笔记 · 踩过的坑](#13-工程笔记--踩过的坑)
 - [14. 已知限制与未决](#14-已知限制与未决)
 - [15. YOLO 眼部与嘴部辅助识别 · Shadow Mode](#15-yolo-眼部与嘴部辅助识别--shadow-mode)
+- [16. Fusion V2 · 多模型证据融合与增量监测 UI](#16-fusion-v2--多模型证据融合与增量监测-ui)
 
 ---
 
@@ -1364,6 +1365,46 @@ MRL 数据目录为 `datasets/mrlEyes_2018_01/mrlEyes_2018_01/`，需包含原�
   但尚无真实 `.rknn` 转换成功、NPU 输出一致性、INT8 精度或板端资源结果。
 - 改动在 `feat/yolo-face-shadow` 分支分批提交，未修改 main。需要撤销某次改动时使用
   `git revert <提交号>` 保留历史；不要通过 `reset --hard`/`clean` 清理带有其他未提交工作的目录。
+
+---
+
+## 16. Fusion V2 · 多模型证据融合与增量监测 UI
+
+第三阶段新增独立的 `src/fusion_v2.py` 和摄像头接入层 `src/fusion_session.py`。
+原 `src/fuse.py` 保留为 Legacy 参考，Transformer、LR 权重及特征定义不变。
+当前默认仍为 Legacy；V2 是需要匹配验证报告和显式许可的 **PC 试验模式**。
+
+V2 将 EAR/YOLO Eye、MAR/YOLO Mouth、头姿、Transformer 和 FaceBranch 分组，
+同组相关证据不相加；增加持续性、冲突标记、有效性与降级滞回。YOLO 缺失时退回
+Legacy。它不提供未经校准的综合疲劳概率，也不代表已经证明优于原版。
+
+现有监测详情页新增眼部、嘴部、头部、融合解释和运行状态卡片，原有四个区域、
+导航、配色、字体及交互保留。页面数据来自同一条真实 WebSocket，模式切换需后端
+确认并等待实际决策；无效、过期、冲突、热身与断连都有独立状态。
+
+```powershell
+cd D:\sdk_env_v1.12.1\dms_project
+$py='D:\Anaconda3\envs\dms\python.exe'
+$env:DMS_YOLO_SHADOW='1'
+$env:DMS_YOLO_BACKEND='onnx'
+$env:DMS_FUSION_COMPARE='1'
+$env:FUSION_MODE='legacy'
+& $py ui/server.py --source cam
+# 验证报告匹配后，可显式设置 DMS_FUSION_V2_ALLOWED=1 并重启，开放页面切换。
+# 需要启动即选 V2 时，再设置 FUSION_MODE=v2。回退时设置 FUSION_MODE=legacy。
+```
+
+原有 17 项测试、512 种原版组合、294 次视频决策回归已通过；新增 16 项规则/集成
+场景通过。YawDD 实际推理记录对照包含 663 次决策和 260 次有效 LR 投票。
+两版有 511 次等级不同，切换次数为 Legacy 11 / V2 22：**尚未证明 V2 更稳定或更准确**。
+无可靠逐帧标签，误报率、漏报率与检测延迟不填写伪造数值。
+
+- [Fusion V2 架构、输入、规则、开关与协议](docs/FUSION_V2.md)
+- [UI 增量设计与前后对比](docs/UI_V2.md)
+- [真实对照结果与限制](docs/validation/fusion_v2_report.md)
+
+本阶段未做 RK3568 部署、RKNN/NPU/INT8 转换。需要继续解决的重点是自然场景标签、
+说话/大笑/唱歌误报、等级稳定性及整链路实时性能。所有新功能默认保留可回退路径。
 
 ---
 

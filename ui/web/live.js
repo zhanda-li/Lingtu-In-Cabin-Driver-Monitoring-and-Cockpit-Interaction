@@ -2035,7 +2035,7 @@ XQ.asr = {
 XQ.connect = function (opts = {}) {
   let ws = null, retry = null, down = false;
 
-  const setDown = (d) => { if (d !== down) { down = d; opts.onDown && opts.onDown(d); } };
+  const setDown = (d) => { if (d !== down) { down = d; opts.onDown && opts.onDown(d); window.dispatchEvent(new CustomEvent('xq-down',{detail:d})); } };
 
   /* 先建出 api 再连：hello 一到就要把链路交给 XQ.tts（服务端兜底要靠它发）。
      消息是异步的，理论上等 api 建好再连更保险，但 `open()` 里只是发起连接，
@@ -2044,6 +2044,7 @@ XQ.connect = function (opts = {}) {
     send: (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); },
     get online() { return !down; },
   };
+  XQ.fusionTransport = api;
 
   const open = () => {
     if (XQ.isFile()) { setDown(true); return; }      // file:// 下没有服务端，别白试
@@ -2065,7 +2066,7 @@ XQ.connect = function (opts = {}) {
         if (XQ.asr && XQ.asr.attach) XQ.asr.attach(api, d.asr);
         opts.onHello && opts.onHello(d);
       }
-      else if (m.type === 'state') { XQ.Hist.push(d); opts.onState && opts.onState(d); }
+      else if (m.type === 'state') { XQ.Hist.push(d); opts.onState && opts.onState(d); window.dispatchEvent(new CustomEvent('xq-state',{detail:d})); }
       else if (m.type === 'say') opts.onSay && opts.onSay(d);
       // ⚠️ 第二个参数是整个 payload，不只是文案：驾驶监测页那颗换源按钮要靠
       //    `d.source_switch` / `d.ok` 复位「正在接入…」，**不能**去匹配中文文案
@@ -2078,6 +2079,7 @@ XQ.connect = function (opts = {}) {
       //   不写这个口子的话，每加一种页内消息就要来改这个函数一次，
       //   而改它等于动全站每一个页面。
       if (opts.onMsg) opts.onMsg(m.type, d);
+      window.dispatchEvent(new CustomEvent('xq-message',{detail:{type:m.type,data:d}}));
     };
     ws.onclose = () => { setDown(true); clearTimeout(retry); retry = setTimeout(open, 1800); };
     ws.onerror = () => {};

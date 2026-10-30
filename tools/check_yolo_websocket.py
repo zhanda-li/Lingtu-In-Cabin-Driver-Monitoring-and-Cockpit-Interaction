@@ -8,9 +8,32 @@ import sys
 import time
 from pathlib import Path
 import aiohttp
+import argparse
 ROOT = Path(__file__).resolve().parents[1]
 
-async def probe(enabled):
+async def mode_check(ws,allowed):
+    results=[]
+    for target in (['v2','legacy','bad'] if allowed else ['v2','bad']):
+        await ws.send_json({'type':'fusion_mode','mode':target})
+        deadline=time.monotonic()+20
+        ack=None;effective=None
+        expected=allowed and target!='bad'
+        while time.monotonic()<deadline:
+            message=await ws.receive_json()
+            if message.get('type')=='fusion_mode':
+                ack=message['data'];assert ack['ok']==expected
+                if not expected:break
+            if ack and message.get('type')=='state':
+                state=message['data'];fusion=state.get('fusion_v2',{})
+                if fusion.get('mode')==target:
+                    assert fusion['final_level']==state['l_fused']
+                    if target=='v2':assert fusion['fusion_v2_level']==state['l_fused']
+                    effective=target;break
+        assert ack is not None and (not expected or effective==target),'Missing backend mode acknowledgment/application'
+        results.append(dict(target=target,ack=ack,effective=effective))
+    return results
+
+async def probe(enabled,allow_switch=None):
     config = ROOT/'runs/yolo_ws_test_config.json'
     config.write_text(json.dumps(dict(agent={'backend':'scripted'},
         asr={'enabled':False,'preload':False},tts={'enabled':False},
@@ -20,6 +43,8 @@ async def probe(enabled):
         port = reservation.getsockname()[1]
     env = dict(os.environ,DMS_YOLO_SHADOW='1' if enabled else '0',
                DMS_YOLO_BACKEND='onnx',DMS_YOLO_ASYNC='1',DMS_YOLO_LOG='')
+    env.update(FUSION_MODE='legacy',DMS_FUSION_COMPARE='1' if allow_switch is not None else '0',
+               DMS_FUSION_V2_ALLOWED='1' if allow_switch else '0',OMP_NUM_THREADS='1',MKL_NUM_THREADS='1')
     log = ROOT/f'runs/yolo_ws_{int(enabled)}.txt'
     command = [sys.executable,str(ROOT/'ui/server.py'),'--config',str(config),
         '--source','cam:datasets/yawdd_samples/01-FemaleNoGlasses.avi',
@@ -59,9 +84,13 @@ async def probe(enabled):
                             assert shadow['mode']=='shadow'
                             for key in ['eye_left_open_prob','eye_right_open_prob','yawn_probability']:
                                 assert shadow[key] is None or 0<=shadow[key]<=1
-                            return dict(enabled=True,legacy_keys=sorted(k for k in state if k!='yolo_shadow'),
+                            assert 'fusion_v2' in state and 'yolo' in state
+                            result=dict(enabled=True,legacy_keys=sorted(k for k in state if k not in ('yolo_shadow','fusion_v2','yolo')),
                                         shadow_present=True,eye_backend=shadow['eye_backend'],
                                         sample_timestamp=shadow['sample_timestamp'])
+                            if allow_switch is not None:
+                                result['mode_checks']=await mode_check(ws,allow_switch)
+                            return result
                     raise RuntimeError('No completed shadow result reached WebSocket')
         finally:
             child.terminate()
@@ -71,6 +100,13 @@ async def probe(enabled):
                 child.kill(); child.wait(timeout=5)
 
 async def main():
+    ap=argparse.ArgumentParser();ap.add_argument('--fusion-tests',action='store_true');args=ap.parse_args()
+    if args.fusion_tests:
+        denied=await probe(True,False)
+        allowed=await probe(True,True)
+        report=dict(denied=denied,allowed=allowed,note='Real backend confirmations and selected decision states, no simulated mode labels')
+        (ROOT/'docs/validation/fusion_websocket.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+        print(json.dumps(report,indent=2));return
     off = await probe(False)
     on = await probe(True)
     assert off['legacy_keys']==on['legacy_keys']

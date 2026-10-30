@@ -10,12 +10,14 @@ from pathlib import Path
 import psutil
 ROOT = Path(__file__).resolve().parents[1]
 
-def run(mode, seconds):
+def run(mode, seconds, fusion=False):
     dump = ROOT/f'runs/yolo_profile_{mode}.csv'
     log = ROOT/f'runs/yolo_profile_{mode}.txt'
     video = ROOT/'datasets/yawdd_samples/01-FemaleNoGlasses.avi'
     env = dict(os.environ,DMS_YOLO_SHADOW='0' if mode=='off' else '1',
                DMS_YOLO_BACKEND='onnx',DMS_YOLO_ASYNC='1',DMS_YOLO_LOG='')
+    env.update(DMS_FUSION_COMPARE='1' if fusion and mode!='off' else '0',
+               DMS_FUSION_V2_ALLOWED='1' if fusion else '0',FUSION_MODE='v2' if fusion and mode!='off' else 'legacy')
     command = [sys.executable,str(ROOT/'ui/cam.py'),'--replay',str(video),'--fast',
                '--no-overlay','--seconds',str(seconds),'--dump',str(dump)]
     samples = []
@@ -58,19 +60,21 @@ def run(mode, seconds):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--seconds',type=float,default=30)
+    ap.add_argument('--fusion',action='store_true',help='Profile Legacy against active V2; requires matching validation report')
     args = ap.parse_args()
     if args.seconds<15:
         ap.error('At least 15 seconds required for warm CPU measurement')
     results = []
     for mode in ['off','onnx_async']:
-        result = run(mode,args.seconds)
+        result = run(mode,args.seconds,args.fusion)
         results.append(result)
         print(json.dumps(result),flush=True)
     report = dict(workload='Public YawDD first participant replay, fast mode, no overlay',
         scope='Full CamSource: decode, Pose Transformer, FaceMesh, fusion, JPEG. HTTP server/browser excluded.',
         note='Sequential bounded wall-time profiles process different amounts of source video. Not a speedup benchmark or decision-equivalence comparison; CPU cores can exceed 1.',
         results=results)
-    (ROOT/'docs/yolo_desktop_resources.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+    output=ROOT/('docs/validation/fusion_desktop_resources.json' if args.fusion else 'docs/yolo_desktop_resources.json')
+    output.write_text(json.dumps(report,indent=2),encoding='utf-8')
 
 if __name__ == '__main__':
     main()

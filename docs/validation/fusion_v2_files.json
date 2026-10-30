@@ -1,0 +1,56 @@
+{
+  "added": [
+    "docs/FUSION_V2.md",
+    "docs/UI_V2.md",
+    "docs/validation/fusion_desktop_resources.json",
+    "docs/validation/fusion_v2_report.json",
+    "docs/validation/fusion_v2_report.md",
+    "docs/validation/fusion_v2_yawdd.csv",
+    "docs/validation/fusion_websocket.json",
+    "docs/validation/legacy_regression.json",
+    "docs/validation/ui/after_1280.png",
+    "docs/validation/ui/before_1024.png",
+    "docs/validation/ui/before_1280.png",
+    "docs/validation/ui/disconnected_1024.png",
+    "docs/validation/ui/v2_1024.png",
+    "docs/validation/ui/v2_1280.png",
+    "docs/validation/ui_structure.json",
+    "src/fusion_session.py",
+    "src/fusion_v2.py",
+    "tools/check_fusion_ui_structure.py",
+    "tools/evaluate_fusion_v2.py",
+    "tools/regress_fusion_v2_legacy.py",
+    "tools/test_fusion_v2.py",
+    "ui/web/fusion-v2.css",
+    "ui/web/fusion-v2.js",
+    "docs/validation/fusion_v2_files.json"
+  ],
+  "modified": [
+    "README.md",
+    "config.py",
+    "src/face_roi_yolo.py",
+    "tools/check_yolo_websocket.py",
+    "tools/profile_yolo_desktop.py",
+    "ui/cam.py",
+    "ui/server.py",
+    "ui/state.py",
+    "ui/web/detail.html",
+    "ui/web/live.js",
+    "ui/web/monitor.html"
+  ],
+  "preserved_unstaged_user_changes": [
+    "README.md",
+    "hr/README.md",
+    "hr/firmware/README.md",
+    "hr/firmware/src/max30102.h",
+    "tools/record.py"
+  ],
+  "legacy_core_and_theme_unchanged": [
+    "src/fuse.py",
+    "src/model.py",
+    "src/pose.py",
+    "src/live.py",
+    "ui/web/style.css",
+    "ui/web/pages.css"
+  ]
+}

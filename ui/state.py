@@ -200,6 +200,8 @@ class State:
     head_swing: float | None = None   # 最近 2 秒头摆了多少度（免基线）
     src: str = ""
     yolo_shadow: dict | None = None   # Auxiliary only; never read by derive/risk rules.
+    fusion_v2: dict | None = None
+    yolo: dict | None = None
 
     # ---- 派生（下面 derive() 填）----
     severity: str = "normal"
@@ -447,11 +449,27 @@ class State:
             elif not self.b2_ready:
                 self.note = (f"PERCLOS 已出 · 疲劳判决还需 "
                              f"{self.b2_warmup_left:.0f} 秒")
+        if self.fusion_v2 and self.fusion_v2.get('mode') == 'v2':
+            self.level = self.l_fused = int(self.fusion_v2['final_level'])
+            self.level_name = LEVEL_NAMES[self.level]
+            self.severity = ('normal','mild','moderate','severe')[self.level]
+            self.severity_name = SEVERITY_NAMES[self.severity]
+            self.note = '；'.join(self.fusion_v2.get('risk_reasons', []))
+            self.alarms = []
+            if self.level:
+                for key,kind in [('eye_evidence','eyes'),('mouth_evidence','yawn'),('head_evidence','head')]:
+                    g=self.fusion_v2.get(key,{})
+                    if g.get('valid') and g.get('level',0)>0:
+                        self.alarms.append(dict(kind=kind,text='；'.join(g.get('reasons',[]))))
         return self
 
     def to_json(self) -> dict:
         d = asdict(self)
         if self.yolo_shadow is None:
             d.pop('yolo_shadow', None)
+        if self.fusion_v2 is None:
+            d.pop('fusion_v2', None)
+        if self.yolo is None:
+            d.pop('yolo', None)
         d["probs"] = {k: round(float(v), 4) for k, v in self.probs.items()}
         return d

@@ -195,6 +195,11 @@ class CamSource:
         self.frames = 0
         self.error: str | None = None
         self.latest = None
+        self.fusion_session = None
+        if C.FUSION_V2_ENABLED or C.YOLO_SHADOW_ENABLED:
+            from fusion_session import FusionSession
+            self.fusion_session = FusionSession()
+        self.runtime = {}
         self.head: dict = {}
         self._stop = threading.Event()
         self._fps_t = time.monotonic()
@@ -297,7 +302,9 @@ class CamSource:
                 frame_id += 1
                 self.frames = frame_id
 
+                timing = time.perf_counter()
                 lm = self.pose.detect(frame, mt * 1000.0)
+                self.runtime['pose'] = dict(valid=lm is not None,latency_ms=(time.perf_counter()-timing)*1000,timestamp=mt,backend='mediapipe_cpu')
                 if lm is not None:
                     last_lm, last_lm_id = lm, frame_id
 
@@ -306,7 +313,9 @@ class CamSource:
 
                 ear = mar = pitch = float("nan")
                 det = None
+                timing = time.perf_counter()
                 d = self.face.detect(frame, mt * 1000.0)
+                self.runtime['facemesh'] = dict(valid=d is not None,latency_ms=(time.perf_counter()-timing)*1000,timestamp=mt,backend='mediapipe_cpu')
                 if d is not None:
                     det = d
                     ear, mar, pitch = d["ear"], d["mar"], d["pitch"]
@@ -334,19 +343,24 @@ class CamSource:
                     x = np.asarray(ring, np.float32)
                     x = (x - self.feat_mean) / self.feat_std
                     import torch
+                    timing = time.perf_counter()
                     with torch.no_grad():
                         probs = torch.softmax(
                             self.model(torch.from_numpy(x[None])), dim=1)[0].numpy()
+                    self.runtime['transformer'] = dict(valid=lm is not None,latency_ms=(time.perf_counter()-timing)*1000,timestamp=mt,backend='torch_cpu')
                     l1, _ = self.state.update(probs, mt)
 
                     gate = bool(np.argmax(self.state.ema) == NORMAL_I
                                 and self.state.ema[NORMAL_I] >= GATE_MIN)
                     st = self.fb.snapshot() if (gate and self.fb.ready()) else None
                     p_fat = float("nan")
+                    self.runtime['face_branch']=dict(valid=False,timestamp=mt,backend='logistic_regression',latency_ms=None)
                     if gate and self.fb.full() and st is not None:
                         fv = np.array([feature_vector(st)], float)
                         if np.all(np.isfinite(fv)):
+                            timing=time.perf_counter()
                             p_fat = float(self.model2.predict_proba(fv)[0, 1])
+                            self.runtime['face_branch'].update(valid=True,latency_ms=(time.perf_counter()-timing)*1000)
                             l2 = self.b2.update(p_fat, mt)
                         else:
                             l2 = 0
@@ -414,9 +428,15 @@ class CamSource:
                                       yawn_sec, eye_sec, h_swing, l_fused,
                                       src_of_level, ear, mar, pitch)
                     self.head = head
-                    self.latest = row_to_state(head, "cam")
+                    next_state = row_to_state(head, "cam")
                     if self.face.yolo_shadow is not None:
-                        self.latest.yolo_shadow = self.face.shadow_latest
+                        next_state.yolo_shadow = self.face.shadow_latest
+                    if self.fusion_session is not None:
+                        try:
+                            stats_v2 = st if st is not None else (self.fb.snapshot() if self.fb.ready() else None)
+                            self.fusion_session.update(self,next_state,d,lm,probs,stats_v2,eye_sec,h_swing,self.runtime,now=mt)
+                        except Exception as fusion_error:
+                            self.fusion_session.fallback(next_state,mt,fusion_error)
                     # 基线攒了多少秒 —— 界面的「基线热身中 · 还需 N 秒」照它算。
                     # ★ 2026-09-26 起这个数**从开机起单调增长**：闸门不再清缓冲
                     #   （见上面那段），所以低头一次不会让它跳回去 —— 用户投诉的
@@ -424,7 +444,8 @@ class CamSource:
                     # **仍然只能问 FaceBranch**（它知道缓冲的真实跨度）。写在这儿
                     # 不是写进 `head`：CSV 的列名和顺序要和 `src/fuse.py` 对拍，
                     # 加一列就破了那个契约。
-                    self.latest.pc_span = self.fb.span
+                    next_state.pc_span = self.fb.span
+                    self.latest = next_state  # Publish one complete immutable-for-producer decision.
                     if self._log_fp:
                         self._log_fp.write(
                             ",".join(str(v) for v in head.values()) + "\n")
@@ -433,7 +454,10 @@ class CamSource:
                 # ---- 出图 ----
                 if self.overlay:
                     try:
-                        draw_overlay(frame, det, lm, self.head)
+                        overlay_head=self.head
+                        if self.latest and self.latest.fusion_v2 and self.latest.fusion_v2.get('mode')=='v2':
+                            overlay_head=dict(self.head,l_fused=str(self.latest.l_fused),src='fusion_v2')
+                        draw_overlay(frame, det, lm, overlay_head)
                     except Exception:
                         pass
                 self._encode(frame)
@@ -503,6 +527,11 @@ class CamSource:
                 "error": self.error, "replay": bool(self.replay),
                 "model": self.model_name, "window": self.window}
 
+    def set_fusion_mode(self,mode):
+        if self.fusion_session is None:
+            raise PermissionError('本次启动未开启 Fusion V2 对照')
+        return self.fusion_session.set_mode(mode)
+
     def stop(self):
         self._stop.set()
         if getattr(self, 'face', None) is not None and hasattr(self.face.yolo_shadow, 'close'):
@@ -534,7 +563,8 @@ def main():
                 break
             h = src.head
             if h:
-                print(f"\r  [{h['t']:>7}s] L{h['l_fused']} gate={h['gate']} "
+                selected_level=src.latest.l_fused if src.latest is not None else h['l_fused']
+                print(f"\r  [{h['t']:>7}s] L{selected_level} gate={h['gate']} "
                       f"pc={h['perclos']} pfat={h['p_fat']} "
                       f"{src.fps:4.1f} fps   ", end="")
     except KeyboardInterrupt:

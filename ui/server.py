@@ -1826,7 +1826,15 @@ async def handle(hub: Hub, req: dict, ws: web.WebSocketResponse):
     now = time.monotonic()
     st = hub.last_state
 
-    if kind == "say":
+    if kind == "fusion_mode":
+        try:
+            control=getattr(hub.source,'set_fusion_mode',None)
+            if control is None:raise PermissionError('当前数据源不支持融合切换')
+            result=control(req.get('mode'))
+            await ws.send_json({'type':'fusion_mode','data':dict(ok=True,**result)})
+        except (ValueError,PermissionError) as exc:
+            await ws.send_json({'type':'fusion_mode','data':dict(ok=False,error=str(exc))})
+    elif kind == "say":
         text = (req.get("text") or "").strip()
         if not text or st is None:
             return

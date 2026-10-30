@@ -239,6 +239,7 @@
               <div class="mr"><span class="k">头部姿态</span><b class="v" id="mPose">—</b></div>
               <div class="mr"><span class="k">疲劳概率 P(fat)</span><b class="v" id="mPFat">—</b></div>
               <div class="mr"><span class="k">安全通道</span><b class="v" id="mLevel">—</b></div>
+              <div class="note" id="fusionModeBadge">等待融合模式数据</div>
             </div>
 
             <!-- 支路二那两条独立告警（持续闭眼 / 打哈欠），与首页同一份实现
@@ -364,6 +365,7 @@
      —— 它建在 `XQ` 这个命名空间上，还要借 `XQ.speak` / `XQ.flash`。
      ⚠️ 它**不会**自己开麦克风：只有点了那颗「听」才会（文首第 1 条纪律）。 -->
 <script src="/static/wake.js"></script>
+<script src="/static/fusion-v2.js"></script>
 <script>
 /* =========================================================================
    04 驾驶监测

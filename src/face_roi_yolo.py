@@ -136,7 +136,9 @@ class FaceRoiYolo:
     def process(self, frame, points, mar, now):
         start = time.perf_counter()
         probs, errors = {}, []
+        latency = {}
         for key, ids in REGIONS.items():
+            region_start = time.perf_counter()
             roi = crop_roi(frame, points, ids)
             probs[key] = None
             if roi is not None:
@@ -144,8 +146,12 @@ class FaceRoiYolo:
                     probs[key] = (self.mouth if key == 'mouth' else self.eye)(roi)
                 except Exception as exc:
                     errors.append(f'{key}: {type(exc).__name__}: {exc}')
+            latency[key] = (time.perf_counter()-region_start)*1000 if roi is not None else None
         out = self.temporal.update(now, probs['left'], probs['right'], probs['mouth'], mar)
         out.update(mode='shadow', inference_ms=(time.perf_counter()-start)*1000, errors=errors,
+                   sample_timestamp=now,
+                   eye_latency_ms=(latency['left']+latency['right']) if latency['left'] is not None and latency['right'] is not None else None,
+                   mouth_latency_ms=latency['mouth'],
                    eye_backend=getattr(self.eye,'backend','pt_cpu'),
                    mouth_backend=getattr(self.mouth,'backend','pt_cpu'),
                    fallback_reasons=[v for v in [getattr(self.eye,'fallback_reason',None),getattr(self.mouth,'fallback_reason',None)] if v],

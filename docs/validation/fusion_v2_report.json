@@ -1,0 +1,55 @@
+{
+  "basic_acceptance_passed": true,
+  "policy_source_sha256": "8c21623c5193ea51bade61a7ddc8b421398291bd7cab8602d557f355b1f9e6e5",
+  "policy": {
+    "eye_closed_probability": 0.7,
+    "yawn_probability": 0.8,
+    "max_age": 0.5,
+    "eye_seconds": 1.0,
+    "mouth_seconds": 1.5,
+    "severe_seconds": 3.0,
+    "head_degrees": 10.0,
+    "enter_seconds": 0.5,
+    "exit_seconds": 1.5,
+    "perclos_mild": 0.187,
+    "perclos_moderate": 0.426,
+    "pose_probability": 0.6
+  },
+  "source": "YawDD first public participant; recorded real Pose/FaceMesh/YOLO/LR decision features",
+  "inference_log": "D:\\sdk_env_v1.12.1\\dms_project\\runs\\fusion_v2_yawdd.jsonl",
+  "decisions": 663,
+  "duration_seconds": 88.265784,
+  "levels_legacy": {
+    "0": 69,
+    "3": 442,
+    "1": 152
+  },
+  "levels_v2": {
+    "0": 327,
+    "2": 232,
+    "3": 65,
+    "1": 39
+  },
+  "level_disagreements": 511,
+  "legacy_transitions": 11,
+  "v2_transitions": 22,
+  "lr_valid_decisions": 260,
+  "conflict_decisions": 319,
+  "false_positive_rate": null,
+  "false_negative_rate": null,
+  "detection_delay": null,
+  "metrics_unavailable_reason": "No reliable frame/event labels; disagreement is not error or improvement.",
+  "tests": [
+    {
+      "script": "test_yolo_shadow.py",
+      "exit_code": 0
+    },
+    {
+      "script": "test_fusion_v2.py",
+      "exit_code": 0
+    }
+  ],
+  "scope": "Basic implementation checks only, not calibrated superiority or production acceptance",
+  "fusion_rules_ms_median": 0.04070000068168156,
+  "fusion_rules_ms_p95": 0.05807999878015834
+}

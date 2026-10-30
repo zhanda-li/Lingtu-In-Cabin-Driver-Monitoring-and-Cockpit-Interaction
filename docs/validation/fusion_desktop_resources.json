@@ -1,0 +1,37 @@
+{
+  "workload": "Public YawDD first participant replay, fast mode, no overlay",
+  "scope": "Full CamSource: decode, Pose Transformer, FaceMesh, fusion, JPEG. HTTP server/browser excluded.",
+  "note": "Sequential bounded wall-time profiles process different amounts of source video. Not a speedup benchmark or decision-equivalence comparison; CPU cores can exceed 1.",
+  "results": [
+    {
+      "mode": "off",
+      "wall_seconds": 27.25,
+      "peak_rss_mb": 461.9609375,
+      "mean_warm_cpu_core_equivalents": 1.0782610640582373,
+      "warmup_excluded_seconds": 10,
+      "decision_rows": 100,
+      "last_video_timestamp": 16.167,
+      "levels_observed": [
+        "0",
+        "3"
+      ],
+      "face_lr_probability_rows": 0,
+      "exit_code": 0
+    },
+    {
+      "mode": "onnx_async",
+      "wall_seconds": 28.84400000000096,
+      "peak_rss_mb": 502.5,
+      "mean_warm_cpu_core_equivalents": 1.548116727490572,
+      "warmup_excluded_seconds": 10,
+      "decision_rows": 107,
+      "last_video_timestamp": 17.1,
+      "levels_observed": [
+        "0",
+        "3"
+      ],
+      "face_lr_probability_rows": 0,
+      "exit_code": 0
+    }
+  ]
+}

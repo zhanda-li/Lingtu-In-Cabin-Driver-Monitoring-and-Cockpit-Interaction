@@ -114,10 +114,17 @@ N_LAYER = 3
 DROPOUT = 0.1
 LABEL_SMOOTH = 0.05
 
-# Optional auxiliary inference; never consumed by L0-L3 fusion.
+# Optional YOLO inference: ignored by Legacy, grouped evidence in explicitly selected V2.
 import os
 YOLO_SHADOW_ENABLED = os.environ.get('DMS_YOLO_SHADOW', '0') == '1'
 YOLO_SHADOW_ASYNC = os.environ.get('DMS_YOLO_ASYNC', '1') == '1'
 YOLO_EYE_PATH = MODELS_DIR / 'yolo_shadow' / 'best.pt'
 YOLO_MOUTH_PATH = MODELS_DIR / 'yolo_shadow' / 'best_yawn.pt'
 YOLO_SHADOW_LOG = os.environ.get('DMS_YOLO_LOG', '')
+
+# Stage 3: explicit opt-in; existing entry points default to Legacy.
+FUSION_MODE = os.environ.get('FUSION_MODE', 'legacy')
+FUSION_V2_ENABLED = os.environ.get('DMS_FUSION_COMPARE', '0') == '1' or FUSION_MODE == 'v2'
+FUSION_V2_ALLOWED = os.environ.get('DMS_FUSION_V2_ALLOWED', '0') == '1'
+FUSION_V2_POLICY = {}  # Optional named FusionPolicy overrides; defaults documented in docs/FUSION_V2.md.
+FUSION_LOG = os.environ.get('DMS_FUSION_LOG', str(RUNS / f'fusion_v2_{os.getpid()}.jsonl'))

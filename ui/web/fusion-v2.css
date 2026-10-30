@@ -1,0 +1,14 @@
+/* Local extension only. Original selectors and theme variables are untouched. */
+.fusion-extension { min-width:0;max-width:100%; }
+.fusion-extension .fusion-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.fusion-extension .mt .v { overflow-wrap:anywhere; }
+.fusion-extension .fusion-evidence { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.5rem;margin-top:.7rem; }
+.fusion-extension .fusion-evidence-row { display:flex;flex-direction:column;gap:.4rem;padding:.7rem;border:1px solid var(--line);border-radius:var(--r-sm); }
+.fusion-extension summary { min-height:44px;cursor:pointer;display:flex;align-items:center; }
+.fusion-extension .fusion-control { display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;margin-top:.7rem; }
+.fusion-extension .fusion-control[hidden] { display:none; }
+.fusion-extension select { min-height:44px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-sm);padding:.4rem .6rem;font:inherit; }
+.fusion-extension[data-valid="false"] .fusion-grid { opacity:.65; }
+.fusion-extension .fusion-runtime { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;overflow-wrap:anywhere; }
+@media(max-width:1100px){.fusion-extension .fusion-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.fusion-extension .fusion-evidence{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:700px){.fusion-extension .fusion-grid,.fusion-extension .fusion-runtime{grid-template-columns:minmax(0,1fr);}}
