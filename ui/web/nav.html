@@ -133,7 +133,9 @@
 .dst-list button{ display:block; width:100%; text-align:left; font:inherit;
   font-size:.78rem; padding:.42rem .55rem; border-radius:.55rem; cursor:pointer;
   color:var(--ink); background:transparent; border:0; }
-.dst-list button:hover{ background:rgba(var(--rgb),.12); }
+.dst-list button:hover,.dst-list button[aria-selected="true"]{ background:rgba(var(--rgb),.12); }
+.dst-list button:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+.nav-btn:disabled{ opacity:.65; cursor:wait; }
 .dst-list .dn{ font-weight:600; }
 .dst-list .da{ display:block; font-size:.68rem; color:var(--muted); margin-top:.1rem; }
 /* 下拉框里那种**不是候选**的行：「正在问高德…」「高德一条都没搜到」。
@@ -475,7 +477,7 @@
           <span data-ic="watch"></span>重新定位
         </button>
         <button class="nav-btn primary" id="dstGo">
-          <span data-ic="search"></span>搜索路线
+          <span data-ic="search"></span><span id="routeSearchLabel">搜索路线</span>
         </button>
         <span class="spacer"></span>
         <span class="pill" id="connPill">连接中…</span>
@@ -656,6 +658,7 @@
      持麦的那张页面，见 server.py 的 `voice_do`）。不挂它，站在这一页喊小瑞
      只能得到"这会儿没有页面能帮我定位"。 -->
 <script src="/static/wake.js"></script>
+<script src="/static/nav-flow.js"></script>
 <script>
 /* =========================================================================
    导航页的页面逻辑
@@ -690,9 +693,9 @@ const PRESETS = [
    ⚠️ 这三个颜色在 CSS 里**一次都不出现**（面板上那个小圆点的点色由 JS 内联
       给），所以改这里就够，不会两边漂移。 */
 const RSTYLE = [
-  { c: '#1f4fa8', w: 7, nm: '推荐路线' },
-  { c: '#7fb2ea', w: 5, nm: '备选路线一' },
-  { c: '#9aa3ad', w: 4, nm: '备选路线二' },
+  { c: '#1f4fa8', w: 7, nm: '方案 1' },
+  { c: '#7fb2ea', w: 5, nm: '方案 2' },
+  { c: '#9aa3ad', w: 4, nm: '方案 3' },
 ];
 
 let link = null;
@@ -805,6 +808,83 @@ function mapNote(txt) {
   else { w.classList.remove('empty'); }
 }
 function hint(txt) { const h = $('navHint'); if (h) h.textContent = txt; }
+const ROUTE_QUERY = new NavFlow.LatestRequest();
+let routeBinding = '';
+let originRevision = 0;
+function inputsReady() {
+  return !!NavFlow.binding(origin, dest)
+    && $('orgIn').value.trim() === origin.label
+    && $('dstIn').value.trim() === dest.name;
+}
+function routeReady() {
+  return !ROUTE_QUERY.busy && inputsReady() && !!curRoute
+    && routeBinding === NavFlow.binding(origin, dest);
+}
+function paintFlow() {
+  $('dstGo').disabled = ROUTE_QUERY.busy;
+  $('dstGo').setAttribute('aria-busy', String(ROUTE_QUERY.busy));
+  $('routeSearchLabel').textContent = ROUTE_QUERY.busy ? '路线计算中…' : '搜索路线';
+  hint(ROUTE_QUERY.busy ? '正在规划路线' : navOn ? '逐段路线引导'
+    : routeReady() ? routes.length + ' 个方案 · 已选方案 ' + (routes.indexOf(curRoute) + 1)
+    : inputsReady() ? '起终点已选' : dest ? '目的地已选' : '选择目的地');
+  paintStart();
+}
+function invalidateRoutes() {
+  ROUTE_QUERY.invalidate();
+  routeBinding = '';
+  if (navOn) setNav(false);
+  clearAll();
+  paintFlow();
+}
+function paintSelection() {
+  if (!map || routes.length || ROUTE_QUERY.busy) return;
+  clearOverlays();
+  const markers = [];
+  if (NavFlow.validPoint(origin)) {
+    ovOrigin = new AMap.CircleMarker({ center: [origin.lng, origin.lat], radius: 8,
+      fillColor: '#22a06b', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3,
+      label: { content: '起点', direction: 'top' } });
+    markers.push(ovOrigin);
+  }
+  if (NavFlow.validPoint(dest)) {
+    ovDest = new AMap.CircleMarker({ center: [dest.lng, dest.lat], radius: 9,
+      fillColor: '#e5484d', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3,
+      label: { content: XQ.esc(dest.name || '目的地'), direction: 'top' } });
+    markers.push(ovDest);
+  }
+  if (!markers.length) return;
+  map.add(markers);
+  map.setFitView(markers, false, [60, 60, 40, $('navPanel').offsetWidth + 24], 15);
+}
+async function requestRoutes(kind, fetcher) {
+  const request = ROUTE_QUERY.begin();
+  routeBinding = '';
+  if (navOn) setNav(false);
+  clearAll();
+  paintFlow();
+  $('nbNote').textContent = '路线计算中…';
+  try {
+    const result = await fetcher(request.controller.signal);
+    if (!ROUTE_QUERY.current(request)) return null;
+    ROUTE_QUERY.finish(request);
+    showResult(result, kind);
+    if (result && result.ok && curRoute) routeBinding = NavFlow.binding(origin, dest);
+    paintFlow();
+    return result;
+  } catch (error) {
+    if (ROUTE_QUERY.current(request)) {
+      ROUTE_QUERY.finish(request);
+      showResult({ ok: false, why: '路线查询未完成，请重试' }, kind);
+      paintFlow();
+    }
+    return null;
+  } finally {
+    if (ROUTE_QUERY.current(request)) {
+      ROUTE_QUERY.finish(request);
+      paintFlow();
+    }
+  }
+}
 
 /* -------------------------------------------------------------- 定位/起点 */
 function paintOrigin() {
@@ -821,14 +901,15 @@ function paintOrigin() {
 
 /** 定一个起点。**四条路都走这里**：手输 / 预设点位 / 地图上点 / 电脑定位。 */
 async function useOrigin(lat, lng, label, manual) {
+  ++originRevision;
+  invalidateRoutes();
   origin = { lat: +lat, lng: +lng, label: label || '—', manual: !!manual };
-  if (window.XQ && XQ.geo) {
-    XQ.geo.remember({ lat: origin.lat, lng: origin.lng, manual: origin.manual });
-  }
-  saveOrg();
-  paintOrigin();
+  if (window.XQ && XQ.geo) XQ.geo.remember({ lat: origin.lat, lng: origin.lng, manual: origin.manual });
+  saveOrg(); paintOrigin();
   $('orgIn').value = origin.label;
-  await restOrRoute();
+  paintFlow();
+  paintSelection();
+  if (WANT === 'nearby') await restOrRoute();
 }
 
 /**
@@ -841,16 +922,18 @@ async function useOrigin(lat, lng, label, manual) {
 async function restOrRoute() {
   if (!origin) return null;
   if (dest) return await routeTo();
-  const o = await fetchNearby(origin.lat, origin.lng);
-  showResult(o, 'rest');
-  return o;
+  if (WANT !== 'nearby') { paintFlow(); return null; }
+  const start = { ...origin };
+  return await requestRoutes('rest', signal => fetchNearby(start.lat, start.lng, signal));
 }
 
 /** 电脑自己那个位置：**先问浏览器，再问高德（IP 定位），最后才请人自己给**。 */
 async function tryGeo() {
+  const revision = ++originRevision;
   $('orgText').textContent = '正在定位…';
   $('orgState').className = 'org-state';
   const p = (window.XQ && XQ.geo) ? await XQ.geo.ask() : null;
+  if (revision !== originRevision) return;
   if (p && p.lat != null) {
     /* ⚠️ `XQ.geo.ask()` 会**先给它 5 分钟内的缓存**（`fresh()`），那个缓存里
        可能是**人在别的页面上自己设的起点**（`remember({... manual:true})`）。
@@ -861,6 +944,7 @@ async function tryGeo() {
   }
   // ① 浏览器定位拿不到（这台机器上就是这条）→ 试高德的城市级 IP 定位。
   const ip = await fetchJSON('/amap/ip');
+  if (revision !== originRevision) return;
   if (ip && ip.ok) {
     await useOrigin(ip.lat, ip.lng,
                     '电脑位置（IP 定位 · ' + (ip.city || ip.province) + '）', false);
@@ -902,27 +986,42 @@ function restoreOrg() {
   try { v = JSON.parse(localStorage.getItem(ORG_KEY) || 'null'); } catch (e) {
     return false;
   }
-  if (!v || v.lat == null || v.lng == null) return false;
+  if (!v || !NavFlow.validPoint({ lat: +v.lat, lng: +v.lng })) return false;
+  ++originRevision;
   origin = { lat: +v.lat, lng: +v.lng, label: v.label || '上次用的起点',
              manual: true };
   paintOrigin();
   $('orgIn').value = origin.label;
-  hint('定位没打开，起点用上次那个。');
-  restOrRoute();                    // 起点有了，照常出结果
+  paintFlow();
+  paintSelection();
+  if (WANT === 'nearby') restOrRoute();
   return true;
 }
 
 /* ------------------------------------------------------------- 问服务端 */
-async function fetchJSON(url) {
+async function fetchJSON(url, signal) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const abort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) abort();
+    else signal.addEventListener('abort', abort, { once: true });
+  }
+  const timer = setTimeout(() => { timedOut = true; abort(); }, 12000);
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, { signal: controller.signal });
+    if (!r.ok) return { ok: false, why: '服务暂不可用（HTTP ' + r.status + '）' };
     return await r.json();
   } catch (e) {
-    return { ok: false, why: '这一页连不上服务端（' + (e && e.name) + '）' };
+    return { ok: false, aborted: !!(signal && signal.aborted),
+      why: timedOut ? '查询超时，请重试' : '查询未完成，请检查连接后重试' };
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', abort);
   }
 }
-const fetchNearby = (lat, lng) => fetchJSON(
-  '/amap/nearby?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng));
+const fetchNearby = (lat, lng, signal) => fetchJSON(
+  '/amap/nearby?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng), signal);
 /* ★ `full=true` = **上屏那一下**（回车 / 「搜索路线」）：服务端会再并上
    `place/text` 的结果（整地名「无锡市」、看得懂的分类只有它有）。
    打字那条路**不许**带它 —— 一个字两个请求 = QPS 翻倍，见 `TYPING` 那段。
@@ -936,11 +1035,11 @@ const fetchSearch = (kw, full) => fetchJSON(
   '/amap/search?kw=' + encodeURIComponent(kw) + (full ? '&mode=full' : '')
   + (origin ? ('&lat=' + encodeURIComponent(origin.lat)
                + '&lng=' + encodeURIComponent(origin.lng)) : ''));
-const fetchRoute = (org, d) => fetchJSON(
+const fetchRoute = (org, d, signal) => fetchJSON(
   '/amap/route?olat=' + org.lat + '&olng=' + org.lng +
   '&dlat=' + d.lat + '&dlng=' + d.lng +
   '&name=' + encodeURIComponent(d.name || '') +
-  '&addr=' + encodeURIComponent(d.address || ''));
+  '&addr=' + encodeURIComponent(d.address || ''), signal);
 
 /* ---------------------------------------------- 搜（起点 / 终点都走这儿）
    ★★ 2026-09-25 用户拍板改了两件事，这一块现在是那个新口径：
@@ -1005,7 +1104,7 @@ const fetchRoute = (org, d) => fetchJSON(
      `place/text`（「无锡」→「无锡市」这种**整地名**、还有看得懂的分类，只有它
      有）。打字那条路只打一个接口，理由同上。 */
 const TYPING = { timer: 0, seq: 0, busy: false, pending: '', stopUntil: 0,
-                 cache: {}, ime: false };
+                 cache: {}, ime: false, which: '', list: [], index: -1 };
 
 /** 问一次高德。`full` 只由**上屏那一下**传 true（见上面）。 */
 async function lookup(kw, full) {
@@ -1026,7 +1125,7 @@ async function lookup(kw, full) {
     return r;                                   // ⚠️ 这种失败**不进缓存**
   }
   if (Object.keys(TYPING.cache).length > 60) TYPING.cache = {};
-  TYPING.cache[key] = r;
+  if (r && r.ok) TYPING.cache[key] = r;
   return r;
 }
 
@@ -1043,7 +1142,17 @@ async function lookup(kw, full) {
       `CUQPS_HAS_EXCEEDED_THE_LIMIT`）—— 打字这条路最容易撞的就是它。 */
 const SLOW_CODE = /码 (10003|10004|10019|10020|10021|10044)/;
 
-function hideList() { const b = $('dstList'); if (b) b.hidden = true; }
+function hideList() {
+  ++TYPING.seq;
+  clearTimeout(TYPING.timer);
+  TYPING.pending = '';
+  TYPING.list = []; TYPING.index = -1; TYPING.which = '';
+  const box = $('dstList'); if (box) box.hidden = true;
+  ['orgIn', 'dstIn'].forEach(id => {
+    $(id).setAttribute('aria-expanded', 'false');
+    $(id).removeAttribute('aria-activedescendant');
+  });
+}
 
 /** 只管一件事：**把下拉框打开，并且里面一定有一行字**。
    ★ 2026-09-25 用户当场说的：「比如我输了一个字 它相关的地点要自动弹出让我选择啊」
@@ -1056,6 +1165,7 @@ function listNote(txt) {
   const box = $('dstList');
   if (!box) return;
   box.innerHTML = '';
+  TYPING.list = []; TYPING.index = -1;
   const d = document.createElement('span');
   d.className = 'dtip';
   d.textContent = txt;
@@ -1067,12 +1177,15 @@ function listNote(txt) {
 function onType(which) {
   const inp = $(which === 'org' ? 'orgIn' : 'dstIn');
   const kw = (inp.value || '').trim();
+  ++TYPING.seq;
+  TYPING.which = which;
   clearTimeout(TYPING.timer);
+  if (curRoute || ROUTE_QUERY.busy) { if (!inputsReady()) invalidateRoutes(); }
   if (!kw) { hideList(); return; }
   if (Date.now() < TYPING.stopUntil) {
     const w = Math.ceil((TYPING.stopUntil - Date.now()) / 1000);
-    listNote('高德说问得太快了 —— ' + w + ' 秒后自动接着搜。');
-    hint('高德限流了，' + w + ' 秒后再自动搜。');
+    listNote('查询频率受限，' + w + ' 秒后可重试');
+    hint('高德限流，' + w + ' 秒后可重试');
     return;
   }
   // ★ 敲下第一个字就冒这一行：450 ms 的防抖里屏幕也不是死的（用户点名的那件事）。
@@ -1113,7 +1226,7 @@ async function runType(which) {
   if (nxt) runType(nxt);
   // ⚠️ 两道"过时"判断：这期间又敲了字（`seq` 变了）、或者框里的词已经不是
   //    刚才那个了 —— 迟到的答案不能盖住新的（同 `_voice_watchdog` 那个思路）。
-  if (seq !== TYPING.seq) return;
+  if (seq !== TYPING.seq || TYPING.which !== which) return;
   if ((inp.value || '').trim() !== kw) return;
   if (!r || !r.ok) {
     // ⚠️ 名字**别叫 `why`** —— 上面刚加了一个全局的 `why()`（写面板那一行），
@@ -1153,9 +1266,16 @@ function renderList(list, which) {
     listNote('高德一条都没搜到 —— 换个说法试试。');
     return;
   }
-  list.forEach((it) => {
+  TYPING.which = which; TYPING.list = list; TYPING.index = -1;
+  box.setAttribute('role', 'listbox');
+  box.setAttribute('aria-label', which === 'org' ? '起点候选' : '目的地候选');
+  $(which === 'org' ? 'orgIn' : 'dstIn').setAttribute('aria-expanded', 'true');
+  list.forEach((it, index) => {
     const b = document.createElement('button');
     b.type = 'button';
+    b.id = 'navPlaceOption' + index;
+    b.setAttribute('role', 'option');
+    b.setAttribute('aria-selected', 'false');
     const n = document.createElement('span');
     n.className = 'dn';
     n.textContent = it.name || '（高德没给名字）';
@@ -1188,7 +1308,10 @@ async function resolveBox(which) {
   }
   // ★ **上屏那一下**：`full=true` —— 服务端再并上 `place/text`，整地名
   //   （「无锡」→「无锡市」）和看得懂的分类只有那边有。打字那条路不带它。
+  const seq = ++TYPING.seq;
+  TYPING.which = which;
   const r = await lookup(kw, true);
+  if (seq !== TYPING.seq || inp.value.trim() !== kw || TYPING.which !== which) return false;
   if (!r || !r.ok) {
     hideList();
     why('没搜成：' + ((r && r.why) || '服务端没回话'));
@@ -1196,8 +1319,9 @@ async function resolveBox(which) {
   }
   // ★ **一字不差**才自动用：高德回来的第一条名字和敲的完全一样时没有歧义，
   //   不是"替你猜一个"。差一个字都不行 —— 那种就摆候选让人点。
-  if (r.list.length && (r.list[0].name || '') === kw) {
-    await takePlace(r.list[0], which);
+  const exact = (r.list || []).filter(it => it.name === kw);
+  if (exact.length === 1) {
+    await takePlace(exact[0], which);
     return true;
   }
   hint('');
@@ -1263,10 +1387,14 @@ async function searchRoute() {
  *     否则只把框里的字对调，然后请人再按一次「搜索路线」—— **绝不拿文字去猜
  *     坐标**（"无锡站"这三个字既不是起点的坐标也不是终点的坐标）。 */
 async function swapEnds() {
+  ++originRevision;
   const o = origin, d = dest;
   const ot = ($('orgIn').value || '').trim();
   const dt = ($('dstIn').value || '').trim();
-  if (!o || !d) {
+  if (!inputsReady()) {
+    invalidateRoutes();
+    origin = null; dest = null; userDest = null;
+    paintOrigin();
     $('orgIn').value = dt;
     $('dstIn').value = ot;
     // 🔴 2026-09-26：削掉「按「搜索路线」重新定一次」那半句（那也是教人用页面）。
@@ -1275,6 +1403,7 @@ async function swapEnds() {
     hint('两边对调了（有一边还没定）');
     return;
   }
+  invalidateRoutes();
   origin = { lat: d.lat, lng: d.lng, label: d.name || '（高德没给名字）',
              manual: true };
   // ⚠️ 这里**不调 `useOrigin()`**：那个函数会顺手 `XQ.geo.remember()`，而
@@ -1291,29 +1420,23 @@ async function swapEnds() {
 
 /** 把某个地方定成终点并算路线。`kind` 决定面板右上角写它从哪儿来。 */
 async function goTo(d, kind) {
-  dest = { name: d.name, address: d.address || '', lat: d.lat, lng: d.lng };
+  invalidateRoutes();
+  dest = { name: d.name, address: d.address || '', lat: +d.lat, lng: +d.lng };
   destKind = kind || 'user';
+  $('dstIn').value = dest.name;
   hideFat();
-  // 换了个目的地 = 上一趟导航作废（不然面板还写着"导航中"，人以为还在导老路）
-  if (navOn) setNav(false);
-  if (!origin) {
-    // 只有终点、没有起点 —— 高德算不了路线。**如实说**，一个数都不编。
-    clearAll();
-    put($('nbName'), dest.name || null);
-    $('nbNote').textContent = '还没有起点';
-    why('终点定好了：' + (dest.name || '') + '。还差一个起点。');
-    paintStart();
-    return;
-  }
-  await routeTo();
+  put($('nbName'), dest.name || null);
+  $('nbNote').textContent = '目的地已选';
+  why('');
+  paintFlow();
+  try { paintSelection(); } catch (e) {}
 }
 
 async function routeTo() {
-  if (!origin || !dest) return null;
-  why('正在算「' + origin.label + ' → ' + (dest.name || '') + '」…');
-  const o = await fetchRoute(origin, dest);
-  showResult(o, destKind);
-  return o;
+  if (!inputsReady()) { hint('请选择完整的起点和目的地'); return null; }
+  const start = { ...origin }, target = { ...dest }, kind = destKind;
+  why('');
+  return await requestRoutes(kind, signal => fetchRoute(start, target, signal));
 }
 
 /** 把"该收的都收掉"：数字变「—」、路线清空、图上清画。 */
@@ -1356,18 +1479,19 @@ function showResult(o, kind) {
     dest = (o.poi_lat && o.poi_lng)
       ? { name: o.name, address: o.address, lat: o.poi_lat, lng: o.poi_lng }
       : null;
+    if (dest) $('dstIn').value = dest.name;
   }
   $('nbNote').textContent = (kind === 'rest') ? '推荐休息点 · 高德' : '高德搜的';
   put($('nbName'), o.name || null);
-  // ★ 公里数**照抄服务端那个数**（`o.km`），不在这儿换算。
+  // Drive summary uses the same selected route's meters/seconds as its card.
   // ⚠️ 只有直线距离的时候必须把"直线"两个字摆出来 —— 说成"开车 12 公里"等于
   //    把一条没算出来的路说成算出来了。
   const hasKm = (o.km != null && !!o.km);
-  put($('nbKm'), hasKm ? String(o.km) : null);
+  put($('nbKm'), curRoute ? (curRoute.drive_m / 1000).toFixed(1) : hasKm ? String(o.km) : null);
   $('nbKmUnit').textContent = hasKm
     ? (o.by === 'drive' ? ' 公里（驾车）' : ' 公里（直线）') : '';
   // ⚠️ 预计到达只在**真有驾车路线**时给（直线距离配不出一条路的时间）。
-  put($('nbEta'), (o.by === 'drive' && o.min) ? fmtEta(o.min * 60) : null);
+  put($('nbEta'), curRoute ? fmtEta(curRoute.drive_s) : (o.by === 'drive' && o.min) ? fmtEta(o.min * 60) : null);
   if (o.by === 'drive' && o.min) {
     $('nbEta').title = '按现在的时间加上高德给的那条路线的用时算的';
   }
@@ -1414,14 +1538,17 @@ function showResult(o, kind) {
       数据源，写上去就是编的。 */
 
 function uniqMin(key) {
-  const vs = routes.map((r) => r[key]);
-  const m = Math.min.apply(null, vs);
-  return vs.filter((v) => v === m).length === 1 ? vs.indexOf(m) : -1;
+  const values = routes.map((route, index) => ({ value: route[key], index }))
+    .filter(item => Number.isFinite(item.value));
+  if (!values.length) return -1;
+  const minimum = Math.min(...values.map(item => item.value));
+  const winners = values.filter(item => item.value === minimum);
+  return winners.length === 1 ? winners[0].index : -1;
 }
 function routeTags() {
   const tags = routes.map(() => []);
   const add = (i, t) => { if (i >= 0 && tags[i] && tags[i].length < 2) tags[i].push(t); };
-  add(uniqMin('min'), '用时最短');
+  add(uniqMin('drive_s'), '用时最短');
   add(uniqMin('drive_m'), '里程最短');
   if (routes.some((r) => r.tolls > 0)) add(uniqMin('tolls'), '过路费最少');
   if (routes.some((r) => r.lights > 0)) add(uniqMin('lights'), '红绿灯最少');
@@ -1429,6 +1556,8 @@ function routeTags() {
 }
 function routeNote(r, tags) {
   const bits = (tags || []).slice();
+  const delta = NavFlow.comparison(r, routes);
+  if (delta && !(delta === '最快方案' && bits.includes('用时最短'))) bits.push(delta);
   if (r.lights != null) bits.push('红绿灯 ' + r.lights + ' 个');
   if (r.tolls != null) bits.push('过路费 ' + r.tolls + ' 元');
   return bits.length ? bits.join(' · ') : '高德没给更细的路况';
@@ -1447,6 +1576,7 @@ function paintRoutes() {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'rt-row' + (curRoute === r ? ' on' : '');
+    b.setAttribute('aria-pressed', String(curRoute === r));
     const sw = document.createElement('i');
     sw.className = 'sw';
     // ⚠️ 点色 = 图上那条线的颜色。**内联给**，别在 CSS 里再抄一份（会漂移）。
@@ -1457,7 +1587,7 @@ function paintRoutes() {
     l1.className = 'l1';
     const nm = document.createElement('i');
     nm.className = 'nm';
-    nm.textContent = st.nm;
+    nm.textContent = '方案 ' + (i + 1) + (curRoute === r ? ' · 已选' : '');
     const km = document.createElement('i');
     km.className = 'km';
     km.textContent = (r.drive_m / 1000).toFixed(1) + ' 公里 · ' + fmtDur(r.drive_s);
@@ -1480,6 +1610,9 @@ function pickRoute(i) {
   curRoute = routes[i] || routes[0];
   paintRoutes();
   paintRouteStyles();
+  if (map && ovLines[i] && !navOn) {
+    try { map.setFitView([ovLines[i]], false, [60, 60, 40, $('navPanel').offsetWidth + 24]); } catch (e) {}
+  }
   const r = curRoute;
   put($('nbName'), dest ? (dest.name || null) : null);
   put($('nbKm'), r ? (r.drive_m / 1000).toFixed(1) : null);
@@ -1491,6 +1624,7 @@ function pickRoute(i) {
   //   🔴 **但不许自己播**（用户 2026-09-26：「不用自动演示好吧 我没让你自动演示」）：
   //      换一条路 = 重新落到第 1 段 + 念第 1 段，跟刚进导航一模一样。
   if (navOn) { simEnter(); paintSteps(); }
+  paintFlow();
 }
 
 /* ═════════════════════════ 逐段引导（导航态）═════════════════════════════════
@@ -1669,12 +1803,11 @@ function pickStep(i) {
 function paintStart() {
   const b = $('navStart');
   if (!b) return;
-  // ⚠️ **不做成一颗死键**（用户 2026-09-25：「我点开始导航你要实际开始导航后
-  //    啊」）：没有路线的时候它照样点得动，点了会告诉你还差什么（见下面那颗
-  //    键的接线）。按下去一点反应都没有的灰键，人只会以为这一页坏了。
-  b.className = 'nav-start' + (curRoute ? '' : ' off');
-  b.disabled = false;
-  b.title = curRoute ? '进入导航（逐段引导）' : '还没有算出来的路线';
+  // Enable only for the current confirmed endpoints and the selected route.
+  const ready = routeReady();
+  b.className = 'nav-start' + (ready ? '' : ' off');
+  b.disabled = !ready;
+  b.title = ready ? '按所选路线进入逐段引导' : ROUTE_QUERY.busy ? '路线计算中' : '选择起终点并搜索路线';
   b.innerHTML = '';
   const s = document.createElement('span');
   s.innerHTML = XQ.icon(navOn ? 'pause' : 'play');
@@ -2213,11 +2346,12 @@ function paintRouteKm() {
 
 /** 「开始导航」那颗键。没有路线时**不是没反应**，而是说清楚差什么。 */
 function toggleNav() {
-  if (!curRoute) {
-    XQ.flash('还没有路线 —— 先按「搜索路线」');
+  if (!routeReady()) {
+    XQ.flash('当前起终点还没有可用路线');
     return;
   }
   setNav(!navOn);
+  paintFlow();
 }
 
 /* ══════════════════ 疲劳联动（这一页和 DMS 的那个"创新点"）══════════════════
@@ -2247,15 +2381,9 @@ function hideFat() { const b = $('fatBubble'); if (b) b.hidden = true; }
 /** 「查看服务区」：真的去查、真的画。查不到就照实说，**不编一个地方**。 */
 async function fatGo() {
   hideFat();
-  if (navOn) setNav(false);      // 改去服务区 = 上一趟导航作废（同上）
-
-  if (!origin) {
-    why('起点还没定。');
-    return;
-  }
-  why('正在找前面的服务区…');
-  const o = await fetchNearby(origin.lat, origin.lng);
-  showResult(o, 'rest');
+  if (!origin) { why('起点还没定。'); return; }
+  const start = { ...origin };
+  return await requestRoutes('rest', signal => fetchNearby(start.lat, start.lng, signal));
 }
 
 /** 「忽略」：收起气泡。人自己那条路线**原样不动**（本来就没被动过）。 */
@@ -2343,7 +2471,7 @@ function draw(o, org, rt) {
       center: [org.lng, org.lat], radius: 8,
       fillColor: '#22a06b', fillOpacity: 1,
       strokeColor: '#ffffff', strokeWeight: 3,
-      label: { content: org.manual ? '当前位置（手动）' : '当前位置',
+      label: { content: org.manual ? '起点' : '当前位置',
                direction: 'top' } });
     map.add(ovOrigin);
     if (o.poi_lat && o.poi_lng) {
@@ -2351,7 +2479,7 @@ function draw(o, org, rt) {
         center: [o.poi_lng, o.poi_lat], radius: 9,
         fillColor: '#e5484d', fillOpacity: 1,
         strokeColor: '#ffffff', strokeWeight: 3,
-        label: { content: o.name || '目的地', direction: 'top' } });
+        label: { content: XQ.esc(o.name || '目的地'), direction: 'top' } });
       map.add(ovDest);
     }
     const list = (rt && o.routes && o.routes.length) ? o.routes : [];
@@ -2380,7 +2508,7 @@ function draw(o, org, rt) {
     //    底下穿过去 —— 高德自己的 App 也是这样的（线继续画，卡片盖在上面）。
     //    不要去猜 `avoid` 那四个数的顺序（[上下左右] 还是 [上右下左]），猜错了
     //    图会往反方向偏，而且看起来"只是没居中"，很难查。
-    map.setFitView(null, false, [80, 80, 80, 80]);
+    map.setFitView(null, false, [60, 60, 40, $('navPanel').offsetWidth + 24]);
     paintRouteStyles();
   } catch (e) {
     return false;                       // 画不出来就老实说没画出来
@@ -2419,6 +2547,7 @@ async function initMap() {
     $('mapPick').hidden = false;
   });
   if (origin && lastDaily) draw(lastDaily, origin, curRoute);
+  else paintSelection();
 }
 
 /* ------------------------------------------------- 语音那条路（wake.js 调） */
@@ -2504,13 +2633,16 @@ XQ.nav = {
    *     于是"进导航"必须由**「要」那一下**自己带过来 —— 否则路线画出来了、
    *     面板上却不在引导，而小瑞说"就在这一页上，我这就给你查"，屏幕看着像没做完。 */
   async doNearby(p, nav) {
+    ++originRevision;
     const manual = (p.manual == null)
       ? !!(window.XQ && XQ.geo && XQ.geo.last && XQ.geo.last.manual) : !!p.manual;
     origin = { lat: +p.lat, lng: +p.lng,
                label: manual ? '起点（手动）' : '我的位置', manual: manual };
     paintOrigin();
-    const o = await fetchNearby(origin.lat, origin.lng);
-    showResult(o, 'rest');
+    $('orgIn').value = origin.label;
+    const start = { ...origin };
+    const o = await requestRoutes('rest', signal => fetchNearby(start.lat, start.lng, signal));
+    if (o && o.ok && dest) $('dstIn').value = dest.name;
     const drew = !!(o && o.ok && o.has_route && map);
     // ⚠️ 只在**真画成了**的时候进导航：没路线还进引导，屏上是一条空路配着
     //    "前方 520 米右转"，那是"话和事不一致"的另一种写法。
@@ -2563,9 +2695,18 @@ PRESETS.forEach((p) => {
 [['orgIn', 'org'], ['dstIn', 'dest']].forEach((p) => {
   const inp = $(p[0]);
   const which = p[1];
+  inp.setAttribute('role', 'combobox');
+  inp.setAttribute('aria-autocomplete', 'list');
+  inp.setAttribute('aria-controls', 'dstList');
+  inp.setAttribute('aria-expanded', 'false');
   // ⚠️ 拼音**上屏之前不问**（见 `TYPING` 那段最后一条）：`isComposing` 那一下
   //    只清掉待发的防抖，等 `compositionend` 再问一次。
   inp.oninput = (e) => {
+    if (which === 'org') {
+      ++originRevision;
+      if (origin && inp.value.trim() !== origin.label) { origin = null; paintOrigin(); }
+    } else if (dest && inp.value.trim() !== dest.name) { dest = null; userDest = null; }
+    if (!inputsReady()) invalidateRoutes();
     if (TYPING.ime || (e && e.isComposing)) { clearTimeout(TYPING.timer); return; }
     onType(which);
   };
@@ -2573,9 +2714,23 @@ PRESETS.forEach((p) => {
   inp.oncompositionend = () => { TYPING.ime = false; onType(which); };
   inp.onfocus = () => { if ((inp.value || '').trim()) onType(which); };
   inp.onkeydown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.isComposing || TYPING.ime) return;
+    const open = !$('dstList').hidden && TYPING.which === which && TYPING.list.length;
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && open) {
+      e.preventDefault();
+      const direction = e.key === 'ArrowDown' ? 1 : -1;
+      TYPING.index = (TYPING.index + direction + TYPING.list.length) % TYPING.list.length;
+      const options = $('dstList').querySelectorAll('button');
+      options.forEach((b, index) => b.setAttribute('aria-selected', String(index === TYPING.index)));
+      const active = options[TYPING.index];
+      inp.setAttribute('aria-activedescendant', active.id);
+      active.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
       clearTimeout(TYPING.timer);
-      resolveBox(which);
+      if (open && TYPING.index >= 0) takePlace(TYPING.list[TYPING.index], which);
+      else if (inputsReady()) searchRoute();
+      else resolveBox(which);
     } else if (e.key === 'Escape') {
       hideList();
     }

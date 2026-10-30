@@ -472,11 +472,12 @@ class AMap:
         out, seen = [], set()
 
         def _add(name, addr, lat, lng, typ):
-            """同名只要一条（**先来的那条赢**，见下面的摆放顺序）。"""
+            """同名不同坐标保留；同地点的重复结果只留第一条。"""
             name = (name or "").strip()
-            if not name or name in seen:
+            identity = (name, round(lat, 6), round(lng, 6))
+            if not name or identity in seen:
                 return
-            seen.add(name)
+            seen.add(identity)
             out.append({"name": name, "address": (addr or "").strip(),
                         "lat": lat, "lng": lng, "type": (typ or "").strip()})
 

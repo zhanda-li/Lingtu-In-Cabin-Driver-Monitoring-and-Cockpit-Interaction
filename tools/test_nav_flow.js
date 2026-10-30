@@ -1,0 +1,22 @@
+const assert = require('assert/strict');
+const { LatestRequest, binding, comparison } = require('../ui/web/nav-flow.js');
+const gate = new LatestRequest();
+const first = gate.begin(), second = gate.begin();
+assert(first.controller.signal.aborted);
+assert(!gate.current(first));
+assert(gate.current(second));
+gate.finish(first);
+assert(gate.busy, 'an old response must not clear the current loading state');
+gate.invalidate();
+assert(second.controller.signal.aborted);
+assert(!gate.current(second));
+assert(!gate.busy);
+assert.equal(binding({lat:NaN,lng:10},{lat:1,lng:2}),'');
+assert.equal(binding({lat:31,lng:120},{lat:32,lng:121}),'31|120|32|121');
+assert.notEqual(binding({lat:31,lng:120},{lat:32,lng:121}),
+                binding({lat:31,lng:120},{lat:33,lng:121}));
+const routes=[{drive_s:600},{drive_s:780}];
+assert.equal(comparison(routes[1],routes),'比最快多 3 分钟');
+assert.equal(comparison(routes[0],routes),'最快方案');
+assert.equal(comparison({},routes),'');
+console.log('PASS stale responses, cancellation, loading ownership, route binding, real duration comparisons');
