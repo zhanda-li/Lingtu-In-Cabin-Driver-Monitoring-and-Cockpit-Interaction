@@ -12,6 +12,8 @@
 >
 > 两条线跑在同一台机器上、共用同一条推理链路，只是出口不同。
 
+> **YOLO 辅助识别（默认关闭）**：新增双眼睁闭与嘴部哈欠分类，采用 Shadow Mode，不参与原有疲劳等级判决。启用、电脑端验证和限制见 [§15](#15-yolo-眼部与嘴部辅助识别--shadow-mode)。
+
 ---
 
 ## 目录
@@ -30,6 +32,7 @@
 - [12. 性能实测](#12-性能实测)
 - [13. 工程笔记 · 踩过的坑](#13-工程笔记--踩过的坑)
 - [14. 已知限制与未决](#14-已知限制与未决)
+- [15. YOLO 眼部与嘴部辅助识别 · Shadow Mode](#15-yolo-眼部与嘴部辅助识别--shadow-mode)
 
 ---
 
@@ -158,6 +161,7 @@ src/fuse.py ──写──> runs/sessionN.csv ──读──> ui/sources.py �
 ```
 config.py                   全局参数，所有脚本共用
 requirements.txt
+requirements-yolo-shadow.txt / -runtime.txt / -validation.txt  可选 YOLO 推理与电脑验证依赖
 
 src/
   pose.py                   MediaPipe 封装（离线与实时**共用**，见 §13.6）
@@ -165,6 +169,8 @@ src/
   train.py                  训练 + 测试集评估 + 出图
   live.py                   实时推理主程序（支路一）
   face.py                   支路二：EAR/MAR/头姿 → 4 统计量 → 逻辑回归
+  face_roi_yolo.py           可选双眼/嘴部 ROI 分类、时序事件与有界异步 Shadow
+  yolo_runtime.py            ONNX CPU / Lite2 接口及 CPU fallback
   fuse.py                   两路同进程跑（= live.py + 支路二 + 融合闸门）
 
 tools/
@@ -1267,11 +1273,107 @@ if __name__ == "__main__":
 
 ---
 
+## 15. YOLO 眼部与嘴部辅助识别 · Shadow Mode
+
+2026-10-30 新增两份公开 **YOLOv8 分类模型**，分别识别左右眼的睁眼/闭眼与嘴部的哈欠/非哈欠。
+它们复用现有 `FaceExtractor` 输出的 FaceMesh 关键点裁剪 ROI，**不启动第二套 FaceMesh**。
+默认关闭；启用后只输出辅助状态与日志，**不参与 L0–L3 判决**。
+原有 Pose Transformer、45×132 输入、FaceMesh、EAR/MAR/PERCLOS、头姿、
+`FEATURE_NAMES = (perclos, brate, nod)`、`branch2_lr.npz` 和融合公式保持不变。
+低头/点头继续走原有 Pose、Pitch、Transformer、`head_swing` 与 `nod`，没有增加头部 YOLO。
+本次没有重新训练模型，也不要求录制或标注新数据。
+
+### 15.1 权重、环境与启动
+
+在已有电脑端 `dms` 环境中执行以下 PowerShell 命令。下面是推理与验证流程，**不需要运行 §5.2 的训练步骤**。
+
+```powershell
+cd D:\sdk_env_v1.12.1\dms_project
+$py = 'D:\Anaconda3\envs\dms\python.exe'
+& $py -m pip install -r requirements-yolo-validation.txt
+& $py tools/download_yolo_shadow.py     # 下载并核对已审查权重的 SHA256
+& $py tools/export_yolo_shadow.py       # 导出 ONNX，并核对与 PyTorch 的输出
+
+$env:DMS_YOLO_SHADOW = '1'
+$env:DMS_YOLO_BACKEND = 'onnx'          # pt / onnx；rknn 接口尚未通过实机验收
+$env:DMS_YOLO_ASYNC = '1'              # 单工作线程、最多一帧等待，替换过期任务
+$env:DMS_YOLO_LOG = 'runs/yolo_shadow.jsonl'  # 可选；不需要日志时移除此环境变量
+& $py ui/server.py --source cam        # 在原有界面点击「接入摄像头」
+# 或直接运行融合程序（同一摄像头只启动一个入口）：
+# & $py src/fuse.py --no-voice
+
+# 关闭：退出并重新启动原入口，默认也是关闭状态。
+$env:DMS_YOLO_SHADOW = '0'
+```
+
+首次下载地址与本地路径：
+
+| 用途 | 公开权重 | 本地路径 | 实测 task / 类别顺序 |
+|---|---|---|---|
+| 双眼分类，共用一份权重 | [best.pt](https://raw.githubusercontent.com/hongshenlv/Fatigue-Detection/master/Blink_detection/best.pt) | `models/yolo_shadow/best.pt` | `classify`；0=`closed`，1=`open` |
+| 嘴部分类 | [best_yawn.pt](https://raw.githubusercontent.com/hongshenlv/Fatigue-Detection/master/Blink_detection/best_yawn.pt) | `models/yolo_shadow/best_yawn.pt` | `classify`；0=`no_yawn`，1=`yawn` |
+
+两者输入均为 **224×224**，已实际加载、执行和导出；不能按检测框模型配置 NMS。
+导出的 `.onnx` 与 `.pt` 放在同一目录。Ultralytics 已测试版本为 `8.4.163`。
+首选仓库的代码和权重授权尚未确认；模型文件、视频没有上传到本仓库，也不代表可以商业分发。
+
+### 15.2 输出与失效处理
+
+`src/face_roi_yolo.py` 输出 `eye_left_open_prob`、`eye_right_open_prob`、左右眼状态/置信度、
+`eye_closed_duration`、`eye_event`、`yawn_probability`、`yawn_duration`、`yawn_event` 和推理耗时。
+左右以未镜像输入中的驾驶员自身方向定义。概率经过时间平滑，尚未进行概率校准。
+闭眼事件区分短暂眨眼与持续闭眼；嘴部候选需要分类概率、原有 MAR 和持续时间同时满足条件。
+这是待验证的辅助判据，不能据此宣称已经解决所有说话、大笑或唱歌误报。
+
+人脸丢失、ROI 无效或结果过期时输出 `invalid`/空概率，并清除旧事件证据。
+异步结果带 `sample_timestamp`，消费者应按采样时间去重；旧任务完成后不能覆盖新一代 invalid 状态。
+UI 的 WebSocket 状态新增可选 `yolo_shadow` 字段；关闭时不输出此字段，原有 42 个状态字段保持一致。
+
+### 15.3 电脑端测试与真实结果
+
+公开数据用于测试，不启动训练。MRL 与 YawDD 需先放到详细指南指定的本地目录：
+
+```powershell
+& $py tools/fetch_yawdd_samples.py       # 从官方归档有界提取一段公开视频
+& $py tools/validate_yolo_desktop.py      # 权重、17 项测试、模型加载、MRL、YawDD
+& $py tools/validate_yolo_desktop.py --full  # 再检查本机 HTTP/WS 与完整摄像头链路资源
+```
+
+`--full` 需要本机回环网络可用。接口测试使用独立配置，关闭外部服务、微信推送和串口硬件。
+MRL 数据目录为 `datasets/mrlEyes_2018_01/mrlEyes_2018_01/`，需包含原始图像和 `annotation.txt`。
+若数据缺失，测试明确报错，不会生成替代数据或编造结果。
+
+| 验证项 | 已记录的结果与范围 |
+|---|---|
+| 统一电脑端验收 | 8 个阶段通过；17 项测试，包含原版融合代码的 512 种 L0–L3/闸门/规则组合 |
+| 原链路视频对拍 | 正常片段 167 次、疲劳片段 127 次决策，19 列原有输出逐格一致；自然视频实际覆盖 L0、L3 |
+| MRL 有标签子集 | 按参与者选取 s0034–s0037，共 371 张，356 张正确，95.96%；上游训练数据是否重叠未知，不代表端到端泛化精度 |
+| YawDD 定性回放 | 一名参与者、91.37 s、457 个采样帧；最新判据输出 7 次眨眼、1 次哈欠候选；没有可靠逐帧标签，不报告准确率 |
+| ONNX 数值一致性 | 相同预处理张量上的最大概率差：眼部约 `2.98e-7`，嘴部约 `1.10e-6` |
+| 完整摄像头链路资源 | 桌面采样峰值 RSS：关闭约 469.54 MiB，开启约 511.39 MiB；不含 HTTP/浏览器，未证明整链路实时性能或 RK3568 性能 |
+
+完整证据、CPU 耗时、数据划分、脚本入口与部署步骤见 [YOLO Shadow 详细指南](docs/YOLO_SHADOW.md)，
+统一验收结果见 [电脑端验收记录](docs/yolo_desktop_acceptance.json)。
+
+### 15.4 未完成事项与回退
+
+- 自然视频中的完整 L1/L2、逻辑回归热身后投票回归仍未覆盖；组合回归不能替代这项验证。
+- 说话、大笑、唱歌缺少可靠逐帧标签，当前只能报告选定片段的定性观察，不能给出误报率。
+- NITYMED 官方访问需要申请，尚未取得夜间验证数据。
+- RK3568 实机工作按当前安排暂缓。已有 Toolkit2 转换脚本和 Lite2→ONNX CPU fallback 接口，
+  但尚无真实 `.rknn` 转换成功、NPU 输出一致性、INT8 精度或板端资源结果。
+- 改动在 `feat/yolo-face-shadow` 分支分批提交，未修改 main。需要撤销某次改动时使用
+  `git revert <提交号>` 保留历史；不要通过 `reset --hard`/`clean` 清理带有其他未提交工作的目录。
+
+---
+
 ## 附：常用入口速查
 
 | 想干什么 | 跑什么 |
 |---|---|
 | 端到端自检（无视频） | `tools/selftest.py` |
+| YOLO 电脑端完整验证 | `tools/validate_yolo_desktop.py --full`（需公开数据） |
+| YOLO 使用与验证说明 | [docs/YOLO_SHADOW.md](docs/YOLO_SHADOW.md) |
 | 摄像头实时推理 | `live.bat` |
 | 融合演示（两路 + 闸门） | `live_fuse.bat` |
 | 支路二实时观察（看 EAR/MAR/头姿） | `live_face.bat` |
