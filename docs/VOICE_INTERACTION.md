@@ -7,7 +7,7 @@
 | 问题 | 本次处理 |
 |---|---|
 | `asr.prefer=browser` 是按键输入的偏好，却被常听引擎解释为优先 Whisper；流式模型也未下载 | 常听优先现有 sherpa 流式实现，失败仍退回 Whisper；支持独立 `asr.wake_prefer` |
-| Whisper 整段完成才出字，叠加原先用户指定的 10 秒静音断句 | 本机安装现有代码支持的公开流式模型，真实中间文字由原 partial 协议输出；本次没有擅自缩短 10 秒断句 |
+| Whisper 整段完成才出字，叠加原先用户指定的 10 秒静音断句 | 本机安装现有代码支持的公开流式模型，真实中间文字由原 partial 协议输出；用户最新选择将两路断句配置同步为 3 秒 |
 | 音乐等页面没有 wake 模块，跳页后常听中断 | 沿用同一标签页的 `xq.wake.want=on` 接续采集；主动停止仍保留 off；首次访问首页等页面不会因此自动开麦 |
 | 模型未就绪就显示在听，开头可能被丢掉 | 等后端真实 ready 才进入 listening；断线明确显示重连，重连后重新注册 voice_start |
 | 取消权限等待后，迟到的授权仍开启麦克风 | 使用采集轮次标记，迟到授权释放音轨 |
@@ -35,7 +35,7 @@
 
 `ui/config.json` 的 `asr.wake_prefer` 可设 `stream` 或 `whisper`；不填写时 `prefer=browser` 的常听链路优先流式，`prefer=local` 保留优先 Whisper。按键输入自己的 browser/local 策略不变。
 
-10 秒断句是旧需求。若用户选择更快响应，可同时配置 `asr.rule1_min_trailing_silence`、`asr.rule2_min_trailing_silence`、`asr.whisper_silence_s`；不能只修改一种引擎。追问窗口 `follow_s` 与一句话的静音断句是不同参数。
+10 秒断句是旧需求。2026-10-30 用户明确选择停顿 3 秒，两份配置已同步设置 `asr.rule1_min_trailing_silence=3.0`、`asr.rule2_min_trailing_silence=3.0`、`asr.whisper_silence_s=3.0`。代码内未提供配置时的历史默认值仍为 10 秒。追问窗口 `follow_s` 与一句话的静音断句是不同参数，本次不修改。重启服务后生效；3 秒是静音等待，后续识别和动作执行仍需时间。
 
 ## 验证
 

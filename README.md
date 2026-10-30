@@ -1433,4 +1433,4 @@ $env:FUSION_MODE='legacy'
 
 已补齐常听流式识别、会话内跨页接续和多媒体页真实点歌入口，保留现有 UI 与 Fusion V2。重启 `ui/run_ui.bat` 并 Ctrl+F5 刷新。首次播放可能需要点一次原有播放按钮，麦克风须获得浏览器授权。
 
-本机已下载项目支持的公开中文流式模型；其他机器运行 `python ui/voice/fetch_models.py asr`。原先用户指定的 10 秒静音断句暂时保留，未擅自缩短。详见 [语音交互使用说明](docs/VOICE_INTERACTION.md)、[真实验证报告](docs/validation/voice_interaction_report.md) 和 [俏皮音色说明](docs/VOICE_PROFILE.md)。
+本机已下载项目支持的公开中文流式模型；其他机器运行 `python ui/voice/fetch_models.py asr`。按用户最新选择，流式与 Whisper 均配置为停顿 **3 秒**提交整句话；追问窗口保持不变。详见 [语音交互使用说明](docs/VOICE_INTERACTION.md)、[真实验证报告](docs/validation/voice_interaction_report.md) 和 [俏皮音色说明](docs/VOICE_PROFILE.md)。
