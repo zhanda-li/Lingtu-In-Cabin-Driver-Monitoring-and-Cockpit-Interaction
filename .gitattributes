@@ -1,0 +1,2 @@
+# Keep the Linux launcher runnable after Windows checkouts and file copies.
+ui/run_ui.sh text eol=lf

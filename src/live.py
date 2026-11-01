@@ -49,6 +49,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 import config as C
+from src.capture_backend import open_camera, camera_device
 from model import PoseTransformer
 from pose import PoseExtractor
 from record import draw_hud, draw_pose, GREEN, RED, YELLOW, WHITE
@@ -273,6 +274,17 @@ class TTSWorker:
     def _run(self):
         while True:
             text = self.q.get()
+            if sys.platform != 'win32':
+                from src.audio_playback import speak_text
+                ok, detail = speak_text(text, timeout=20,
+                                        device=os.environ.get('DMS_AUDIO_DEVICE'))
+                if ok:
+                    self.spoken += 1
+                    self.last_error = None
+                else:
+                    self.last_error = detail
+                    print(f'[TTS] {detail}', file=sys.stderr)
+                continue
             # 单引号在 PowerShell 里靠翻倍转义；念的稿子都是固定常量，
             # 但别养成不转义就往 shell 里拼字符串的习惯。
             safe = str(text).replace("'", "''")
@@ -282,7 +294,7 @@ class TTSWorker:
                   f"$s.Rate = {int(self.rate)}; $s.Speak('{safe}')")
             try:
                 subprocess.run(["powershell", "-NoProfile", "-Command", ps],
-                               timeout=20, capture_output=True)
+                               timeout=20, capture_output=True, check=True)
                 self.spoken += 1
             except Exception as e:                      # 出声失败不该拖垮主循环
                 self.last_error = f"{type(e).__name__}: {e}"
@@ -351,11 +363,8 @@ class LightOutput:
 class CameraSource:
     """摄像头。media_time() = 真实流逝的秒数。"""
 
-    def __init__(self, cam=0, size=(1280, 720)):
-        self.cap = cv2.VideoCapture(cam, cv2.CAP_DSHOW)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, size[0])
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, size[1])
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    def __init__(self, cam=0, size=(1280, 720), *, backend=None, fps=None):
+        self.cap = open_camera(cam, size, backend=backend, fps=fps)
         self.frames = 0
         self.t0 = None
         if not self.cap.isOpened():
@@ -446,7 +455,7 @@ def load_infer_model(path, device="cpu"):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=None, help="默认 runs/ 下最新的 best.pt")
-    ap.add_argument("--cam", type=int, default=0)
+    ap.add_argument("--cam", type=camera_device, default=0, help="camera index or Linux device path")
     ap.add_argument("--replay", default=None, help="回放视频而不是开摄像头")
     ap.add_argument("--fast", action="store_true", help="回放时不按真实时间配速")
     ap.add_argument("--no-display", action="store_true")

@@ -1,0 +1,16 @@
+# DRAFT Linux ARM64 runtime. Use constraints-arm64.txt and review pip's dry-run.
+# Does not install models, training/export tools, players, drivers or system libs.
+torch
+numpy
+mediapipe
+opencv-contrib-python
+onnxruntime
+Pillow
+matplotlib
+aiohttp
+pyserial
+scipy
+sounddevice
+sherpa-onnx
+edge-tts
+certifi

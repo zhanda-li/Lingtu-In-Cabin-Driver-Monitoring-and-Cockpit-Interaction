@@ -184,7 +184,7 @@ class CamSource:
     """
 
     def __init__(self, cfg: dict | None = None, replay: str | None = None,
-                 cam: int = 0, fast: bool = False, out_w: int = 720,
+                 cam: int | str = 0, fast: bool = False, out_w: int = 720,
                  log_probs: str | None = None, overlay: bool = True):
         cfg = cfg or {}
         cam_cfg = cfg.get("camera", {})
@@ -217,7 +217,9 @@ class CamSource:
         #   ⚠️ 顺序变了但**语义没变**：成了的路径上两者互不相干（帧源不读权重，
         #      权重不读帧源）；没成的那条路上省下的全是白干的活。
         self.src = (VideoSource(replay, fast=fast) if replay
-                    else CameraSource(cam, size=tuple(cam_cfg.get("size", (1280, 720)))))
+                    else CameraSource(cam_cfg.get("device", cam),
+                                      size=tuple(cam_cfg.get("size", (1280, 720))),
+                                      backend=cam_cfg.get("backend"), fps=cam_cfg.get("fps")))
         self.replay = replay
 
         # ⚠️ 上面把开设备挪到了最前面（理由见那段注释），于是**下面任何一步失败
@@ -542,7 +544,8 @@ class CamSource:
 # ---------------------------------------------------------------- 单独跑
 def main():
     ap = argparse.ArgumentParser(description="界面用的实时推理源")
-    ap.add_argument("--cam", type=int, default=0)
+    from src.capture_backend import camera_device
+    ap.add_argument("--cam", type=camera_device, default=0)
     ap.add_argument("--replay", default=None, help="跑视频而不是摄像头")
     ap.add_argument("--fast", action="store_true")
     ap.add_argument("--dump", default=None, help="逐次决策写 CSV（用于对拍 fuse.py）")

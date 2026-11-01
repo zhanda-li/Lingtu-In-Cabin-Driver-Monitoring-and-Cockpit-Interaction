@@ -376,7 +376,8 @@ def main():
     ap.add_argument("--model", default=None, help="支路一权重，默认 runs/ 下最新 best.pt")
     ap.add_argument("--model2", default=None,
                     help="支路二权重，默认 models/branch2_lr.npz")
-    ap.add_argument("--cam", type=int, default=0)
+    from src.capture_backend import camera_device
+    ap.add_argument("--cam", type=camera_device, default=0)
     ap.add_argument("--replay", default=None, help="回放视频而不是开摄像头")
     ap.add_argument("--fast", action="store_true", help="回放时不按真实时间配速")
     ap.add_argument("--no-display", action="store_true")

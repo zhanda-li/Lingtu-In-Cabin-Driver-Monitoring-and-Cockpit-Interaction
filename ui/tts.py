@@ -41,6 +41,8 @@ import queue
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 # 合成的 mp3 落在这儿。**必须是 D: 相对路径**（C: 盘满，见项目笔记）；
 # server 的 cwd 就是项目根，所以 runs/ 一定在。
 TMP_DIR = ROOT / "runs"
@@ -106,6 +108,10 @@ class ServerVoice:
         # 只有"总开关开着"且"服务端兜底开着"才起线程。都不开就彻底不占资源。
         self.enabled = bool(cfg.get("enabled", True)) and bool(cfg.get("server_fallback", True))
         self.voice = str(srv.get("voice") or DEFAULT_VOICE)
+        # Optional argv arrays; no Linux player or sound card is assumed.
+        self.audio_player = srv.get('audio_player')
+        self.tts_command = srv.get('tts_command')
+        self.audio_device = os.environ.get('DMS_AUDIO_DEVICE', srv.get('audio_device'))
         # ★ 在线引擎。`engine` 决定"用哪个音色字段"，两个字段不是一套命名。
         _e = str(srv.get("engine") or "edge").strip().lower()
         self.engine = _e if _e in ("edge", "sapi") else "edge"
@@ -289,15 +295,21 @@ class ServerVoice:
         `Position` 直到追上 `NaturalDuration`，否则这个方法会立刻返回、下一句
         直接把这一句掐掉。`NaturalDuration.HasTimeSpan` 在打开完成前是 False，
         所以那一项必须一起判。
-        ⚠️ 路径直接拼进单引号字符串里：这里**不做转义**，因为路径是我们自己
-        拼的（`TMP_DIR` + pid），不含单引号。谁要是把它改成用户可控的路径，
-        这里就是一个注入口子。
+        Windows路径在PowerShell单引号字符串中转义；Linux使用配置的argv数组，
+        不经过shell。播放器是否可用及声卡错误均由适配层报告。
         """
+        if sys.platform != 'win32':
+            from src.audio_playback import play_file
+            ok, detail = play_file(path, self.audio_player, timeout=self.timeout_s,
+                                   device=self.audio_device, on_process=self._audio_process,
+                                   stop_event=self._stop)
+            self.last_detail = detail
+            return ok, '' if ok else detail
         ps = (
             "[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
             "Add-Type -AssemblyName PresentationCore; $e='XQOK'; "
             "$p = New-Object System.Windows.Media.MediaPlayer; "
-            "try { $p.Open([Uri]'" + path + "'); $p.Play() } "
+            "try { $p.Open([Uri]'" + path.replace("'", "''") + "'); $p.Play() } "
             "catch { $e='XQERR open: ' + $_.Exception.Message }; "
             "$t0=Get-Date; "
             "while (((Get-Date)-$t0).TotalSeconds -lt " + str(self.timeout_s) + ") { "
@@ -369,8 +381,25 @@ class ServerVoice:
                 pass
 
     # ------------------------------------------------------------ 主循环
+    def _audio_process(self, proc):
+        with self._lock:
+            self._proc = proc
+            if proc is not None and self._stop.is_set() and proc.poll() is None:
+                proc.kill()
+
     def _sapi_once(self, text: str, emotion: str) -> None:
         """SAPI 念一句（在线那一路的翻版，也是它的兜底）。"""
+        if sys.platform != 'win32':
+            from src.audio_playback import speak_text
+            ok, detail = speak_text(text, self.tts_command, timeout=self.timeout_s,
+                                    device=self.audio_device, on_process=self._audio_process,
+                                    stop_event=self._stop)
+            self.last_detail = detail
+            self.last_error = None if ok else detail
+            if ok:
+                self.spoken += 1
+                self.last_text = text
+            return
         ps = self._ps(text, emotion)
         try:
             p = subprocess.Popen(
@@ -441,7 +470,8 @@ class ServerVoice:
             # 所以补一句 —— 两个字段各管一半：edge_error 说原因，last_error
             # 说这一句最后是怎么念的。
             if self.last_error is None:
-                self.last_error = f"在线音色没接上，这一句用的 Windows 音色（{why}）"
+                fallback = 'Windows 音色' if sys.platform == 'win32' else '配置的本地语音命令'
+                self.last_error = f"在线音色没接上，这一句用的{fallback}（{why}）"
 
     # 不做更多清理：server 退出走 `os._exit(0)`，线程是 daemon，
     # 本来就不会被 orderly shutdown 照顾到。要管的只有子进程，见 stop()。
@@ -477,6 +507,9 @@ def list_edge_voices() -> tuple[list[dict], str]:
 
 def _list_voices() -> int:
     """列这台机器上 SAPI 实际装了什么 —— 配置里的音色名该照着这里写。"""
+    if sys.platform != 'win32':
+        print('SAPI voice listing is Windows-only; configure a Linux TTS command explicitly.')
+        return 1
     ps = ("Add-Type -AssemblyName System.Speech; "
           "(New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() "
           "| ForEach-Object { $i = $_.VoiceInfo; "

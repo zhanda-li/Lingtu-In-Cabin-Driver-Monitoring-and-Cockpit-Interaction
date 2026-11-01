@@ -1,0 +1,235 @@
+{
+  "host": "Windows-10-10.0.26200-SP0",
+  "python": "3.10.21 | packaged by Anaconda, Inc. | (main, Aug 27 2026, 14:35:39) [MSC v.1942 64 bit (AMD64)]",
+  "packages": {
+    "mediapipe": {
+      "version": "1.0.1",
+      "requires_python": null,
+      "requires_dist": [
+        "absl-py~=2.3",
+        "certifi",
+        "numpy",
+        "sounddevice~=0.5",
+        "flatbuffers~=25.9",
+        "opencv-contrib-python",
+        "matplotlib"
+      ]
+    },
+    "torch": {
+      "version": "2.14.0",
+      "requires_python": ">=3.10",
+      "requires_dist": [
+        "filelock",
+        "typing-extensions>=4.10.0",
+        "setuptools>=77.0.3",
+        "sympy>=1.13.3",
+        "networkx>=2.5.1",
+        "jinja2",
+        "fsspec>=0.8.5",
+        "cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == \"Linux\"",
+        "cuda-bindings<14,>=13.0.3; platform_system == \"Linux\" and python_version < \"3.15\"",
+        "nvidia-cudnn-cu13==9.24.0.43; platform_system == \"Linux\"",
+        "nvidia-cusparselt-cu13==0.8.1; platform_system == \"Linux\"",
+        "nvidia-nccl-cu13==2.30.7; platform_system == \"Linux\"",
+        "nvidia-nvshmem-cu13==3.4.5; platform_system == \"Linux\"",
+        "triton~=3.8.0; platform_system == \"Linux\" and python_version < \"3.15\"",
+        "optree>=0.13.0; extra == \"optree\"",
+        "opt-einsum>=3.3; extra == \"opt-einsum\"",
+        "pyyaml; extra == \"pyyaml\""
+      ]
+    },
+    "onnxruntime": {
+      "version": "1.23.2",
+      "requires_python": ">=3.10",
+      "requires_dist": [
+        "coloredlogs",
+        "flatbuffers",
+        "numpy>=1.21.6",
+        "packaging",
+        "protobuf",
+        "sympy"
+      ]
+    },
+    "opencv-contrib-python": {
+      "version": "5.0.0.93",
+      "requires_python": ">=3.6",
+      "requires_dist": [
+        "numpy<2.0; python_version < \"3.9\"",
+        "numpy>=2; python_version >= \"3.9\""
+      ]
+    },
+    "numpy": {
+      "version": "2.2.6",
+      "requires_python": ">=3.10",
+      "requires_dist": []
+    },
+    "aiohttp": {
+      "version": "3.14.3",
+      "requires_python": ">=3.10",
+      "requires_dist": [
+        "aiohappyeyeballs>=2.5.0",
+        "aiosignal>=1.4.0",
+        "async-timeout<6.0,>=4.0; python_version < \"3.11\"",
+        "attrs>=17.3.0",
+        "frozenlist>=1.1.1",
+        "multidict<7.0,>=4.5",
+        "propcache>=0.2.0",
+        "typing_extensions>=4.4; python_version < \"3.13\"",
+        "yarl<2.0,>=1.17.0",
+        "aiodns>=3.3.0; (sys_platform != \"android\" and sys_platform != \"ios\") and extra == \"speedups\"",
+        "Brotli>=1.2; (platform_python_implementation == \"CPython\" and sys_platform != \"android\" and sys_platform != \"ios\") and extra == \"speedups\"",
+        "brotlicffi>=1.2; platform_python_implementation != \"CPython\" and extra == \"speedups\"",
+        "backports.zstd; (platform_python_implementation == \"CPython\" and python_version < \"3.14\" and sys_platform != \"android\" and sys_platform != \"ios\") and extra == \"speedups\""
+      ]
+    },
+    "sherpa-onnx": {
+      "version": "1.13.8",
+      "requires_python": ">=3.7",
+      "requires_dist": [
+        "sherpa-onnx-core==1.13.8"
+      ]
+    },
+    "sherpa-onnx-core": {
+      "version": "1.13.8",
+      "requires_python": null,
+      "requires_dist": []
+    },
+    "scipy": {
+      "version": "1.15.3",
+      "requires_python": ">=3.10",
+      "requires_dist": [
+        "numpy<2.5,>=1.23.5",
+        "pytest; extra == \"test\"",
+        "pytest-cov; extra == \"test\"",
+        "pytest-timeout; extra == \"test\"",
+        "pytest-xdist; extra == \"test\"",
+        "asv; extra == \"test\"",
+        "mpmath; extra == \"test\"",
+        "gmpy2; extra == \"test\"",
+        "threadpoolctl; extra == \"test\"",
+        "scikit-umfpack; extra == \"test\"",
+        "pooch; extra == \"test\"",
+        "hypothesis>=6.30; extra == \"test\"",
+        "array-api-strict<2.1.1,>=2.0; extra == \"test\"",
+        "Cython; extra == \"test\"",
+        "meson; extra == \"test\"",
+        "ninja; sys_platform != \"emscripten\" and extra == \"test\"",
+        "sphinx<8.0.0,>=5.0.0; extra == \"doc\"",
+        "intersphinx_registry; extra == \"doc\"",
+        "pydata-sphinx-theme>=0.15.2; extra == \"doc\"",
+        "sphinx-copybutton; extra == \"doc\"",
+        "sphinx-design>=0.4.0; extra == \"doc\"",
+        "matplotlib>=3.5; extra == \"doc\"",
+        "numpydoc; extra == \"doc\"",
+        "jupytext; extra == \"doc\"",
+        "myst-nb; extra == \"doc\"",
+        "pooch; extra == \"doc\"",
+        "jupyterlite-sphinx>=0.19.1; extra == \"doc\"",
+        "jupyterlite-pyodide-kernel; extra == \"doc\"",
+        "mypy==1.10.0; extra == \"dev\"",
+        "typing_extensions; extra == \"dev\"",
+        "types-psutil; extra == \"dev\"",
+        "pycodestyle; extra == \"dev\"",
+        "ruff>=0.0.292; extra == \"dev\"",
+        "cython-lint>=0.12.2; extra == \"dev\"",
+        "rich-click; extra == \"dev\"",
+        "doit>=0.36.0; extra == \"dev\"",
+        "pydevtool; extra == \"dev\""
+      ]
+    },
+    "sounddevice": {
+      "version": "0.5.6",
+      "requires_python": ">=3.7",
+      "requires_dist": [
+        "cffi",
+        "numpy; extra == \"numpy\""
+      ]
+    },
+    "matplotlib": {
+      "version": "3.10.9",
+      "requires_python": ">=3.10",
+      "requires_dist": [
+        "contourpy>=1.0.1",
+        "cycler>=0.10",
+        "fonttools>=4.22.0",
+        "kiwisolver>=1.3.1",
+        "numpy>=1.23",
+        "packaging>=20.0",
+        "pillow>=8",
+        "pyparsing>=3",
+        "python-dateutil>=2.7",
+        "meson-python<0.17.0,>=0.13.1; extra == \"dev\"",
+        "pybind11!=2.13.3,>=2.13.2; extra == \"dev\"",
+        "setuptools_scm<10,>=7; extra == \"dev\"",
+        "setuptools>=64; extra == \"dev\""
+      ]
+    },
+    "Pillow": {
+      "version": "12.3.0",
+      "requires_python": ">=3.10",
+      "requires_dist": [
+        "furo; extra == \"docs\"",
+        "olefile; extra == \"docs\"",
+        "sphinx>=8.2; extra == \"docs\"",
+        "sphinx-autobuild; extra == \"docs\"",
+        "sphinx-copybutton; extra == \"docs\"",
+        "sphinx-inline-tabs; extra == \"docs\"",
+        "sphinxext-opengraph; extra == \"docs\"",
+        "olefile; extra == \"fpx\"",
+        "olefile; extra == \"mic\"",
+        "arro3-compute; extra == \"test-arrow\"",
+        "arro3-core; extra == \"test-arrow\"",
+        "nanoarrow; extra == \"test-arrow\"",
+        "pyarrow; extra == \"test-arrow\"",
+        "coverage>=7.4.2; extra == \"tests\"",
+        "defusedxml; extra == \"tests\"",
+        "markdown2; extra == \"tests\"",
+        "olefile; extra == \"tests\"",
+        "packaging; extra == \"tests\"",
+        "pytest; extra == \"tests\"",
+        "pytest-cov; extra == \"tests\"",
+        "pytest-timeout; extra == \"tests\"",
+        "pytest-xdist; extra == \"tests\"",
+        "setuptools; extra == \"tests\"",
+        "trove-classifiers>=2024.10.12; extra == \"tests\"",
+        "defusedxml; extra == \"xmp\""
+      ]
+    },
+    "edge-tts": {
+      "version": "7.3.1",
+      "requires_python": ">=3.7",
+      "requires_dist": [
+        "aiohttp<4.0.0,>=3.8.0",
+        "certifi>=2023.11.17",
+        "tabulate<1.0.0,>=0.4.4",
+        "typing-extensions<5.0.0,>=4.1.0",
+        "black; extra == \"dev\"",
+        "isort; extra == \"dev\"",
+        "mypy; extra == \"dev\"",
+        "pylint; extra == \"dev\"",
+        "types-tabulate; extra == \"dev\""
+      ]
+    },
+    "certifi": {
+      "version": "2026.7.22",
+      "requires_python": ">=3.7",
+      "requires_dist": []
+    },
+    "pyserial": {
+      "version": "3.5",
+      "requires_python": null,
+      "requires_dist": [
+        "hidapi; extra == 'cp2110'"
+      ]
+    }
+  },
+  "target_install_tested": false,
+  "unresolved": [
+    "ARM64 wheel availability and full transitive graph",
+    "CPU torch wheel metadata (not default PyPI CUDA dependencies)",
+    "sherpa-onnx-core matching ARM64 wheel",
+    "PortAudio, ALSA/Pulse/PipeWire device availability",
+    "OpenCV shared libraries, V4L2, CPU instruction compatibility",
+    "Optional Whisper/numba/llvmlite not included in runtime draft"
+  ]
+}
