@@ -1,0 +1,246 @@
+{
+  "schema": 1,
+  "passed": true,
+  "results": {
+    "eye": {
+      "passed": true,
+      "tolerance": {
+        "atol": 1e-05,
+        "rtol": 0.0001
+      },
+      "arrays": {
+        "probabilities": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 4,
+          "missing_values": 0
+        },
+        "roi_probabilities": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 2,
+          "missing_values": 0
+        },
+        "preprocessed": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 301056,
+          "missing_values": 0
+        },
+        "top1_agreement": {
+          "passed": true
+        }
+      },
+      "reference_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      },
+      "candidate_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      }
+    },
+    "face": {
+      "passed": true,
+      "tolerance": {
+        "atol": 0.0001,
+        "rtol": 0.0001
+      },
+      "arrays": {
+        "valid": {
+          "passed": true,
+          "exact": true
+        },
+        "geometry": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 225,
+          "missing_values": 0
+        },
+        "points": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 1980,
+          "missing_values": 0
+        },
+        "point_ids": {
+          "passed": true,
+          "exact": true
+        }
+      },
+      "reference_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      },
+      "candidate_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      }
+    },
+    "mouth": {
+      "passed": true,
+      "tolerance": {
+        "atol": 1e-05,
+        "rtol": 0.0001
+      },
+      "arrays": {
+        "probabilities": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 2,
+          "missing_values": 0
+        },
+        "roi_probabilities": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 1,
+          "missing_values": 0
+        },
+        "preprocessed": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 150528,
+          "missing_values": 0
+        },
+        "top1_agreement": {
+          "passed": true
+        }
+      },
+      "reference_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      },
+      "candidate_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      }
+    },
+    "pose": {
+      "passed": true,
+      "tolerance": {
+        "atol": 1e-05,
+        "rtol": 0.0001
+      },
+      "arrays": {
+        "valid": {
+          "passed": true,
+          "exact": true
+        },
+        "landmarks": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 5940,
+          "missing_values": 0
+        }
+      },
+      "reference_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      },
+      "candidate_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      }
+    },
+    "transformer": {
+      "passed": true,
+      "tolerance": {
+        "atol": 1e-05,
+        "rtol": 0.0001
+      },
+      "arrays": {
+        "logits": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 2,
+          "missing_values": 0
+        },
+        "probabilities": {
+          "passed": true,
+          "max_abs": 0.0,
+          "mean_abs": 0.0,
+          "max_relative": 0.0,
+          "finite_values": 2,
+          "missing_values": 0
+        },
+        "top1_agreement": {
+          "passed": true
+        }
+      },
+      "reference_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      },
+      "candidate_packages": {
+        "mediapipe": "1.0.1",
+        "torch": "2.14.0",
+        "onnxruntime": "1.23.2",
+        "numpy": "2.2.6",
+        "Pillow": "12.3.0",
+        "opencv-contrib-python": "5.0.0.93"
+      }
+    }
+  },
+  "board_validation": "待板端验证",
+  "limits": [
+    "Engineering numerical tolerances only; not calibrated fatigue decision thresholds",
+    "Matching values do not establish detection accuracy, sensitivity or clinical performance",
+    "A PC self-comparison is only a harness check, never ARM64 parity"
+  ]
+}

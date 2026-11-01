@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "baseline_commit": "8776bb9",
+  "board_validation": "待板端验证",
+  "pc_tests": {
+    "count": 67,
+    "passed": true
+  },
+  "target_metadata": {
+    "311": {
+      "packages": 48,
+      "passed": true,
+      "errors": 0,
+      "wheel_bodies_downloaded": false
+    },
+    "312": {
+      "packages": 48,
+      "passed": true,
+      "errors": 0,
+      "wheel_bodies_downloaded": false
+    }
+  },
+  "pc_repeat_parity_passed": true,
+  "production_files_unchanged": true,
+  "full_294_video_regression_rerun_this_stage": false,
+  "linux_or_board_executed": false
+}

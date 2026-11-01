@@ -1,0 +1,7 @@
+{
+  "pose": {"atol": 0.00001, "rtol": 0.0001},
+  "face": {"atol": 0.0001, "rtol": 0.0001},
+  "transformer": {"atol": 0.00001, "rtol": 0.0001},
+  "eye": {"atol": 0.00001, "rtol": 0.0001},
+  "mouth": {"atol": 0.00001, "rtol": 0.0001}
+}
