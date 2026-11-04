@@ -1,0 +1,21 @@
+PC execution 2026-11-04, Asia/Shanghai
+
+=== unittest discovery: actual captured output ===
+....................Executing <Task pending name='Task-1' coro=<IsolatedAsyncioTestCase._asyncioLoopRunner() running at D:\Anaconda3\envs\dms\lib\unittest\async_case.py:95> wait_for=<Future pending cb=[Task.task_wakeup()] created at D:\Anaconda3\envs\dms\lib\asyncio\base_events.py:429> created at D:\Anaconda3\envs\dms\lib\unittest\async_case.py:117> took 0.563 seconds
+....................[TTS] AudioError: Linux audio is not configured: set DMS_AUDIO_PLAYER (file playback) or DMS_TTS_COMMAND (text synthesis/playback)
+................Executing <Task pending name='Task-13' coro=<IsolatedAsyncioTestCase._asyncioLoopRunner() running at D:\Anaconda3\envs\dms\lib\unittest\async_case.py:95> wait_for=<Future pending cb=[Task.task_wakeup()] created at D:\Anaconda3\envs\dms\lib\asyncio\base_events.py:429> created at D:\Anaconda3\envs\dms\lib\unittest\async_case.py:117> took 0.171 seconds
+....................
+----------------------------------------------------------------------
+Ran 76 tests in 18.742s
+
+OK
+[voice] 丢掉一条上一轮的 voice_spoken：round=2 当前 round=3
+[voice] 回复未播放：'muted'
+
+=== existing video regression: actual captured output ===
+normal True 167
+fatigue True 127
+
+=== Node checks: summary of actual tool output ===
+node tools/test_ui_voice.js: six PASS groups
+node tools/test_nav_flow.js: PASS stale responses, cancellation, loading ownership, route binding, real duration comparisons

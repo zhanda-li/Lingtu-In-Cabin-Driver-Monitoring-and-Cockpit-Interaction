@@ -1,3 +1,5 @@
+> 最新显示与运行状态见[部署状态](DEPLOYMENT_STATUS.md)：RK3568已完成X11逻辑1280×800、Goodix触摸确认及重启自动横屏验证。当前工作副本增加camera_runtime速率/结果年龄诊断；下文的原PC截图与结构检查维持其阶段范围。
+
 # Incremental monitoring UI extension
 
 The original product's theme, backgrounds, gradients, type scale, card styling,

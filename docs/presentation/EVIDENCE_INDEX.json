@@ -1,0 +1,131 @@
+{
+  "as_of": "2026-11-04",
+  "latest_board_observation": "2026-11-02",
+  "note": "Local-only raw records are retained on the project PC, not publicly bundled. Hashes identify the reviewed evidence; they are not independent certification.",
+  "sources": [
+    {
+      "path": "docs/ARM64_SOFTWARE_PREFLIGHT.md",
+      "bytes": 15292,
+      "sha256": "10eda1363a4ef81728d776de50fbbae6421ae5d3fe830af1036c7a3a2e6ad636",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/PC_LINUX_COMPATIBILITY.md",
+      "bytes": 11220,
+      "sha256": "7e5a83acc48b389e04c032e4d6e657b511daf4b9c7ae60e193f372423ec3c385",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/validation/arm64_preflight_report.md",
+      "bytes": 4676,
+      "sha256": "ad471c2d154cb0ba62cb035da43308ad50dd78f6693e6666fc2fe6356f137577",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/validation/pc_linux_compat_report.md",
+      "bytes": 4791,
+      "sha256": "696a4324b7eaacdc9170595b616545c653c063133d548458849b4f394853060d",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/validation/fusion_v2_report.json",
+      "bytes": 1601,
+      "sha256": "7d225d42b4bc5ee03045e9275701d9dc20fabe75b7cacebc84ea7b1dc8b8cb82",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/validation/legacy_regression.json",
+      "bytes": 1396,
+      "sha256": "51b5f71ad9d2ea37eef35b3bda2ca03ff343753273f2ff1cb4178aa8cc38c998",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/yolo_mrl_labelled_eval.json",
+      "bytes": 67101,
+      "sha256": "3f120a3d3db9ca9c715f1ab9508b746313dcd8372c659ec440826a683bd7a388",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/yolo_onnx_parity.json",
+      "bytes": 905,
+      "sha256": "25f20bdf66daa161fce86e9806cdc93fab5bf6d5db2734ab7f58bceba8192d38",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/yolo_shadow_cpu.json",
+      "bytes": 6818,
+      "sha256": "1df7979b2d27e9e11bff18df09231d8915a43dfb3456b925a52b7e6e84ffcd9b",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/performance/RK3568_COMBINED_OPTIMIZATION_REPORT.md",
+      "bytes": 11391,
+      "sha256": "aa7a99344008302d69d26b974b82b48bbe8defa6f1957270102b496e6568b39d",
+      "distribution": "local_only"
+    },
+    {
+      "path": "docs/performance/combined_pc/unit_final.txt",
+      "bytes": 771,
+      "sha256": "de725b505135b74e73826b3972a6855f68383ae88902120688794bc163f51614",
+      "distribution": "local_only"
+    },
+    {
+      "path": "docs/performance/combined_pc/legacy_regression.json",
+      "bytes": 1396,
+      "sha256": "51b5f71ad9d2ea37eef35b3bda2ca03ff343753273f2ff1cb4178aa8cc38c998",
+      "distribution": "local_only"
+    },
+    {
+      "path": "docs/performance/combined_board/combined_after_async.json",
+      "bytes": 360124,
+      "sha256": "6b805e0e7b8d8776bc1450e410639f9cd6a093025ed52dd08a9f067f010d58d8",
+      "distribution": "local_only"
+    },
+    {
+      "path": "docs/performance/combined_board/reboot_after.txt",
+      "bytes": 3067,
+      "sha256": "ca626ce6bbae66ee7c7d4817b72a333bb136d5df967a0eee17dc266fd6207785",
+      "distribution": "local_only"
+    },
+    {
+      "path": "docs/hardware/k1mini_ubuntu_deployment/ubuntu_running_20261102_135938/summary.md",
+      "bytes": 3082,
+      "sha256": "a8657bf29db3b3738c20a2900696f0f9a41ce5f86f0e784472a0e9b9ce78607b",
+      "distribution": "local_only"
+    },
+    {
+      "path": "docs/hardware/k1mini_ubuntu_deployment/dms_install_20261102_140748/DMS_RUNTIME_REPORT.md",
+      "bytes": 7005,
+      "sha256": "15e1fa08abd547e6eb0acea1d691ff694b9688bf268491df952ec91ae559362e",
+      "distribution": "local_only"
+    },
+    {
+      "path": "docs/validation/ui/v2_1280.png",
+      "bytes": 376893,
+      "sha256": "a66fbe94bd657d1a9d023325e5de0d14f11a7b1797e85c02ef85bac0c5e81b59",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/validation/ui/before_1280.png",
+      "bytes": 420632,
+      "sha256": "9d8e3a37329d4a3b3faa2a54907ba9605a27858e8a950c05ec93bd027871b5df",
+      "distribution": "repository"
+    },
+    {
+      "path": "docs/validation/documentation_tests.txt",
+      "bytes": 1541,
+      "sha256": "1700ef646a1e21084cbfafd109d461b53aac070696681c9a3289549b1eaf903f",
+      "distribution": "repository"
+    }
+  ],
+  "assets": [
+    {
+      "path": "docs/presentation/assets/fusion_v2_pc.png",
+      "sha256": "a66fbe94bd657d1a9d023325e5de0d14f11a7b1797e85c02ef85bac0c5e81b59"
+    },
+    {
+      "path": "docs/presentation/assets/monitor_original_pc.png",
+      "sha256": "9d8e3a37329d4a3b3faa2a54907ba9605a27858e8a950c05ec93bd027871b5df"
+    }
+  ]
+}

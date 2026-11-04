@@ -1,3 +1,5 @@
+> 当前状态索引（2026-11-04）：Windows UI启动器默认V2，库/API未配置时默认Legacy；Linux启动器默认Legacy。V2已在RK3568运行，但实时证据有效性与整机性能仍按[部署状态](DEPLOYMENT_STATUS.md)分项验收。下文保留PC规则实现与原验证阶段的技术范围。
+
 # Fusion V2 · PC experimental evidence fusion
 
 ## Architecture and preservation
@@ -65,7 +67,7 @@ The new combinations and the use of window duration as severe persistence are
 engineering policy, not empirically optimal or physiologically calibrated limits.
 Named overrides are possible through `config.FUSION_V2_POLICY`. After a policy or
 engine edit, regenerate the validation report: switching checks both source hash
-and the complete policy against that report. Default remains Legacy.
+and the complete policy against that report. Library/API defaults remain Legacy; the Windows UI launchers explicitly select V2.
 
 ## Missing data, fallback, and explanations
 
@@ -100,7 +102,7 @@ $env:FUSION_MODE='legacy'
 & $py ui/server.py --source cam
 ```
 
-Legacy is the default even with YOLO enabled. To explicitly allow V2 after the
+For the library/API, Legacy is the default even with YOLO enabled; Windows UI launchers explicitly set V2. To explicitly allow V2 after the
 matching basic report exists, restart with `DMS_FUSION_V2_ALLOWED=1`. The monitoring
 detail page then displays a backend-confirmed mode selector. For startup selection
 also set `FUSION_MODE=v2`. A missing/mismatched/failed report rejects V2 selection.

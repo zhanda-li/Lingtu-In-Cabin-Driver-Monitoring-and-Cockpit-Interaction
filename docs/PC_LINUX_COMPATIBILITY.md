@@ -1,6 +1,8 @@
+> 阶段更新（2026-11-04）：本页保留原PC兼容层设计与草案范围；RK3568已完成Ubuntu启动、V4L2实拍、五模型独立推理和横屏触摸。当前状态及仍需验收的音频/重连/性能见[部署状态](DEPLOYMENT_STATUS.md)。
+
 # PC端跨平台兼容改造与ARM64移植草案
 
-日期：2026-11-01。PC参考分支`feat/yolo-face-shadow`，基线提交`44d3751`。本轮只改采集、音频、启动及依赖准备代码；未连接RK3568、未下载固件或访问存储设备。Ubuntu/Debian候选的硬件兼容门槛仍见[K1-MINI原调查](K1_MINI_V22_IMAGE_AUDIT.md)。
+日期：2026-11-01。PC参考分支`feat/yolo-face-shadow`，基线提交`44d3751`。本轮只改采集、音频、启动及依赖准备代码；未连接RK3568、未下载固件或访问存储设备。Ubuntu/Debian候选的硬件兼容门槛仍见[当前K1-MINI部署状态](DEPLOYMENT_STATUS.md)。
 
 ## 设计边界
 

@@ -1,0 +1,624 @@
+{
+  "date": "2026-11-04",
+  "checked_markdown": [
+    "README.md",
+    "docs/SYSTEM_ARCHITECTURE.md",
+    "docs/ALGORITHM_ARCHITECTURE.md",
+    "docs/DEPLOYMENT_STATUS.md",
+    "docs/presentation/PPT_HANDOFF.md",
+    "docs/presentation/PROJECT_OVERVIEW.md",
+    "docs/presentation/ALGORITHM_HIGHLIGHTS.md",
+    "docs/presentation/SYSTEM_ARCHITECTURE.md",
+    "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+    "docs/presentation/assets/README.md",
+    "docs/presentation/PPT_ASSET_INDEX.md",
+    "docs/validation/INDEX.md",
+    "docs/FUSION_V2.md",
+    "docs/UI_V2.md",
+    "docs/ARM64_SOFTWARE_PREFLIGHT.md",
+    "docs/PC_LINUX_COMPATIBILITY.md",
+    "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md"
+  ],
+  "local_links": 115,
+  "links": [
+    {
+      "source": "README.md",
+      "target": "docs/presentation/PPT_HANDOFF.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/SYSTEM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/ALGORITHM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/validation/INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/ALGORITHM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/FUSION_V2.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/presentation/assets/fusion_v2_pc.png",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/UI_V2.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/VOICE_INTERACTION.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/VOICE_PROFILE.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/NAVIGATION_FLOW.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/presentation/PPT_ASSET_INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/PC_LINUX_COMPATIBILITY.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/YOLO_SHADOW.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "README_LEGACY.md",
+      "fragment": ""
+    },
+    {
+      "source": "README.md",
+      "target": "docs/presentation/PPT_ASSET_INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/SYSTEM_ARCHITECTURE.md",
+      "target": "docs/ALGORITHM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/SYSTEM_ARCHITECTURE.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/SYSTEM_ARCHITECTURE.md",
+      "target": "docs/presentation/SYSTEM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/ALGORITHM_ARCHITECTURE.md",
+      "target": "docs/YOLO_SHADOW.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/ALGORITHM_ARCHITECTURE.md",
+      "target": "docs/FUSION_V2.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/ALGORITHM_ARCHITECTURE.md",
+      "target": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/ALGORITHM_ARCHITECTURE.md",
+      "target": "docs/validation/INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/ALGORITHM_ARCHITECTURE.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/DEPLOYMENT_STATUS.md",
+      "target": "docs/ARM64_SOFTWARE_PREFLIGHT.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/DEPLOYMENT_STATUS.md",
+      "target": "constraints-arm64-py312.txt",
+      "fragment": ""
+    },
+    {
+      "source": "docs/DEPLOYMENT_STATUS.md",
+      "target": "requirements-arm64.txt",
+      "fragment": ""
+    },
+    {
+      "source": "docs/DEPLOYMENT_STATUS.md",
+      "target": "docs/presentation/EVIDENCE_INDEX.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/DEPLOYMENT_STATUS.md",
+      "target": "docs/validation/INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_HANDOFF.md",
+      "target": "docs/presentation/SYSTEM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_HANDOFF.md",
+      "target": "docs/presentation/PPT_ASSET_INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_HANDOFF.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_HANDOFF.md",
+      "target": "docs/presentation/PROJECT_OVERVIEW.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_HANDOFF.md",
+      "target": "docs/presentation/ALGORITHM_HIGHLIGHTS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_HANDOFF.md",
+      "target": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PROJECT_OVERVIEW.md",
+      "target": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PROJECT_OVERVIEW.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/ALGORITHM_HIGHLIGHTS.md",
+      "target": "docs/ALGORITHM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/ALGORITHM_HIGHLIGHTS.md",
+      "target": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/SYSTEM_ARCHITECTURE.md",
+      "target": "docs/SYSTEM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/SYSTEM_ARCHITECTURE.md",
+      "target": "docs/presentation/PPT_ASSET_INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/validation/legacy_regression.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/validation/arm64_preflight_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/presentation/EVIDENCE_INDEX.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/yolo_mrl_labelled_eval.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/yolo_onnx_parity.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/yolo_shadow_cpu.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/validation/fusion_v2_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/validation/fusion_desktop_resources.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "target": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/assets/README.md",
+      "target": "docs/presentation/PPT_ASSET_INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_ASSET_INDEX.md",
+      "target": "docs/presentation/assets/fusion_v2_pc.png",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_ASSET_INDEX.md",
+      "target": "docs/presentation/assets/monitor_original_pc.png",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_ASSET_INDEX.md",
+      "target": "ui/web/assets/xiaorui_hero.png",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_ASSET_INDEX.md",
+      "target": "docs/presentation/SYSTEM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_ASSET_INDEX.md",
+      "target": "docs/SYSTEM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_ASSET_INDEX.md",
+      "target": "docs/yolo_mrl_labelled_eval.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_ASSET_INDEX.md",
+      "target": "docs/validation/fusion_v2_yawdd.csv",
+      "fragment": ""
+    },
+    {
+      "source": "docs/presentation/PPT_ASSET_INDEX.md",
+      "target": "docs/presentation/EVIDENCE_INDEX.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/legacy_regression.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/yolo_desktop_acceptance.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/yolo_mrl_labelled_eval.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/yolo_onnx_parity.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/fusion_v2_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/fusion_v2_report.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/fusion_v2_yawdd.csv",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/UI_V2.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/ui_structure.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/fusion_websocket.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/pc_linux_compat_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/arm64_preflight_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/arm64_metadata_py312.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/arm64_metadata_py311.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/voice_interaction_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/validation/navigation_flow_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/presentation/EVIDENCE_INDEX.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/validation/INDEX.md",
+      "target": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/FUSION_V2.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/FUSION_V2.md",
+      "target": "docs/validation/fusion_v2_files.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/FUSION_V2.md",
+      "target": "docs/validation/fusion_v2_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/FUSION_V2.md",
+      "target": "docs/UI_V2.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/UI_V2.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/UI_V2.md",
+      "target": "docs/validation/ui_structure.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/UI_V2.md",
+      "target": "docs/validation/fusion_websocket.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/UI_V2.md",
+      "target": "docs/FUSION_V2.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/ARM64_SOFTWARE_PREFLIGHT.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/ARM64_SOFTWARE_PREFLIGHT.md",
+      "target": "docs/validation/arm64_preflight_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PC_LINUX_COMPATIBILITY.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PC_LINUX_COMPATIBILITY.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PC_LINUX_COMPATIBILITY.md",
+      "target": "docs/validation/pc_linux_compat_report.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "README.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/SYSTEM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/ALGORITHM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/validation/INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/presentation/PPT_HANDOFF.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/presentation/PROJECT_OVERVIEW.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/presentation/ALGORITHM_HIGHLIGHTS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/presentation/SYSTEM_ARCHITECTURE.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/presentation/DEMO_AND_EXPERIMENTS.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/presentation/PPT_ASSET_INDEX.md",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/presentation/EVIDENCE_INDEX.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/validation/documentation_tests.txt",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/validation/documentation_links.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/validation/documentation_external_links.json",
+      "fragment": ""
+    },
+    {
+      "source": "docs/PROJECT_DOCUMENTATION_UPDATE_REPORT.md",
+      "target": "docs/DEPLOYMENT_STATUS.md",
+      "fragment": ""
+    }
+  ],
+  "external_urls": [
+    "https://download.pytorch.org/whl/cpu/torch/",
+    "https://pypi.org/project/mediapipe/1.0.1/#files",
+    "https://pypi.org/project/aiohttp/3.14.3/#files",
+    "https://github.com/Adkid-Zephyr/anti-defensive-writing-Skill/blob/main/skills/anti-defensive-writing/SKILL.md",
+    "https://pypi.org/project/opencv-contrib-python/5.0.0.93/#files",
+    "https://pypi.org/project/sherpa-onnx-core/1.13.8/#files",
+    "https://pypi.org/project/onnxruntime/1.23.2/#files"
+  ],
+  "external_check_scope": "Writing principle and user-selected repository checked via browser; historical vendor/data URLs not comprehensively revalidated.",
+  "archive_scope": "README_LEGACY.md is a preserved historical snapshot, excluded from current-entry link acceptance.",
+  "protected_preexisting_files": [
+    "hr/README.md",
+    "hr/firmware/README.md",
+    "hr/firmware/src/max30102.h",
+    "tools/record.py",
+    "ui/cam.py",
+    "ui/server.py",
+    "ui/web/detail.html",
+    "ui/web/fusion-v2.js"
+  ],
+  "protected_patches_unchanged": true,
+  "issues": [],
+  "passed": true
+}
