@@ -56,3 +56,16 @@ PC和板端结果分别标注；现有67/76项、294×19、512组合、MRL、ONN
 ## 后续工程验收
 
 先处理散热与连接条件，再验证摄像头完整重连、原YOLO同步选项、MediaPipe字段级数值差异、三模式完整启动/释放、长时CPU/内存/温度、板端收音/播报及其他硬件。无重训、无规则阈值更改、无UI重做、无固件操作。详见[当前工程状态](DEPLOYMENT_STATUS.md)。
+
+## GitHub实际同步记录
+
+- 发布仓库：`https://github.com/zhanda-li/Lingtu-In-Cabin-Driver-Monitoring-and-Cockpit-Interaction.git`。
+- 分支：`feat/yolo-face-shadow`；原origin未改，main保持`75878d2f945536cb4742b2d3dac599b4ffcd05aa`。
+- 文档主提交：`74c075f9fec93c09c2104c201f3eb30512fc1175`，24个文件；仅文档、验证文本/JSON与两张既有公开截图。
+- 正常推送实际返回：`c0619f3..74c075f HEAD -> feat/yolo-face-shadow`。
+- 随后`ls-remote --heads`回读功能分支准确为上述完整SHA，main与推送前一致。
+- 本节以补充记录提交同步；最终记录提交号可由功能分支最新git log取得。没有强推、合并main、重置或清理工作区。
+- 暂存清单核对24/24，未纳入私有config或模型；凭证模式检查无命中；原8个已有非本轮tracked补丁逐字节一致。
+- 本地链接最终115处通过，外链7项HTTP200；归档README不参与当前入口链接验收。验证原始输出与SHA索引均随资料发布。
+
+回退本次文档时先保存后续修改，通过`git revert`按反向顺序撤销资料记录提交和`74c075f`；该操作保留历史，不采用reset/clean。之前10个已有功能提交不属于本轮文档回退范围。

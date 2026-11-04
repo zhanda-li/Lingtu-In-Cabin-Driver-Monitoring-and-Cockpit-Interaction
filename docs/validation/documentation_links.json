@@ -599,12 +599,12 @@
   ],
   "external_urls": [
     "https://download.pytorch.org/whl/cpu/torch/",
-    "https://pypi.org/project/mediapipe/1.0.1/#files",
-    "https://pypi.org/project/aiohttp/3.14.3/#files",
     "https://github.com/Adkid-Zephyr/anti-defensive-writing-Skill/blob/main/skills/anti-defensive-writing/SKILL.md",
+    "https://pypi.org/project/aiohttp/3.14.3/#files",
+    "https://pypi.org/project/mediapipe/1.0.1/#files",
+    "https://pypi.org/project/onnxruntime/1.23.2/#files",
     "https://pypi.org/project/opencv-contrib-python/5.0.0.93/#files",
-    "https://pypi.org/project/sherpa-onnx-core/1.13.8/#files",
-    "https://pypi.org/project/onnxruntime/1.23.2/#files"
+    "https://pypi.org/project/sherpa-onnx-core/1.13.8/#files"
   ],
   "external_check_scope": "Writing principle and user-selected repository checked via browser; historical vendor/data URLs not comprehensively revalidated.",
   "archive_scope": "README_LEGACY.md is a preserved historical snapshot, excluded from current-entry link acceptance.",
